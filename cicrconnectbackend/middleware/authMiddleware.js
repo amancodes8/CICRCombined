@@ -22,8 +22,15 @@ const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'User not found' });
       }
 
+      const approval = String(req.user.approvalStatus || '').trim().toLowerCase();
+      const isApproved = req.user.isVerified || approval === 'approved';
+
+      if (approval === 'rejected') {
+        return res.status(403).json({ message: 'Your registration has been rejected. Contact admin.' });
+      }
+
       // SECONDARY SECURITY: Block routes if account is not admin-approved
-      if (!req.user.isVerified) {
+      if (!isApproved) {
         return res.status(403).json({ message: 'Your account is pending admin approval' });
       }
 

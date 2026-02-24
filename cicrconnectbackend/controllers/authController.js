@@ -48,11 +48,13 @@ const loginUser = async (req, res) => {
     return res.status(401).json({ message: 'Invalid credentials' });
   }
 
-  if (user.approvalStatus === 'Rejected') {
+  const approval = String(user.approvalStatus || '').trim().toLowerCase();
+
+  if (approval === 'rejected') {
     return res.status(403).json({ message: 'Your registration has been rejected. Contact admin.' });
   }
 
-  const isApproved = user.isVerified || user.approvalStatus === 'Approved';
+  const isApproved = user.isVerified || approval === 'approved';
   if (!isApproved) {
     return res.status(401).json({ message: 'Account pending admin approval' });
   }

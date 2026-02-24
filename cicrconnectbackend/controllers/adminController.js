@@ -144,6 +144,22 @@ exports.deleteUser = async (req, res) => {
 exports.updateUserByAdmin = async (req, res) => {
   try {
     const payload = { ...req.body };
+    const normalizeApprovalStatus = (value) => {
+      const v = String(value || '').trim().toLowerCase();
+      if (!v) return null;
+      if (v === 'approved') return 'Approved';
+      if (v === 'pending') return 'Pending';
+      if (v === 'rejected') return 'Rejected';
+      return null;
+    };
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'approvalStatus')) {
+      const normalized = normalizeApprovalStatus(payload.approvalStatus);
+      if (!normalized) {
+        return res.status(400).json({ success: false, message: 'Invalid approvalStatus value' });
+      }
+      payload.approvalStatus = normalized;
+    }
 
     if (Object.prototype.hasOwnProperty.call(payload, 'isVerified')) {
       payload.approvalStatus = payload.isVerified ? 'Approved' : 'Pending';
