@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: cicr-backend
+    env: node
+    rootDir: cicrconnectbackend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+
+  - type: web
+    name: cicr-frontend
+    env: static
+    rootDir: cicrfrontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
