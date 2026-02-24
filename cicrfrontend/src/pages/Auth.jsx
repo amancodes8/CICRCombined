@@ -121,7 +121,7 @@ export default function Auth() {
             <p className="text-gray-500 mt-3 text-sm font-medium tracking-wide uppercase">
               {isForgot
                 ? (otpSent ? 'Enter OTP and new password' : 'Get OTP on your email')
-                : (isLogin ? 'Welcome back to the hub' : 'Create your lab profile')}
+                : (isLogin ? 'Welcome to CICR' : 'Create your CICR profile')}
             </p>
           </header>
 
@@ -150,7 +150,7 @@ export default function Auth() {
                 >
                   <InputGroup icon={User} name="name" placeholder="Full Name" value={formData.name} onChange={handleChange} />
                   <InputGroup icon={Hash} name="collegeId" placeholder="College ID" value={formData.collegeId} onChange={handleChange} />
-                  <InputGroup icon={Ticket} name="inviteCode" placeholder="Access Code" value={formData.inviteCode} onChange={handleChange} />
+                  <InputGroup icon={Ticket} name="inviteCode" placeholder="Access Code*" value={formData.inviteCode} onChange={handleChange} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -210,9 +210,9 @@ export default function Auth() {
                 }
                 setError('');
               }}
-              className="text-xs font-black uppercase tracking-[0.2em] text-gray-600 hover:text-blue-500 transition-all"
+              className="text-lg mt-2 font-serif uppercase tracking-[0.2em] text-white hover:text-blue-500 transition-all"
             >
-              {isForgot ? 'Return to Sign In' : (isLogin ? 'Generate New Account' : 'Return to Sign In')}
+              {isForgot ? 'Return to Sign In' : (isLogin ? 'Join CICR' : 'Return to Sign In')}
             </button>
           </div>
         </div>

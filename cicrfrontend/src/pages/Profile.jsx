@@ -26,7 +26,8 @@ export default function Profile() {
     name: userData.name || '',
     phone: userData.phone || '',
     year: userData.year || '',
-    branch: userData.branch || '',
+    // UI displays in UPPERCASE
+    branch: (userData.branch || '').toUpperCase(),
     batch: userData.batch || '',
     joinedAt: dateToInput(userData.joinedAt),
     bio: userData.bio || '',
@@ -45,6 +46,8 @@ export default function Profile() {
     try {
       const payload = {
         ...formData,
+        // STORE and COMPARE in lowercase
+        branch: formData.branch.toLowerCase(),
         skills: formData.skillsText.split(',').map((v) => v.trim()).filter(Boolean),
         achievements: formData.achievementsText.split('\n').map((v) => v.trim()).filter(Boolean),
       };
@@ -53,15 +56,16 @@ export default function Profile() {
 
       const { data } = await updateProfile(payload);
       
-      // Update local storage so sidebar and app state refresh
       const normalized = { ...(profileData.result || profileData), ...data };
       localStorage.setItem('profile', JSON.stringify(normalized));
+      
       setFormData((prev) => ({
         ...prev,
         name: data.name || '',
         phone: data.phone || '',
         year: data.year || '',
-        branch: data.branch || '',
+        // Format for UI after save
+        branch: (data.branch || '').toUpperCase(),
         batch: data.batch || '',
         joinedAt: dateToInput(data.joinedAt),
         bio: data.bio || '',
@@ -92,7 +96,8 @@ export default function Profile() {
           name: data.name || '',
           phone: data.phone || '',
           year: data.year || '',
-          branch: data.branch || '',
+          // Ensure display is UPPERCASE on load
+          branch: (data.branch || '').toUpperCase(),
           batch: data.batch || '',
           joinedAt: dateToInput(data.joinedAt),
           bio: data.bio || '',
@@ -126,7 +131,6 @@ export default function Profile() {
         animate={{ opacity: 1, y: 0 }}
         className="bg-[#141417] border border-gray-800 rounded-[2.5rem] overflow-hidden shadow-2xl"
       >
-        {/* Profile Header Banner */}
         <div className="h-32 bg-gradient-to-r from-blue-600 to-purple-600 relative">
           <div className="absolute -bottom-12 left-10">
             <div className="w-24 h-24 rounded-3xl bg-[#0a0a0c] border-4 border-[#141417] flex items-center justify-center text-3xl font-black text-blue-500 shadow-xl">
@@ -270,11 +274,12 @@ export default function Profile() {
                   value={formData.year}
                   onChange={(e) => setFormData({...formData, year: e.target.value})}
                   className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                  placeholder="e.g. 3rd Year"
+                  placeholder="e.g. 3"
                 />
               </div>
             </div>
 
+            {/* BRANCH FIELD - AUTOMATIC UPPERCASE */}
             <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Branch</label>
               <div className="relative">
@@ -282,7 +287,7 @@ export default function Profile() {
                 <input 
                   disabled={!isEditing}
                   value={formData.branch}
-                  onChange={(e) => setFormData({...formData, branch: e.target.value})}
+                  onChange={(e) => setFormData({...formData, branch: e.target.value.toUpperCase()})}
                   className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
                   placeholder="e.g. CSE"
                 />
@@ -298,7 +303,7 @@ export default function Profile() {
                   value={formData.batch}
                   onChange={(e) => setFormData({...formData, batch: e.target.value})}
                   className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                  placeholder="e.g. 2022-2026"
+                  placeholder="e.g. E16, F5"
                 />
               </div>
             </div>
