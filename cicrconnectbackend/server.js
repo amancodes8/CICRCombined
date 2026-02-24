@@ -9,7 +9,7 @@ connectDB();
 const app = express();
 
 const allowedOrigins = new Set([
-    'https://cicrconnect.vercel.app/'
+    'https://cicrconnect.vercel.app'
 ]);
 
 if (process.env.FRONTEND_URL) {
