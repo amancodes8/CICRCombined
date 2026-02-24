@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchMembers, updateUserByAdmin, deleteUser, generateInvite, sendInviteEmail } from '../api';
+import { fetchMembers, updateUserByAdmin, deleteUser, generateInvite, sendInviteEmail, fetchPendingAdminActions, approveAdminAction } from '../api';
 import CicrAssistant from '../components/CicrAssistant';
 import { 
   Shield, Trash2, UserPlus, Copy, Check, 
@@ -15,9 +15,11 @@ export default function AdminPanel() {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [pendingActions, setPendingActions] = useState([]);
 
   useEffect(() => {
     loadUsers();
+    loadPendingActions();
   }, []);
 
   const loadUsers = async () => {
@@ -31,13 +33,27 @@ export default function AdminPanel() {
     }
   };
 
+  const loadPendingActions = async () => {
+    try {
+      const { data } = await fetchPendingAdminActions();
+      setPendingActions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      // ignore
+    }
+  };
+
   const handleRoleChange = async (userId, newRole) => {
     if (!window.confirm(`Change user role to ${newRole}?`)) return;
     try {
-      await updateUserByAdmin(userId, { role: newRole });
+      const { data } = await updateUserByAdmin(userId, { role: newRole });
+      if (data?.requiresApproval) {
+        alert(data.message);
+        loadPendingActions();
+        return;
+      }
       setUsers(users.map(u => u._id === userId ? { ...u, role: newRole } : u));
     } catch (err) {
-      alert("Error updating role");
+      alert(err.response?.data?.message || "Error updating role");
     }
   };
 
@@ -60,10 +76,25 @@ export default function AdminPanel() {
   const handleDelete = async (userId) => {
     if (!window.confirm("Are you sure? This action is permanent.")) return;
     try {
-      await deleteUser(userId);
+      const { data } = await deleteUser(userId);
+      if (data?.requiresApproval) {
+        alert(data.message);
+        loadPendingActions();
+        return;
+      }
       setUsers(users.filter(u => u._id !== userId));
     } catch (err) {
-      alert("Error deleting user");
+      alert(err.response?.data?.message || "Error deleting user");
+    }
+  };
+
+  const handleApproveAction = async (actionId) => {
+    try {
+      const { data } = await approveAdminAction(actionId);
+      alert(data.message || 'Approval recorded');
+      await Promise.all([loadPendingActions(), loadUsers()]);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to approve action');
     }
   };
 
@@ -171,6 +202,32 @@ export default function AdminPanel() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {pendingActions.length > 0 && (
+        <div className="bg-[#141417]/50 border border-amber-500/30 rounded-[2rem] p-6 md:p-8">
+          <h3 className="text-lg font-black text-amber-300 uppercase tracking-widest mb-4">Pending Admin Approvals</h3>
+          <div className="space-y-3">
+            {pendingActions.map((action) => (
+              <div key={action._id} className="bg-[#0a0a0c] border border-gray-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-white">
+                    {action.type === 'ADMIN_DELETE' ? 'Delete Admin Account' : `Demote Admin to ${action.payload?.newRole || 'User'}`}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Target: {action.targetUser?.name} ({action.targetUser?.email}) • Approvals: {action.approvals?.length || 0}/3
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleApproveAction(action._id)}
+                  className="px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-black uppercase tracking-wider"
+                >
+                  Approve
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* --- MEMBER DIRECTORY --- */}
       <div className="bg-[#141417]/50 backdrop-blur-xl border border-gray-800 rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl">

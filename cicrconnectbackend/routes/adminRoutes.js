@@ -5,7 +5,9 @@ const {
     sendInviteEmail, // Ensure this matches the controller export
     getAllUsers, 
     deleteUser, 
-    updateUserByAdmin 
+    updateUserByAdmin,
+    getPendingAdminActions,
+    approveAdminAction,
 } = require('../controllers/adminController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -25,5 +27,8 @@ router.get('/users', getAllUsers);
 router.route('/users/:id')
     .put(updateUserByAdmin)
     .delete(deleteUser);
+
+router.get('/actions/pending', getPendingAdminActions);
+router.post('/actions/:actionId/approve', approveAdminAction);
 
 module.exports = router;

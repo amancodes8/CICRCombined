@@ -1,7 +1,28 @@
 const User = require('../models/User');
 const InviteCode = require('../models/InviteCode');
+const AdminAction = require('../models/AdminAction');
 const sendEmail = require('../utils/sendEmail');
 const crypto = require('crypto');
+
+const REQUIRED_ADMIN_APPROVALS = 3;
+
+const ensureAdminApprover = (req, res) => {
+  if (req.user?.role !== 'Admin') {
+    res.status(403).json({ success: false, message: 'Only Admin accounts can approve admin demotion/deletion actions' });
+    return false;
+  }
+  return true;
+};
+
+const addApprovalIfMissing = (action, approverId) => {
+  const alreadyApproved = action.approvals.some((id) => String(id) === String(approverId));
+  if (!alreadyApproved) {
+    action.approvals.push(approverId);
+  }
+  return !alreadyApproved;
+};
+
+const canExecuteAdminAction = (action) => action.approvals.length >= REQUIRED_ADMIN_APPROVALS;
 
 /**
  * @desc    Generate a new invitation code
@@ -133,7 +154,56 @@ exports.getAllUsers = async (req, res) => {
 
 exports.deleteUser = async (req, res) => {
   try {
-    await User.findByIdAndDelete(req.params.id);
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Prevent self-deletion from admin panel.
+    if (String(targetUser._id) === String(req.user.id)) {
+      return res.status(400).json({ success: false, message: 'You cannot delete your own account' });
+    }
+
+    // Admin deletion requires multi-admin approval.
+    if (targetUser.role === 'Admin') {
+      if (!ensureAdminApprover(req, res)) return;
+
+      let action = await AdminAction.findOne({
+        type: 'ADMIN_DELETE',
+        targetUser: targetUser._id,
+        status: 'Pending',
+      });
+
+      if (!action) {
+        action = new AdminAction({
+          type: 'ADMIN_DELETE',
+          targetUser: targetUser._id,
+          requestedBy: req.user.id,
+          approvals: [],
+          status: 'Pending',
+        });
+      }
+
+      addApprovalIfMissing(action, req.user.id);
+
+      if (!canExecuteAdminAction(action)) {
+        await action.save();
+        return res.status(202).json({
+          success: true,
+          requiresApproval: true,
+          actionId: action._id,
+          message: `Admin deletion pending approvals (${action.approvals.length}/${REQUIRED_ADMIN_APPROVALS})`,
+        });
+      }
+
+      action.status = 'Executed';
+      action.executedAt = new Date();
+      await action.save();
+      await targetUser.deleteOne();
+      return res.json({ success: true, message: 'Admin account deleted after required approvals' });
+    }
+
+    await targetUser.deleteOne();
     res.json({ success: true, message: 'User removed' });
   } catch (err) {
     console.error("❌ deleteUser error:", err.message);
@@ -171,10 +241,127 @@ exports.updateUserByAdmin = async (req, res) => {
       payload.isVerified = false;
     }
 
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const isAdminDemotion = targetUser.role === 'Admin' && payload.role && payload.role !== 'Admin';
+    if (isAdminDemotion) {
+      if (!ensureAdminApprover(req, res)) return;
+
+      let action = await AdminAction.findOne({
+        type: 'ADMIN_ROLE_CHANGE',
+        targetUser: targetUser._id,
+        status: 'Pending',
+        'payload.newRole': payload.role,
+      });
+
+      if (!action) {
+        action = new AdminAction({
+          type: 'ADMIN_ROLE_CHANGE',
+          targetUser: targetUser._id,
+          requestedBy: req.user.id,
+          approvals: [],
+          payload: { newRole: payload.role },
+          status: 'Pending',
+        });
+      }
+
+      addApprovalIfMissing(action, req.user.id);
+
+      if (!canExecuteAdminAction(action)) {
+        await action.save();
+        return res.status(202).json({
+          success: true,
+          requiresApproval: true,
+          actionId: action._id,
+          message: `Admin demotion pending approvals (${action.approvals.length}/${REQUIRED_ADMIN_APPROVALS})`,
+        });
+      }
+
+      action.status = 'Executed';
+      action.executedAt = new Date();
+      await action.save();
+
+      const demoted = await User.findByIdAndUpdate(
+        req.params.id,
+        { role: payload.role },
+        { new: true }
+      );
+      return res.json({
+        success: true,
+        user: demoted,
+        message: 'Admin demoted after required approvals',
+      });
+    }
+
     const updatedUser = await User.findByIdAndUpdate(req.params.id, payload, { new: true });
     res.json({ success: true, user: updatedUser });
   } catch (err) {
     console.error("❌ updateUserByAdmin error:", err.message);
     res.status(500).send('Server error');
+  }
+};
+
+exports.getPendingAdminActions = async (req, res) => {
+  try {
+    const actions = await AdminAction.find({ status: 'Pending' })
+      .populate('targetUser', 'name email role collegeId')
+      .populate('requestedBy', 'name role')
+      .populate('approvals', 'name role')
+      .sort({ createdAt: -1 });
+    return res.json(actions);
+  } catch (err) {
+    console.error("❌ getPendingAdminActions error:", err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.approveAdminAction = async (req, res) => {
+  try {
+    if (!ensureAdminApprover(req, res)) return;
+
+    const action = await AdminAction.findById(req.params.actionId);
+    if (!action || action.status !== 'Pending') {
+      return res.status(404).json({ success: false, message: 'Pending action not found' });
+    }
+
+    const targetUser = await User.findById(action.targetUser);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'Target user not found' });
+    }
+
+    addApprovalIfMissing(action, req.user.id);
+
+    if (!canExecuteAdminAction(action)) {
+      await action.save();
+      return res.json({
+        success: true,
+        requiresApproval: true,
+        message: `Approval recorded (${action.approvals.length}/${REQUIRED_ADMIN_APPROVALS})`,
+        action,
+      });
+    }
+
+    if (action.type === 'ADMIN_DELETE') {
+      await targetUser.deleteOne();
+    } else if (action.type === 'ADMIN_ROLE_CHANGE') {
+      targetUser.role = action.payload?.newRole || targetUser.role;
+      await targetUser.save();
+    }
+
+    action.status = 'Executed';
+    action.executedAt = new Date();
+    await action.save();
+
+    return res.json({
+      success: true,
+      message: 'Action executed after required approvals',
+      action,
+    });
+  } catch (err) {
+    console.error("❌ approveAdminAction error:", err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };

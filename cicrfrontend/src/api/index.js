@@ -41,6 +41,8 @@ export const acknowledgeWarnings = () => API.post('/users/warnings/ack');
 export const fetchMembers = () => API.get('/admin/users'); 
 export const updateUserByAdmin = (id, data) => API.put(`/admin/users/${id}`, data);
 export const deleteUser = (id) => API.delete(`/admin/users/${id}`);
+export const fetchPendingAdminActions = () => API.get('/admin/actions/pending');
+export const approveAdminAction = (actionId) => API.post(`/admin/actions/${actionId}/approve`);
 
 // Invitation System
 export const generateInvite = () => API.post('/admin/invite');
