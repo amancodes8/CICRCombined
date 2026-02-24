@@ -97,6 +97,16 @@ export const deleteInventoryItem = (id) => API.delete(`/inventory/${id}`);
 
   //  AI TOOLS
 export const summarize = (data) => API.post('/chatbot/summarize', data);
-export const askCicrAssistant = (payload) => API.post('/chatbot/query', payload);
+export const askCicrAssistant = async (payload) => {
+  try {
+    return await API.post('/chatbot/query', payload);
+  } catch (err) {
+    try {
+      return await API.post('/chatbot/ask', payload);
+    } catch (err2) {
+      return await API.post('/chatbot/assistant/query', payload);
+    }
+  }
+};
 
 export default API;

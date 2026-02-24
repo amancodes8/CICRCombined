@@ -170,8 +170,14 @@ const askCicrAssistant = async (req, res) => {
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            return res.status(response.status).json({ message: 'AI response failed', details: errorData });
+            const fallbackAnswer = memberInsights
+                ? `${memberInsights.member.name} (${memberInsights.member.collegeId}) has ${memberInsights.metrics.totalProjectContributions} project contributions and ${memberInsights.metrics.totalEvents} events.`
+                : `CICR currently has ${society.memberCount} members, ${society.projectCount} projects, ${society.meetingCount} meetings, and ${society.postCount} community posts.`;
+            return res.json({
+                answer: `${fallbackAnswer} (LLM unavailable, showing live database summary.)`,
+                member: memberInsights,
+                society,
+            });
         }
 
         const result = await response.json();
