@@ -4,7 +4,7 @@ import axios from 'axios';
    AXIOS INSTANCE CONFIGURATION
 =============================== */
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://cicrcombined.onrender.com/api',
 
   headers: {
     'Content-Type': 'application/json',
