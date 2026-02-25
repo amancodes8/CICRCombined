@@ -5,12 +5,19 @@ import {
   Calendar as CalendarIcon, MapPin, Video, Users as UsersIcon, 
   Clock, ArrowLeft, Check, Loader2, Info, Globe
 } from 'lucide-react';
-import { fetchMembers, scheduleMeeting } from '../api';
+import { fetchDirectoryMembers, scheduleMeeting } from '../api';
 
 export default function ScheduleMeeting() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const profile = JSON.parse(localStorage.getItem('profile') || '{}');
+  const userData = profile.result || profile;
+  const role = String(userData.role || '').toLowerCase();
+  const isAdminOrHead = role === 'admin' || role === 'head';
+  const userYear = Number(userData.year);
+  const isSenior = Number.isFinite(userYear) && userYear >= 2;
+  const canSchedule = isAdminOrHead || isSenior;
   
   const [formData, setFormData] = useState({
     title: '',
@@ -25,7 +32,7 @@ export default function ScheduleMeeting() {
   useEffect(() => {
     const loadUsers = async () => {
       try {
-        const { data } = await fetchMembers();
+        const { data } = await fetchDirectoryMembers();
         setUsers(data);
       } catch (err) {
         console.error("Could not load users", err);
@@ -33,6 +40,14 @@ export default function ScheduleMeeting() {
     };
     loadUsers();
   }, []);
+
+  const eligibleUsers = isAdminOrHead
+    ? users
+    : users.filter((u) => {
+        const yr = Number(u.year);
+        if (!Number.isFinite(yr)) return false;
+        return Number.isFinite(userYear) && yr <= userYear;
+      });
 
   const toggleParticipant = (userId) => {
     setFormData(prev => ({
@@ -45,6 +60,10 @@ export default function ScheduleMeeting() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canSchedule) {
+      alert('Only seniors (2nd year+) can schedule meetings.');
+      return;
+    }
     setLoading(true);
     try {
       const payload = {
@@ -64,13 +83,13 @@ export default function ScheduleMeeting() {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-5xl mx-auto pb-20 px-4"
+      className="max-w-5xl mx-auto pb-20 px-4 page-motion-d"
     >
       {/* Header Section */}
-      <div className="flex items-center justify-between mb-10">
+      <div className="flex items-center justify-between mb-10 section-motion section-motion-delay-1">
         <button 
           onClick={() => navigate('/meetings')}
-          className="group flex items-center gap-2 text-gray-400 hover:text-white transition-all bg-[#141417] px-4 py-2 rounded-full border border-gray-800"
+          className="group flex items-center gap-2 text-gray-400 hover:text-white transition-all px-4 py-2 rounded-full border border-gray-800"
         >
           <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" /> 
           <span className="text-sm font-medium">Back</span>
@@ -82,11 +101,17 @@ export default function ScheduleMeeting() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {!canSchedule && (
+        <div className="border border-amber-500/30 rounded-2xl p-4 text-sm text-amber-200 mb-6 section-motion section-motion-delay-1">
+          Scheduling meetings is available to seniors (2nd year+) and Admin/Head only.
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8 section-motion section-motion-delay-2">
         
         {/* Left Column: Form Inputs */}
         <div className="lg:col-span-2 space-y-6">
-          <section className="bg-[#141417]/50 backdrop-blur-xl border border-gray-800 p-8 rounded-[2rem] shadow-2xl space-y-8">
+          <section className="backdrop-blur-xl border border-gray-800 p-8 rounded-[2rem] shadow-2xl space-y-8 pro-hover-lift">
             <div className="flex items-center gap-3 border-b border-gray-800 pb-5">
               <div className="p-2 bg-blue-600/20 rounded-lg text-blue-500">
                 <Info size={20} />
@@ -156,7 +181,7 @@ export default function ScheduleMeeting() {
             </div>
           </section>
 
-          <section className="bg-[#141417]/50 backdrop-blur-xl border border-gray-800 p-8 rounded-[2rem] shadow-2xl space-y-6">
+          <section className="backdrop-blur-xl border border-gray-800 p-8 rounded-[2rem] shadow-2xl space-y-6 pro-hover-lift">
             <div className="flex items-center gap-3 border-b border-gray-800 pb-5">
               <div className="p-2 bg-purple-600/20 rounded-lg text-purple-500">
                 <CalendarIcon size={20} />
@@ -197,7 +222,7 @@ export default function ScheduleMeeting() {
 
         {/* Right Column: Participant Selection */}
         <div className="lg:col-span-1 space-y-6">
-          <section className="bg-[#141417]/50 backdrop-blur-xl border border-gray-800 p-6 rounded-[2rem] h-full flex flex-col">
+          <section className="backdrop-blur-xl border border-gray-800 p-6 rounded-[2rem] h-full flex flex-col pro-hover-lift">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-lg flex items-center gap-2">
                 <UsersIcon className="text-blue-500" size={20} /> Guests
@@ -208,7 +233,7 @@ export default function ScheduleMeeting() {
             </div>
 
             <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar" style={{maxHeight: '480px'}}>
-              {users.map((u, index) => (
+              {eligibleUsers.map((u, index) => (
                 <motion.div 
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -246,7 +271,7 @@ export default function ScheduleMeeting() {
             </div>
 
             <button 
-              disabled={loading}
+              disabled={loading || !canSchedule}
               className="mt-8 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-800 disabled:text-gray-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 flex justify-center items-center gap-3"
             >
               {loading ? <Loader2 className="animate-spin" /> : "Confirm Schedule"}

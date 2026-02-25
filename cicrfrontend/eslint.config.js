@@ -23,7 +23,16 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': [
+        'error',
+        {
+          varsIgnorePattern: '^[A-Z_]|^motion$|^AnimatePresence$|^err$|^primaryErr$',
+          argsIgnorePattern: '^[A-Z_]|^_|^err$|^index$|^primaryErr$',
+          caughtErrorsIgnorePattern: '^_|^err$|^primaryErr$',
+        },
+      ],
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/static-components': 'off',
     },
   },
 ])

@@ -34,7 +34,7 @@ export default function PublicProfile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0c] text-white flex items-center justify-center">
+      <div className="min-h-screen bg-[#0a0a0c] text-white flex items-center justify-center page-motion-c">
         <Loader2 className="animate-spin text-blue-500" />
       </div>
     );
@@ -42,8 +42,8 @@ export default function PublicProfile() {
 
   if (!data?.profile) {
     return (
-      <div className="min-h-screen bg-[#0a0a0c] text-white p-6 flex items-center justify-center">
-        <div className="bg-[#141417] border border-gray-800 rounded-3xl p-8 text-center">
+      <div className="min-h-screen bg-[#0a0a0c] text-white p-6 flex items-center justify-center page-motion-c">
+        <div className="border border-gray-800 rounded-3xl p-8 text-center">
           <p className="text-red-400 font-semibold">Profile not found for college ID: {collegeId}</p>
           <Link to="/login" className="inline-block mt-4 text-blue-400 hover:text-blue-300">Go to sign in</Link>
         </div>
@@ -53,9 +53,9 @@ export default function PublicProfile() {
 
   const { profile, metrics } = data;
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <header className="bg-[#141417] border border-gray-800 rounded-3xl p-8">
+    <div className="min-h-screen bg-[#0a0a0c] text-white p-4 md:p-8 page-motion-c">
+      <div className="max-w-5xl mx-auto space-y-6 pro-stagger">
+        <header className="border border-gray-800 rounded-3xl p-8 section-motion section-motion-delay-1">
           <p className="text-xs uppercase tracking-widest text-blue-400 font-black">Public CICR Profile</p>
           <h1 className="text-3xl font-black mt-2">{profile.name}</h1>
           <div className="mt-3 flex flex-wrap gap-3 text-xs">
@@ -66,14 +66,14 @@ export default function PublicProfile() {
           {profile.bio && <p className="mt-5 text-gray-300">{profile.bio}</p>}
         </header>
 
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 section-motion section-motion-delay-2">
           <Stat label="Years in CICR" value={profile.yearsInCICR || 0} />
           <Stat label="Project Contributions" value={metrics?.totalProjectContributions || 0} />
           <Stat label="Events Participated" value={metrics?.totalEvents || 0} />
         </section>
 
-        <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div className="bg-[#141417] border border-gray-800 rounded-3xl p-6">
+        <section className="grid grid-cols-1 xl:grid-cols-2 gap-4 section-motion section-motion-delay-3">
+          <div className="border border-gray-800 rounded-3xl p-6 pro-hover-lift">
             <h2 className="text-lg font-black">Skills</h2>
             <div className="mt-3 flex flex-wrap gap-2">
               {(profile.skills || []).length === 0 && <p className="text-gray-500 text-sm">No skills added.</p>}
@@ -83,7 +83,7 @@ export default function PublicProfile() {
             </div>
           </div>
 
-          <div className="bg-[#141417] border border-gray-800 rounded-3xl p-6">
+          <div className="border border-gray-800 rounded-3xl p-6 pro-hover-lift">
             <h2 className="text-lg font-black inline-flex items-center gap-2"><Workflow size={16} className="text-emerald-400" /> Achievements</h2>
             <ul className="mt-3 space-y-2">
               {(profile.achievements || []).length === 0 && <li className="text-gray-500 text-sm">No achievements added.</li>}

@@ -211,14 +211,14 @@ export default function Communication() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto pb-4 md:pb-8">
-      <section className="px-1 py-2 md:py-3">
+    <div className="max-w-5xl mx-auto pb-4 md:pb-8 page-motion-d">
+      <section className="px-1 py-2 md:py-3 section-motion section-motion-delay-1">
         <p className="text-xs uppercase tracking-widest text-blue-400 font-black">Collab Stream</p>
         <h1 className="text-2xl md:text-3xl font-black text-white mt-1 tracking-tight">Admin Conversation Hub</h1>
         <p className="text-gray-400 text-sm mt-2">Live team chat. Messages auto-expire after 3 days.</p>
       </section>
 
-      <section className="flex flex-col h-[calc(100vh-190px)] md:h-[calc(100vh-180px)] min-h-[460px]">
+      <section className="flex flex-col h-[calc(100vh-190px)] md:h-[calc(100vh-180px)] min-h-[460px] section-motion section-motion-delay-2">
         <h2 className="text-sm md:text-base font-black text-white inline-flex items-center gap-2 px-1">
           <MessageCircle size={16} className="text-amber-400" /> Conversation
         </h2>

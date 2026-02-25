@@ -8,6 +8,7 @@ const userLastMessageAt = new Map();
 const AI_MENTION_TOKEN = '@cicrai';
 const DOMAIN_SCOPE_HINT =
   'You must answer only CICR-related topics and technology domains: robotics, programming, software, hardware, AI/ML, cybersecurity, IoT, embedded, electronics, networking, product building, and project workflows. If question is outside this scope or nonsense, refuse briefly and ask a relevant CICR/tech question instead.';
+const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const serializeMessage = (messageDoc) => ({
   _id: messageDoc._id,
@@ -250,11 +251,12 @@ const createMessage = async (req, res) => {
 
 const listMentionCandidates = async (req, res) => {
   const q = String(req.query.q || '').trim();
+  const safeQuery = escapeRegex(q);
   const filter = q
     ? {
         $or: [
-          { collegeId: { $regex: q, $options: 'i' } },
-          { name: { $regex: q, $options: 'i' } },
+          { collegeId: { $regex: safeQuery, $options: 'i' } },
+          { name: { $regex: safeQuery, $options: 'i' } },
         ],
       }
     : {};

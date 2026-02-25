@@ -20,5 +20,12 @@ export default function VerifyEmail() {
     run();
   }, [token, navigate]);
 
-  return <p>{status}</p>;
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 page-motion-b">
+      <div className="w-full max-w-lg border border-gray-800 rounded-3xl p-8 section-motion section-motion-delay-1">
+        <p className="text-[10px] uppercase tracking-[0.24em] text-blue-400 font-black">Email Verification</p>
+        <p className="text-gray-200 mt-3">{status}</p>
+      </div>
+    </div>
+  );
 }

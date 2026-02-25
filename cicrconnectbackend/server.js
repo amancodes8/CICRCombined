@@ -2,11 +2,14 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const { securityHeaders } = require('./middleware/securityMiddleware');
 
 dotenv.config();
 connectDB();
 
 const app = express();
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
 
 const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
 
@@ -37,9 +40,10 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.use(securityHeaders);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '200kb' }));
+app.use(express.urlencoded({ extended: true, limit: '200kb' }));
 
 app.get('/', (req, res) => {
     res.send('CICR Connect API is running...');
@@ -58,6 +62,9 @@ app.use('/api/chatbot', require('./routes/chatbotRoutes'));
 app.use('/api/inventory', require('./routes/inventoryRoutes')); 
 app.use('/api/community', require('./routes/postRoutes'));
 app.use('/api/communication', require('./routes/communicationRoutes'));
+app.use('/api/issues', require('./routes/issueRoutes'));
+app.use('/api/events', require('./routes/eventRoutes'));
+app.use('/api/applications', require('./routes/applicationRoutes'));
 
 app.use((err, req, res, next) => {
     const statusCode = res.statusCode === 200 ? 500 : res.statusCode;

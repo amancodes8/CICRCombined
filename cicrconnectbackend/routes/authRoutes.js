@@ -11,11 +11,13 @@ const {
   updateProfile
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
+const { authLimiter, passwordLimiter } = require('../middleware/securityMiddleware');
 
 const router = express.Router();
 
 router.post(
   '/register',
+  authLimiter,
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
@@ -29,6 +31,7 @@ router.post(
 
 router.post(
   '/login',
+  authLimiter,
   [
     body('email').isEmail().withMessage('Valid email is required'),
     body('password').notEmpty().withMessage('Password is required'),
@@ -40,6 +43,7 @@ router.post(
 router.get('/verifyemail/:token', verifyEmail);
 router.post(
   '/password/send-otp',
+  passwordLimiter,
   [
     body('email').isEmail().withMessage('Valid email is required'),
     body('collegeId').trim().notEmpty().withMessage('College ID is required'),
@@ -49,6 +53,7 @@ router.post(
 );
 router.post(
   '/password/reset-with-otp',
+  passwordLimiter,
   [
     body('email').isEmail().withMessage('Valid email is required'),
     body('collegeId').trim().notEmpty().withMessage('College ID is required'),

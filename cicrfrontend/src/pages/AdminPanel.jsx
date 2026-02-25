@@ -1,11 +1,22 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchMembers, updateUserByAdmin, deleteUser, generateInvite, sendInviteEmail, fetchPendingAdminActions, approveAdminAction } from '../api';
+import { fetchMembers, updateUserByAdmin, deleteUser, generateInvite, sendInviteEmail, fetchPendingAdminActions, approveAdminAction, fetchApplications, updateApplication, sendApplicationInvite } from '../api';
 import CicrAssistant from '../components/CicrAssistant';
 import { 
   Shield, Trash2, UserPlus, Copy, Check, 
-  Search, Mail, Send, Loader2, UserCheck, GraduationCap, Fingerprint 
+  Search, Mail, Send, Loader2, UserCheck, GraduationCap, Fingerprint,
+  Briefcase, ClipboardCheck, Crown, FileText, Flag
 } from 'lucide-react';
+
+const APPLICATION_STATUSES = ['New', 'InReview', 'Interview', 'Accepted', 'Selected', 'Rejected'];
+
+const statusBadgeClass = (status) => {
+  if (status === 'Selected') return 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10';
+  if (status === 'Accepted') return 'text-cyan-300 border-cyan-500/40 bg-cyan-500/10';
+  if (status === 'Interview') return 'text-amber-300 border-amber-500/40 bg-amber-500/10';
+  if (status === 'Rejected') return 'text-rose-300 border-rose-500/40 bg-rose-500/10';
+  return 'text-gray-300 border-gray-700 bg-gray-800/30';
+};
 
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);
@@ -16,10 +27,15 @@ export default function AdminPanel() {
   const [isSending, setIsSending] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pendingActions, setPendingActions] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [appFilter, setAppFilter] = useState('All');
+  const [appSearch, setAppSearch] = useState('');
+  const [appLoading, setAppLoading] = useState(true);
 
   useEffect(() => {
     loadUsers();
     loadPendingActions();
+    loadApplications();
   }, []);
 
   const loadUsers = async () => {
@@ -39,6 +55,18 @@ export default function AdminPanel() {
       setPendingActions(Array.isArray(data) ? data : []);
     } catch (err) {
       // ignore
+    }
+  };
+
+  const loadApplications = async () => {
+    setAppLoading(true);
+    try {
+      const { data } = await fetchApplications();
+      setApplications(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setApplications([]);
+    } finally {
+      setAppLoading(false);
     }
   };
 
@@ -98,6 +126,49 @@ export default function AdminPanel() {
     }
   };
 
+  const handleAppStatusChange = async (applicationId, status) => {
+    try {
+      const note = window.prompt('Add a status note (optional):');
+      const payload = { status };
+      if (note) payload.note = note;
+      const { data } = await updateApplication(applicationId, payload);
+      setApplications(applications.map((app) => (app._id === data._id ? data : app)));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update application status');
+    }
+  };
+
+  const handleAppAssign = async (applicationId, assignedTo) => {
+    try {
+      const { data } = await updateApplication(applicationId, { assignedTo });
+      setApplications(applications.map((app) => (app._id === data._id ? data : app)));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to assign application');
+    }
+  };
+
+  const handleAppNote = async (applicationId) => {
+    const note = window.prompt('Add internal note for this applicant:');
+    if (!note) return;
+    try {
+      const { data } = await updateApplication(applicationId, { note });
+      setApplications(applications.map((app) => (app._id === data._id ? data : app)));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to add note');
+    }
+  };
+
+  const handleSendAppInvite = async (applicationId) => {
+    if (!window.confirm('Send invite to this applicant?')) return;
+    try {
+      const { data } = await sendApplicationInvite(applicationId);
+      alert(`Invite sent. Code: ${data.inviteCode}`);
+      loadApplications();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to send invite');
+    }
+  };
+
   const handleGenerateInvite = async () => {
     try {
       const { data } = await generateInvite();
@@ -133,17 +204,34 @@ export default function AdminPanel() {
     u.collegeId?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const adminUsers = users.filter(
+    (u) =>
+      (String(u.role || '').toLowerCase() === 'admin' || String(u.role || '').toLowerCase() === 'head') &&
+      (u.isVerified || String(u.approvalStatus || '').toLowerCase() === 'approved')
+  );
+
+  const filteredApplications = applications.filter((app) => {
+    const matchesStatus = appFilter === 'All' || app.status === appFilter;
+    const query = appSearch.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
+      app.fullName?.toLowerCase().includes(query) ||
+      app.email?.toLowerCase().includes(query) ||
+      app.phone?.toLowerCase().includes(query);
+    return matchesStatus && matchesSearch;
+  });
+
   return (
-    <div className="space-y-6 md:space-y-10 max-w-7xl mx-auto pb-20 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
+    <div className="space-y-6 md:space-y-10 max-w-7xl mx-auto pb-20 px-4 sm:px-6 lg:px-8 overflow-x-hidden page-motion-d">
       
     
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 section-motion section-motion-delay-1">
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-600/20 rounded-lg">
               <Shield size={24} className="text-blue-500" />
             </div>
-            <h2 className="text-3xl md:text-3xl font-black tracking-tighter text-white">Amdin</h2>
+            <h2 className="text-3xl md:text-3xl font-black tracking-tighter text-white">Admin</h2>
           </div>
           <p className="text-gray-500 font-medium md:text-lg">Authorization & Member Lifecycle Management</p>
         </div>
@@ -161,7 +249,7 @@ export default function AdminPanel() {
             initial={{ height: 0, opacity: 0, y: -20 }}
             animate={{ height: 'auto', opacity: 1, y: 0 }}
             exit={{ height: 0, opacity: 0, y: -20 }}
-            className="bg-[#141417] border border-blue-500/30 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl overflow-hidden relative"
+            className="border border-blue-500/30 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl overflow-hidden relative"
           >
             <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-[100px] -mr-20 -mt-20" />
             
@@ -204,7 +292,7 @@ export default function AdminPanel() {
       </AnimatePresence>
 
       {pendingActions.length > 0 && (
-        <div className="bg-[#141417]/50 border border-amber-500/30 rounded-[2rem] p-6 md:p-8">
+        <div className="border border-amber-500/30 rounded-[2rem] p-6 md:p-8 section-motion section-motion-delay-2">
           <h3 className="text-lg font-black text-amber-300 uppercase tracking-widest mb-4">Pending Admin Approvals</h3>
           <div className="space-y-3">
             {pendingActions.map((action) => (
@@ -229,8 +317,150 @@ export default function AdminPanel() {
         </div>
       )}
 
+      <section className="border border-gray-800 rounded-[2.5rem] p-6 md:p-8 space-y-5 section-motion section-motion-delay-2">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 border border-blue-500/40 rounded-xl">
+              <ClipboardCheck size={20} className="text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-white">Recruitment Pipeline</h3>
+              <p className="text-gray-500 text-sm">Track applicants, interview rounds, and onboarding.</p>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <select
+              value={appFilter}
+              onChange={(e) => setAppFilter(e.target.value)}
+              className="border border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-300 bg-[#0a0a0c]"
+            >
+              <option value="All">All Statuses</option>
+              {APPLICATION_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                value={appSearch}
+                onChange={(e) => setAppSearch(e.target.value)}
+                placeholder="Search applicants..."
+                className="border border-gray-800 rounded-xl pl-10 pr-3 py-2 text-xs text-gray-300 bg-[#0a0a0c] w-56"
+              />
+            </div>
+          </div>
+        </div>
+
+        {appLoading ? (
+          <div className="text-sm text-gray-500">Loading applications...</div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {filteredApplications.map((app) => (
+              <article key={app._id} className="border border-gray-800 rounded-[1.4rem] p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-white font-bold text-base">{app.fullName}</p>
+                    <p className="text-xs text-gray-500">{app.email} • {app.phone}</p>
+                  </div>
+                  <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded-lg border ${statusBadgeClass(app.status)}`}>
+                    {app.status}
+                  </span>
+                </div>
+
+                <div className="text-xs text-gray-400 flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1"><Briefcase size={12} className="text-blue-400" /> Year {app.year || 'N/A'}</span>
+                  <span className="inline-flex items-center gap-1"><Flag size={12} className="text-amber-400" /> {app.branch || 'General'}</span>
+                  {app.event?.title && (
+                    <span className="inline-flex items-center gap-1"><FileText size={12} className="text-emerald-400" /> {app.event.title}</span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-[10px] text-gray-500 uppercase tracking-widest">
+                  <span>Stage: {app.stage || 'Round 1'}</span>
+                  {app.assignedTo?.name && (
+                    <>
+                      <span>•</span>
+                      <span className="inline-flex items-center gap-1"><Crown size={10} className="text-blue-400" /> {app.assignedTo.name}</span>
+                    </>
+                  )}
+                  {app.inviteCode && (
+                    <>
+                      <span>•</span>
+                      <span className="inline-flex items-center gap-1"><ClipboardCheck size={10} className="text-emerald-400" /> Invite {app.inviteCode}</span>
+                    </>
+                  )}
+                </div>
+
+                {app.notes?.[0]?.text && (
+                  <p className="text-xs text-gray-300 border border-gray-800 rounded-lg px-3 py-2">
+                    Latest note: {app.notes[0].text}
+                  </p>
+                )}
+                {app.history?.[0]?.status && (
+                  <p className="text-[10px] text-gray-500 border border-gray-800/70 rounded-lg px-3 py-2 uppercase tracking-wider">
+                    Last update: {app.history[0].status}
+                    {app.history[0].changedBy?.name ? ` by ${app.history[0].changedBy.name}` : ''}
+                    {app.history[0].changedAt ? ` • ${new Date(app.history[0].changedAt).toLocaleString()}` : ''}
+                    {app.history[0].note ? ` • ${app.history[0].note}` : ''}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <select
+                    value={app.status}
+                    onChange={(e) => handleAppStatusChange(app._id, e.target.value)}
+                    className="border border-gray-800 rounded-lg px-3 py-2 text-[10px] uppercase tracking-widest text-gray-300 bg-[#0a0a0c]"
+                  >
+                    {APPLICATION_STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={app.assignedTo?._id || ''}
+                    onChange={(e) => handleAppAssign(app._id, e.target.value || null)}
+                    className="border border-gray-800 rounded-lg px-3 py-2 text-[10px] uppercase tracking-widest text-gray-300 bg-[#0a0a0c]"
+                  >
+                    <option value="">Unassigned</option>
+                    {adminUsers.map((u) => (
+                      <option key={u._id} value={u._id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleAppNote(app._id)}
+                    className="text-[10px] uppercase tracking-widest border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg"
+                  >
+                    Add Note
+                  </button>
+                  <button
+                    onClick={() => handleSendAppInvite(app._id)}
+                    className="text-[10px] uppercase tracking-widest border border-emerald-500/40 text-emerald-200 px-3 py-1.5 rounded-lg"
+                  >
+                    Send Invite
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {!appLoading && filteredApplications.length === 0 && (
+          <div className="border border-dashed border-gray-800 rounded-xl p-6 text-sm text-gray-500">
+            No applications found for the selected filter.
+          </div>
+        )}
+      </section>
+
       {/* --- MEMBER DIRECTORY --- */}
-      <div className="bg-[#141417]/50 backdrop-blur-xl border border-gray-800 rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl">
+      <div className="backdrop-blur-xl border border-gray-800 rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl section-motion section-motion-delay-3">
         <div className="p-8 md:p-12 border-b border-gray-800 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div className="flex items-center gap-4">
             <UserCheck className="text-blue-500" size={28} />

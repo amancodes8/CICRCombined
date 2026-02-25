@@ -12,6 +12,12 @@ export default function Meetings() {
   
   // Get user profile to check role for the "Schedule" button
   const user = JSON.parse(localStorage.getItem('profile') || '{}');
+  const userData = user.result || user;
+  const role = String(userData.role || '').toLowerCase();
+  const isAdminOrHead = role === 'admin' || role === 'head';
+  const year = Number(userData.year);
+  const isSenior = Number.isFinite(year) && year >= 2;
+  const canSchedule = isAdminOrHead || isSenior;
 
   useEffect(() => {
     const loadMeetings = async () => {
@@ -39,16 +45,16 @@ export default function Meetings() {
   );
 
   return (
-    <div className="space-y-10 max-w-6xl mx-auto">
+    <div className="space-y-10 max-w-6xl mx-auto page-motion-b pro-stagger">
       {/* Header Section */}
-      <header className="flex justify-between items-center">
+      <header className="flex justify-between items-center section-motion section-motion-delay-1">
         <div>
           <h2 className="text-3xl font-bold">Meetings</h2>
           <p className="text-gray-400 mt-1">Manage your sessions and attendance</p>
         </div>
 
         {/* ONLY Admin or Head can see the Schedule button */}
-        {(user.role === 'Admin' || user.role === 'Head') && (
+        {canSchedule && (
           <Link 
             to="/schedule" 
             className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg shadow-blue-600/20"
@@ -59,7 +65,7 @@ export default function Meetings() {
       </header>
 
       {/* Upcoming Meetings */}
-      <section className="space-y-4">
+      <section className="space-y-4 section-motion section-motion-delay-2">
         <h3 className="text-xl font-semibold flex items-center gap-2">
           <Clock className="text-blue-500" size={20} /> Upcoming Sessions
         </h3>
@@ -67,7 +73,7 @@ export default function Meetings() {
           {upcoming.length > 0 ? upcoming.map(m => (
             <MeetingCard key={m._id} meeting={m} isPast={false} />
           )) : (
-            <p className="text-gray-500 italic p-6 bg-[#141417] rounded-2xl border border-dashed border-gray-800 text-center">
+            <p className="text-gray-500 italic p-6 rounded-2xl border border-dashed border-gray-800 text-center">
               No upcoming meetings scheduled.
             </p>
           )}
@@ -75,7 +81,7 @@ export default function Meetings() {
       </section>
 
       {/* Earlier Meetings */}
-      <section className="space-y-4">
+      <section className="space-y-4 section-motion section-motion-delay-3">
         <h3 className="text-xl font-semibold flex items-center gap-2 text-gray-400">
           <History size={20} /> Earlier Meetings
         </h3>
@@ -96,7 +102,7 @@ function MeetingCard({ meeting, isPast }) {
   const date = new Date(meeting.startTime);
   
   return (
-    <div className="bg-[#141417] border border-gray-800 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-center hover:border-gray-700 transition-all group">
+    <div className="border border-gray-800 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-center hover:border-gray-700 transition-all group pro-hover-lift">
       <div className="flex items-center gap-6 w-full">
         {/* Date Icon */}
         <div className={`p-4 rounded-xl flex flex-col items-center min-w-[70px] ${isPast ? 'bg-gray-800 text-gray-500' : 'bg-blue-600/10 text-blue-500'}`}>

@@ -282,8 +282,8 @@ export default function Profile() {
   }, []);
 
   return (
-    <div className="max-w-6xl mx-auto pb-10 md:pb-16 space-y-8 px-1 sm:px-0">
-      <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="pt-2">
+    <div className="max-w-6xl mx-auto pb-10 md:pb-16 space-y-8 px-1 sm:px-0 page-motion-c">
+      <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="pt-2 section-motion section-motion-delay-1">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
           <div className="flex items-start gap-3 sm:gap-4 min-w-0">
             <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-500 flex items-center justify-center text-2xl md:text-3xl font-black text-white shrink-0 shadow-lg shadow-cyan-500/20">
@@ -329,14 +329,14 @@ export default function Profile() {
         <p className="mt-2 text-sm text-cyan-200 break-all">{publicProfileUrl || 'Public profile URL unavailable'}</p>
       </motion.section>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 section-motion section-motion-delay-2 pro-stagger">
         <MetricCard label="Profile Completion" value={`${completionScore}%`} helper="Keep this above 85%" />
         <MetricCard label="Skills Listed" value={skills.length} helper="Technical + domain skills" />
         <MetricCard label="Achievements" value={achievements.length} helper="Credible accomplishments" />
         <MetricCard label="Years in CICR" value={yearsInCicr(user.joinedAt)} helper={`Joined ${fmtDate(user.joinedAt)}`} />
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-8 section-motion section-motion-delay-2">
         <article>
           <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
             <Briefcase size={17} className="text-cyan-300" />
@@ -374,7 +374,7 @@ export default function Profile() {
         </article>
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-8 section-motion section-motion-delay-3">
         <article>
           <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
             <Briefcase size={17} className="text-cyan-300" />
@@ -409,7 +409,7 @@ export default function Profile() {
       </section>
 
       {warnings.length > 0 && (
-        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="section-motion section-motion-delay-3">
           <h2 className="text-sm font-black uppercase tracking-widest text-red-300 mb-3 inline-flex items-center gap-2">
             <ShieldAlert size={15} />
             Admin Warnings
@@ -429,7 +429,7 @@ export default function Profile() {
 
       <AnimatePresence>
         {isEditing && (
-          <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 14 }}>
+          <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 14 }} className="section-motion section-motion-delay-3">
             <div className="flex items-center justify-between gap-3 mb-5">
               <h2 className="profile-section-flow text-xl font-black">Edit Profile Details</h2>
               <button
@@ -603,7 +603,7 @@ export default function Profile() {
         )}
       </AnimatePresence>
 
-      <section className="pt-1">
+      <section className="pt-1 section-motion section-motion-delay-3">
         <p className="text-sm text-gray-300 leading-relaxed">
           Keep your profile current so collaborators can find your expertise quickly and contact you directly.
         </p>

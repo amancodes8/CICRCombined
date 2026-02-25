@@ -29,7 +29,6 @@ export default function Members() {
   // Filter Categories
   const branches = ['All', 'CSE', 'ECE', 'ECS',  'ECM', 'BCA', 'MCA' ,'Other'];
   const years = ['All', '1', '2', '3', '4', 'Alumni'];
-  const roles = ['All', 'Admin', 'Head', 'Member'];
 
   
   const filteredMembers = members.filter((m) => {
@@ -50,8 +49,8 @@ export default function Members() {
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-8 max-w-7xl mx-auto page-motion-c">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 section-motion section-motion-delay-1">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Community Directory</h2>
           <p className="text-gray-400">Discover innovators across the CICR network</p>
@@ -71,7 +70,7 @@ export default function Members() {
       </header>
 
       {/* Advanced Filter Bar */}
-      <div className="bg-[#141417] border border-gray-800 p-5 rounded-3xl shadow-xl space-y-4">
+      <div className="border border-gray-800 p-5 rounded-3xl shadow-xl space-y-4 section-motion section-motion-delay-2">
         <div className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-widest px-1">
             <Filter size={14} /> Advanced Filtering
         </div>
@@ -116,21 +115,21 @@ export default function Members() {
       </div>
 
       {/* Status Bar - Uses the 'Users' icon fixed above */}
-      <div className="flex items-center gap-2 text-sm text-gray-500 px-2">
+      <div className="flex items-center gap-2 text-sm text-gray-500 px-2 section-motion section-motion-delay-2">
         <Users size={16} className="text-blue-500" />
         <span>Found {filteredMembers.length} members matching your criteria</span>
       </div>
 
       <AnimatePresence mode='popLayout'>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
-          {filteredMembers.map((member, index) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20 section-motion section-motion-delay-3 pro-stagger">
+          {filteredMembers.map((member) => (
             <motion.div
               layout
               key={member._id}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-[#141417] border border-gray-800 rounded-3xl p-6 hover:border-blue-500/50 transition-all group relative overflow-hidden flex flex-col"
+              className="border border-gray-800 rounded-3xl p-6 hover:border-blue-500/50 transition-all group relative overflow-hidden flex flex-col pro-hover-lift"
             >
               <div className="flex items-start justify-between mb-6">
                 <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center text-xl font-bold uppercase shadow-lg">
@@ -172,7 +171,7 @@ export default function Members() {
 
       {/* Empty State */}
       {filteredMembers.length === 0 && !loading && (
-        <div className="text-center py-24 bg-[#141417]/50 rounded-[40px] border border-dashed border-gray-800">
+        <div className="text-center py-24 rounded-[40px] border border-dashed border-gray-800 section-motion section-motion-delay-3">
           <Users className="mx-auto text-gray-700 mb-4" size={48} />
           <h3 className="text-xl font-bold text-gray-300">No matches found</h3>
           <p className="text-gray-500 mt-2">Try changing your filters or search keywords.</p>

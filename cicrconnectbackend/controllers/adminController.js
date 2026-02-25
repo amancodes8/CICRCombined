@@ -5,6 +5,11 @@ const sendEmail = require('../utils/sendEmail');
 const crypto = require('crypto');
 
 const REQUIRED_ADMIN_APPROVALS = 3;
+const resolveFrontendUrl = () => {
+  const raw = String(process.env.FRONTEND_URL || '').trim();
+  if (!raw) return 'https://cicrconnect.vercel.app';
+  return raw.split(',').map((v) => v.trim()).filter(Boolean)[0] || 'https://cicrconnect.vercel.app';
+};
 
 const ensureAdminApprover = (req, res) => {
   if (req.user?.role !== 'Admin') {
@@ -76,7 +81,7 @@ exports.sendInviteEmail = async (req, res) => {
     }
 
     // ✅ Use deployed frontend URL (NOT localhost)
-    const frontendUrl = process.env.FRONTEND_URL || "https://frontend-cicr25.vercel.app";
+    const frontendUrl = resolveFrontendUrl();
     const registerLink = `${frontendUrl}/login`;
 
     const emailMessage = `

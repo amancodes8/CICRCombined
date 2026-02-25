@@ -14,24 +14,30 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react';
-import { fetchMeetings, fetchMyInsights, fetchPosts, fetchProjects } from '../api';
+import { fetchMeetings, fetchMyInsights, fetchPosts, fetchProjects, fetchApplications } from '../api';
 
 const fmtDate = (d) => new Date(d).toLocaleDateString();
 const fmtTime = (d) => new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const Stat = ({ label, value }) => (
-  <div className="bg-[#141417] border border-gray-800 rounded-3xl p-6">
+  <div className="border border-gray-800 rounded-3xl p-6">
     <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black">{label}</p>
     <p className="text-4xl font-black text-white mt-2">{value}</p>
   </div>
 );
 
 export default function Dashboard() {
+  const profile = JSON.parse(localStorage.getItem('profile') || '{}');
+  const userData = profile.result || profile;
+  const role = String(userData.role || '').toLowerCase();
+  const isAdminOrHead = role === 'admin' || role === 'head';
+
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState([]);
   const [projects, setProjects] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [insights, setInsights] = useState(null);
+  const [applications, setApplications] = useState([]);
 
   const recentRef = useRef(null);
   const meetingsRef = useRef(null);
@@ -41,26 +47,38 @@ export default function Dashboard() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [postRes, projectRes, meetingRes, insightRes] = await Promise.all([
+        const [postRes, projectRes, meetingRes, insightRes, appRes] = await Promise.all([
           fetchPosts().catch(() => ({ data: [] })),
           fetchProjects().catch(() => ({ data: [] })),
           fetchMeetings().catch(() => ({ data: [] })),
           fetchMyInsights().catch(() => ({ data: null })),
+          isAdminOrHead ? fetchApplications().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
         ]);
         setPosts(Array.isArray(postRes.data) ? postRes.data : []);
         setProjects(Array.isArray(projectRes.data) ? projectRes.data : []);
         setMeetings(Array.isArray(meetingRes.data) ? meetingRes.data : []);
         setInsights(insightRes.data);
+        setApplications(Array.isArray(appRes.data) ? appRes.data : []);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, []);
+  }, [isAdminOrHead]);
 
   const recentPosts = useMemo(() => posts.slice(0, 4), [posts]);
   const metrics = insights?.metrics;
   const member = insights?.member;
+  const applicationStats = useMemo(() => {
+    const base = { total: applications.length, new: 0, interview: 0, accepted: 0, selected: 0 };
+    applications.forEach((app) => {
+      if (app.status === 'New') base.new += 1;
+      if (app.status === 'Interview') base.interview += 1;
+      if (app.status === 'Accepted') base.accepted += 1;
+      if (app.status === 'Selected') base.selected += 1;
+    });
+    return base;
+  }, [applications]);
 
   const scrollTo = (ref) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -74,8 +92,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto pb-16 space-y-8">
-      <section className="bg-[#141417] p-6 md:p-10 relative overflow-hidden">
+    <div className="max-w-7xl mx-auto pb-16 space-y-8 page-motion-a">
+      <section className="p-6 md:p-10 relative overflow-hidden section-motion section-motion-delay-1">
         <div className="absolute -top-16 right-0 w-72 h-72 bg-blue-600/10 blur-[100px] rounded-full" />
         <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
           <div>
@@ -92,15 +110,31 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 section-motion section-motion-delay-2 pro-stagger">
         <Stat label="Projects Involved" value={metrics?.totalProjectContributions || projects.length} />
         <Stat label="Meetings & Events" value={metrics?.totalEvents || meetings.length} />
         <Stat label="Discussions" value={posts.length} />
         <Stat label="Years In CICR" value={insights?.member?.yearsInCICR ?? 0} />
       </section>
 
+      {isAdminOrHead && (
+        <section className="border border-gray-800 rounded-[2rem] p-6 md:p-8 section-motion section-motion-delay-2">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles size={16} className="text-blue-400" />
+            <h3 className="text-lg font-black text-white">Recruitment Snapshot</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+            <Stat label="Total Applications" value={applicationStats.total} />
+            <Stat label="New" value={applicationStats.new} />
+            <Stat label="Interview" value={applicationStats.interview} />
+            <Stat label="Accepted" value={applicationStats.accepted} />
+            <Stat label="Selected" value={applicationStats.selected} />
+          </div>
+        </section>
+      )}
+
       {member && (
-        <section className="border-b-white border-b-1  p-6 md:p-6">
+        <section className="border-b-white border-b-1  p-6 md:p-6 section-motion section-motion-delay-2">
           <div className="flex items-center justify-between gap-4 mb-5">
             <h3 className="text-xl font-black text-white">Profile Snapshot</h3>
             <span className="text-[10px] uppercase tracking-widest text-blue-400 font-black">{member.role}</span>
@@ -121,7 +155,7 @@ export default function Dashboard() {
         </section>
       )}
 
-      <section ref={recentRef} className="  rounded-[2rem] p-6 md:p-8">
+      <section ref={recentRef} className="rounded-[2rem] p-6 md:p-8 section-motion section-motion-delay-3">
         <div className="flex items-center gap-2 mb-6">
           <Sparkles size={18} className="text-blue-400" />
           <h3 className="text-xl font-black text-white">Latest Posts (Top 4)</h3>
@@ -137,8 +171,8 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        <section ref={meetingsRef} className=" p-6 md:p-8">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 section-motion section-motion-delay-3">
+        <section ref={meetingsRef} className="p-6 md:p-8">
           <h3 className="text-xl font-black text-white flex items-center gap-2 mb-5"><CalendarDays size={18} className="text-emerald-400" />Meetings</h3>
           <div className="space-y-3">
             {meetings.slice(0, 6).map((m) => (
@@ -151,7 +185,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <section ref={projectsRef} className=" p-6 md:p-8">
+        <section ref={projectsRef} className="p-6 md:p-8">
           <h3 className="text-xl font-black text-white flex items-center gap-2 mb-5"><FolderKanban size={18} className="text-indigo-400" />Projects</h3>
           <div className="space-y-3">
             {projects.slice(0, 6).map((p) => (
@@ -164,7 +198,7 @@ export default function Dashboard() {
         </section>
       </div>
 
-      <section ref={discussionsRef} className=" p-6 md:p-8">
+      <section ref={discussionsRef} className="p-6 md:p-8 section-motion section-motion-delay-3">
         <h3 className="text-xl font-black text-white flex items-center gap-2 mb-5"><MessageSquareText size={18} className="text-amber-400" />Recent Discussions</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {posts.slice(0, 6).map((post) => (

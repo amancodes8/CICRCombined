@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Plus, Search, ChevronRight, Star, 
-  Users, Target, Loader2, Rocket, Zap
+  Plus, Search, ChevronRight,
+  Users, Target, Loader2, Rocket
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { fetchProjects } from '../api';
 
 export default function Projects() {
@@ -15,6 +15,11 @@ export default function Projects() {
 
   const user = JSON.parse(localStorage.getItem('profile') || '{}');
   const userData = user.result || user;
+  const role = String(userData.role || '').toLowerCase();
+  const isAdminOrHead = role === 'admin' || role === 'head';
+  const year = Number(userData.year);
+  const isSenior = Number.isFinite(year) && year >= 2;
+  const canCreate = isAdminOrHead || isSenior;
 
   useEffect(() => {
     const loadProjects = async () => {
@@ -49,10 +54,10 @@ export default function Projects() {
   );
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 page-motion-b">
       
       {/* GLOSS HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-4">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-4 section-motion section-motion-delay-1">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Rocket className="text-blue-500" size={24} />
@@ -61,16 +66,22 @@ export default function Projects() {
           <p className="text-gray-500 font-medium text-sm md:text-base">Track lab innovations and team deployments</p>
         </div>
         
-        <Link 
-          to="/create-project" 
-          className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl flex items-center justify-center gap-3 font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 active:scale-95"
-        >
-          <Plus size={18} /> Initiate Project
-        </Link>
+        {canCreate ? (
+          <Link 
+            to="/create-project" 
+            className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl flex items-center justify-center gap-3 font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 active:scale-95"
+          >
+            <Plus size={18} /> Initiate Project
+          </Link>
+        ) : (
+          <div className="w-full md:w-auto border border-amber-500/30 text-amber-200 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-center">
+            Seniors only
+          </div>
+        )}
       </header>
 
       {/* FILTER TERMINAL */}
-      <div className="flex flex-col lg:flex-row gap-4 items-center justify-between  p-3 md:p-4  shadow-2xl">
+      <div className="flex flex-col lg:flex-row gap-4 items-center justify-between p-3 md:p-4 shadow-2xl section-motion section-motion-delay-2">
         <div className="relative w-full lg:w-96 group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={18} />
           <input 
@@ -100,7 +111,7 @@ export default function Projects() {
       </div>
 
       {/* MISSION GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 section-motion section-motion-delay-3 pro-stagger">
         <AnimatePresence>
           {filteredProjects.map((project, idx) => (
             <motion.div 
@@ -109,7 +120,7 @@ export default function Projects() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
               key={project._id}
-              className="bg-[#141417] border border-gray-800 rounded-[2rem] p-8 flex flex-col hover:bg-[#1a1a1f] hover:border-blue-500/50 transition-all group relative overflow-hidden shadow-xl"
+              className="border border-gray-800 rounded-[2rem] p-8 flex flex-col hover:bg-[#1a1a1f] hover:border-blue-500/50 transition-all group relative overflow-hidden shadow-xl pro-hover-lift"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-3xl" />
               
@@ -165,7 +176,7 @@ export default function Projects() {
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-center py-20 bg-[#141417]/50 rounded-[2.5rem] border-2 border-dashed border-gray-800"
+          className="text-center py-20 rounded-[2.5rem] border-2 border-dashed border-gray-800"
         >
           <Target className="mx-auto text-gray-800 mb-4" size={48} />
           <p className="text-gray-500 font-black uppercase text-xs tracking-[0.3em]">No projects found in this sector</p>

@@ -4,12 +4,19 @@ import {
   FolderKanban, Users, Layout, 
   ArrowLeft, Check, Loader2 
 } from 'lucide-react';
-import { fetchMembers, createProject } from '../api';
+import { fetchDirectoryMembers, createProject } from '../api';
 
 export default function CreateProject() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const profile = JSON.parse(localStorage.getItem('profile') || '{}');
+  const userData = profile.result || profile;
+  const role = String(userData.role || '').toLowerCase();
+  const isAdminOrHead = role === 'admin' || role === 'head';
+  const year = Number(userData.year);
+  const isSenior = Number.isFinite(year) && year >= 2;
+  const canCreate = isAdminOrHead || isSenior;
   
   const [formData, setFormData] = useState({
     title: '',
@@ -20,8 +27,16 @@ export default function CreateProject() {
   });
 
   useEffect(() => {
-    fetchMembers().then(res => setUsers(res.data));
+    fetchDirectoryMembers().then(res => setUsers(res.data));
   }, []);
+
+  const eligibleUsers = isAdminOrHead
+    ? users
+    : users.filter((u) => {
+        const yr = Number(u.year);
+        if (!Number.isFinite(yr)) return false;
+        return Number.isFinite(year) && yr <= year;
+      });
 
   const toggleTeamMember = (userId) => {
     setFormData(prev => ({
@@ -34,6 +49,10 @@ export default function CreateProject() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canCreate) {
+      alert('Only seniors (2nd year+) can create projects.');
+      return;
+    }
     setLoading(true);
     try {
       await createProject(formData);
@@ -47,13 +66,19 @@ export default function CreateProject() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <button onClick={() => navigate('/projects')} className="flex items-center gap-2 text-gray-400 hover:text-white">
+    <div className="max-w-4xl mx-auto space-y-6 page-motion-a pro-stagger">
+      <button onClick={() => navigate('/projects')} className="flex items-center gap-2 text-gray-400 hover:text-white section-motion section-motion-delay-1">
         <ArrowLeft size={18} /> Back to Projects
       </button>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-[#141417] border border-gray-800 p-8 rounded-3xl space-y-6">
+      {!canCreate && (
+        <div className="border border-amber-500/30 rounded-2xl p-4 text-sm text-amber-200 section-motion section-motion-delay-1">
+          Project creation is available to seniors (2nd year+) and Admin/Head only.
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6 section-motion section-motion-delay-2">
+        <div className="border border-gray-800 p-8 rounded-3xl space-y-6 pro-hover-lift">
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-400">Project Title</label>
             <input required placeholder="Enter unique title" className="w-full bg-[#0a0a0c] border border-gray-800 p-4 rounded-xl outline-none" onChange={e => setFormData({...formData, title: e.target.value})} />
@@ -72,7 +97,7 @@ export default function CreateProject() {
               <label className="text-sm font-medium text-gray-400">Project Lead</label>
               <select required className="w-full bg-[#0a0a0c] border border-gray-800 p-4 rounded-xl outline-none" onChange={e => setFormData({...formData, lead: e.target.value})}>
                 <option value="">Select a lead</option>
-                {users.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+                {eligibleUsers.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
               </select>
             </div>
           </div>
@@ -83,10 +108,10 @@ export default function CreateProject() {
           </div>
         </div>
 
-        <div className="bg-[#141417] border border-gray-800 p-8 rounded-3xl space-y-4">
+        <div className="border border-gray-800 p-8 rounded-3xl space-y-4 pro-hover-lift">
           <h3 className="text-xl font-bold flex items-center gap-2"><Users size={20} className="text-blue-500" /> Assemble Team</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-            {users.map(u => (
+            {eligibleUsers.map(u => (
               <div 
                 key={u._id}
                 onClick={() => toggleTeamMember(u._id)}
@@ -99,7 +124,7 @@ export default function CreateProject() {
           </div>
         </div>
 
-        <button disabled={loading} className="w-full bg-blue-600 py-5 rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all flex justify-center items-center gap-3">
+        <button disabled={loading || !canCreate} className="w-full bg-blue-600 py-5 rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all flex justify-center items-center gap-3 disabled:opacity-60 disabled:bg-gray-800 disabled:text-gray-500">
           {loading ? <Loader2 className="animate-spin" /> : "Launch Project"}
         </button>
       </form>

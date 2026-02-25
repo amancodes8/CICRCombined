@@ -38,17 +38,17 @@ export default function AddComponent() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6 page-motion-a">
       {/* Back Button */}
       <button 
         onClick={() => navigate('/inventory')} 
-        className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors group"
+        className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors group section-motion section-motion-delay-1"
       >
         <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" /> 
         Back to Inventory
       </button>
 
-      <div className="bg-[#141417] border border-gray-800 rounded-3xl overflow-hidden shadow-2xl">
+      <div className="border border-gray-800 rounded-3xl overflow-hidden shadow-2xl section-motion section-motion-delay-2 pro-hover-lift">
         <div className="bg-blue-600 p-6 flex items-center gap-4">
           <div className="bg-white/20 p-3 rounded-xl">
             <Package className="text-white" size={24} />

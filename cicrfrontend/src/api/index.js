@@ -3,6 +3,7 @@ import axios from 'axios';
 
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'https://cicrcombined.onrender.com/api',
+  timeout: 20000,
 
   headers: {
     'Content-Type': 'application/json',
@@ -194,5 +195,32 @@ export const createCommunicationStream = () => {
   const query = token ? `?token=${encodeURIComponent(token)}` : '';
   return new EventSource(`${base}/communication/stream${query}`);
 };
+
+// Issue tickets
+export const createIssueTicket = (payload) => API.post('/issues', payload);
+export const fetchMyIssues = () => API.get('/issues/mine');
+export const fetchAdminIssues = (status = '') =>
+  API.get(`/issues${status ? `?status=${encodeURIComponent(status)}` : ''}`);
+export const updateIssueTicket = (id, payload) => API.patch(`/issues/${id}`, payload);
+
+// Events
+export const fetchEvents = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/events${suffix}`);
+};
+export const createEvent = (payload) => API.post('/events', payload);
+export const updateEvent = (id, payload) => API.put(`/events/${id}`, payload);
+export const deleteEvent = (id) => API.delete(`/events/${id}`);
+
+// Recruitment applications
+export const createApplication = (payload) => API.post('/applications', payload);
+export const fetchApplications = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/applications${suffix}`);
+};
+export const updateApplication = (id, payload) => API.patch(`/applications/${id}`, payload);
+export const sendApplicationInvite = (id) => API.post(`/applications/${id}/send-invite`);
 
 export default API;

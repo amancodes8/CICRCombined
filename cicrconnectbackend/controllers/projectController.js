@@ -1,5 +1,6 @@
 const Project = require('../models/Project');
 const User = require('../models/User');
+const { isAdminOrHead, validateHierarchyTeam, parseYear, canManageJunior } = require('../utils/hierarchy');
 
 /**
  * @desc    Create a new project
@@ -10,12 +11,45 @@ const createProject = async (req, res) => {
     const { title, description, domain, team, lead } = req.body;
 
     try {
+        if (!isAdminOrHead(req.user)) {
+            const actorYear = parseYear(req.user.year);
+            if (!actorYear || actorYear < 2) {
+                return res.status(403).json({ message: 'Only seniors (2nd year and above) can create projects.' });
+            }
+        }
+
+        const teamIds = Array.isArray(team) ? [...new Set(team.filter(Boolean))] : [];
+        const leadId = lead || req.user.id;
+        if (!teamIds.includes(leadId)) {
+            teamIds.push(leadId);
+        }
+
+        const members = teamIds.length
+            ? await User.find({ _id: { $in: teamIds } }).select('year role name')
+            : [];
+
+        if (teamIds.length && members.length !== teamIds.length) {
+            return res.status(400).json({ message: 'Some team members could not be found.' });
+        }
+
+        if (!isAdminOrHead(req.user) && members.length) {
+            const validation = validateHierarchyTeam(req.user, members);
+            if (!validation.allowed) {
+                return res.status(403).json({ message: validation.reason });
+            }
+
+            const leadUser = members.find((m) => String(m._id) === String(leadId));
+            if (leadUser && String(leadId) !== String(req.user.id) && !canManageJunior(req.user, leadUser)) {
+                return res.status(403).json({ message: 'You can only assign lead roles to your year or junior members.' });
+            }
+        }
+
         const project = new Project({
             title,
             description,
             domain,
-            team,
-            lead: lead || req.user.id, // If no lead specified, creator is lead
+            team: teamIds,
+            lead: leadId, // If no lead specified, creator is lead
         });
 
         const createdProject = await project.save();

@@ -30,7 +30,7 @@ export default function CicrAssistant({ title = 'CICR Assistant', placeholder = 
   };
 
   return (
-    <div className="bg-[#141417] border border-gray-800 rounded-[2.5rem] overflow-hidden shadow-2xl">
+    <div className="border border-gray-800 rounded-[2.5rem] overflow-hidden shadow-2xl">
       <div className="p-6 border-b border-gray-800">
         <h3 className="text-xl font-black text-white">{title}</h3>
       </div>

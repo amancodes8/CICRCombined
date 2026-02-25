@@ -4,6 +4,9 @@ const generateToken = require('../utils/generateToken');
 const sendEmail = require('../utils/sendEmail');
 const crypto = require('crypto');
 
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+const normalizeCollegeId = (value) => String(value || '').trim().toUpperCase();
+
 const normalizeHandle = (value) => {
   if (!value) return '';
   const raw = String(value).trim();
@@ -24,26 +27,30 @@ const normalizeHandle = (value) => {
 
 const registerUser = async (req, res) => {
   const { name, email, password, collegeId, inviteCode, joinedAt } = req.body;
+  const normalizedName = String(name || '').trim();
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedCollegeId = normalizeCollegeId(collegeId);
+  const normalizedInviteCode = String(inviteCode || '').trim().toUpperCase();
 
-  if (!name || !email || !password || !collegeId || !inviteCode) {
+  if (!normalizedName || !normalizedEmail || !password || !normalizedCollegeId || !normalizedInviteCode) {
     return res.status(400).json({ message: 'All fields required' });
   }
 
-  const userExists = await User.findOne({ $or: [{ email }, { collegeId }] });
+  const userExists = await User.findOne({ $or: [{ email: normalizedEmail }, { collegeId: normalizedCollegeId }] });
   if (userExists) {
     return res.status(400).json({ message: 'User already exists' });
   }
 
-  const code = await InviteCode.findOne({ code: inviteCode });
+  const code = await InviteCode.findOne({ code: normalizedInviteCode });
   if (!code || code.isUsed || code.expiresAt < new Date()) {
     return res.status(400).json({ message: 'Invalid invite code' });
   }
 
   await User.create({
-    name,
-    email,
+    name: normalizedName,
+    email: normalizedEmail,
     password,
-    collegeId,
+    collegeId: normalizedCollegeId,
     joinedAt: joinedAt ? new Date(joinedAt) : undefined,
     isVerified: false,
     approvalStatus: 'Pending',
@@ -60,8 +67,9 @@ const registerUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
   const { email, password } = req.body;
+  const normalizedEmail = normalizeEmail(email);
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: normalizedEmail });
   if (!user || !(await user.matchPassword(password))) {
     return res.status(401).json({ message: 'Invalid credentials' });
   }
@@ -97,12 +105,14 @@ const verifyEmail = async (req, res) => {
 
 const sendPasswordResetOtp = async (req, res) => {
   const { email, collegeId } = req.body;
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedCollegeId = normalizeCollegeId(collegeId);
 
-  if (!email || !collegeId) {
+  if (!normalizedEmail || !normalizedCollegeId) {
     return res.status(400).json({ message: 'Email and college ID are required' });
   }
 
-  const user = await User.findOne({ email, collegeId });
+  const user = await User.findOne({ email: normalizedEmail, collegeId: normalizedCollegeId });
   if (!user) {
     return res.status(404).json({ success: false, message: 'User not found with provided email and college ID' });
   }
@@ -129,8 +139,10 @@ const sendPasswordResetOtp = async (req, res) => {
 
 const resetPasswordWithOtp = async (req, res) => {
   const { email, collegeId, otp, newPassword } = req.body;
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedCollegeId = normalizeCollegeId(collegeId);
 
-  if (!email || !collegeId || !otp || !newPassword) {
+  if (!normalizedEmail || !normalizedCollegeId || !otp || !newPassword) {
     return res.status(400).json({ message: 'Email, college ID, OTP, and new password are required' });
   }
 
@@ -141,8 +153,8 @@ const resetPasswordWithOtp = async (req, res) => {
   const hashedOtp = crypto.createHash('sha256').update(String(otp)).digest('hex');
 
   const user = await User.findOne({
-    email,
-    collegeId,
+    email: normalizedEmail,
+    collegeId: normalizedCollegeId,
     passwordResetOtp: hashedOtp,
     passwordResetOtpExpires: { $gt: Date.now() },
   });

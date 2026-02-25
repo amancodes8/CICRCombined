@@ -4,29 +4,35 @@ import { fetchInventory } from '../api';
 
 export default function MyInventory() {
   const [myItems, setMyItems] = useState([]);
-  const user = JSON.parse(localStorage.getItem('profile') || '{}');
+  const profile = JSON.parse(localStorage.getItem('profile') || '{}');
+  const user = profile.result || profile;
+  const userId = user?._id || '';
 
   useEffect(() => {
+    if (!userId) {
+      setMyItems([]);
+      return;
+    }
     fetchInventory().then(res => {
       const filtered = res.data.filter(item => 
-        item.issuedTo.some(log => log.user?._id === user._id)
+        item.issuedTo.some(log => String(log.user?._id) === String(userId))
       );
       setMyItems(filtered);
     });
-  }, []);
+  }, [userId]);
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
-      <header>
+    <div className="space-y-8 max-w-6xl mx-auto page-motion-a pro-stagger">
+      <header className="section-motion section-motion-delay-1">
         <h2 className="text-3xl font-bold">My Borrowed Items</h2>
         <p className="text-gray-400">Components currently assigned to your projects</p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 section-motion section-motion-delay-2">
         {myItems.map(item => {
-          const myLog = item.issuedTo.find(l => l.user?._id === user._id);
+          const myLog = item.issuedTo.find((l) => String(l.user?._id) === String(userId));
           return (
-            <div key={item._id} className="bg-[#141417] border border-gray-800 p-6 rounded-2xl flex justify-between items-center">
+            <div key={item._id} className="border border-gray-800 p-6 rounded-2xl flex justify-between items-center pro-hover-lift">
               <div className="flex gap-4 items-center">
                 <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500"><Package size={24} /></div>
                 <div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, CalendarDays, Loader2, MessageSquarePlus, Users } from 'lucide-react';
 import { addProjectSuggestion, fetchProjectById } from '../api';
@@ -16,7 +16,7 @@ export default function ProjectDetails() {
   const user = profile.result || profile;
   const canSuggest = ['admin', 'head', 'alumni'].includes((user.role || '').toLowerCase());
 
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await fetchProjectById(id);
@@ -26,11 +26,11 @@ export default function ProjectDetails() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     loadProject();
-  }, [id]);
+  }, [loadProject]);
 
   const orderedSuggestions = useMemo(
     () => [...(project?.suggestions || [])].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
@@ -63,11 +63,11 @@ export default function ProjectDetails() {
 
   if (!project) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Link to="/projects" className="inline-flex items-center gap-2 text-gray-400 hover:text-white">
+      <div className="max-w-4xl mx-auto space-y-6 page-motion-b">
+        <Link to="/projects" className="inline-flex items-center gap-2 text-gray-400 hover:text-white section-motion section-motion-delay-1">
           <ArrowLeft size={16} /> Back to projects
         </Link>
-        <div className="bg-[#141417] border border-gray-800 rounded-3xl p-8">
+        <div className="border border-gray-800 rounded-3xl p-8 section-motion section-motion-delay-2">
           <p className="text-red-400 font-semibold">Project not found.</p>
         </div>
       </div>
@@ -75,12 +75,12 @@ export default function ProjectDetails() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12">
-      <Link to="/projects" className="inline-flex items-center gap-2 text-gray-400 hover:text-white">
+    <div className="max-w-5xl mx-auto space-y-6 pb-12 page-motion-b pro-stagger">
+      <Link to="/projects" className="inline-flex items-center gap-2 text-gray-400 hover:text-white section-motion section-motion-delay-1">
         <ArrowLeft size={16} /> Back to projects
       </Link>
 
-      <section className="bg-[#141417] border border-gray-800 rounded-3xl p-8 space-y-5">
+      <section className="border border-gray-800 rounded-3xl p-8 space-y-5 section-motion section-motion-delay-2">
         <p className="text-xs uppercase tracking-widest text-blue-400 font-black">{project.domain} • {project.status}</p>
         <h1 className="text-3xl font-black text-white">{project.title}</h1>
         <p className="text-gray-300 leading-relaxed">{project.description}</p>
@@ -96,7 +96,7 @@ export default function ProjectDetails() {
         </div>
       </section>
 
-      <section className="bg-[#141417] border border-gray-800 rounded-3xl p-8">
+      <section className="border border-gray-800 rounded-3xl p-8 section-motion section-motion-delay-2">
         <h2 className="text-xl font-black text-white flex items-center gap-2"><Users size={18} className="text-indigo-400" /> Team</h2>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
           {(project.team || []).map((member) => (
@@ -112,7 +112,7 @@ export default function ProjectDetails() {
         </div>
       </section>
 
-      <section className="bg-[#141417] border border-gray-800 rounded-3xl p-8 space-y-4">
+      <section className="border border-gray-800 rounded-3xl p-8 space-y-4 section-motion section-motion-delay-3">
         <h2 className="text-xl font-black text-white flex items-center gap-2"><CalendarDays size={18} className="text-emerald-400" /> Suggestions</h2>
 
         {canSuggest && (

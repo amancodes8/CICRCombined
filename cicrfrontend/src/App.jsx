@@ -1,28 +1,28 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import GlobalToastHost from './components/GlobalToastHost';
 
-// Pages
-import Auth from './pages/Auth';
-import Dashboard from './pages/Dashboard';
-import Projects from './pages/Projects';
-import ProjectDetails from './pages/ProjectDetails';
-import Meetings from './pages/Meetings';
-import ScheduleMeeting from './pages/ScheduleMeeting';
-import AdminPanel from './pages/AdminPanel';
-import CreateProject from './pages/CreateProject';
-import Community from './pages/Community';
-import Profile from './pages/Profile'; // Import the new Profile page
-import PublicProfile from './pages/PublicProfile';
-import VerifyEmail from './pages/VerifyEmail';
-import Guidelines from './pages/Guidelines';
-import Communication from './pages/Communication';
-
-// Inventory Pages
-import Inventory from './pages/Inventory'; 
-import AddComponent from './pages/AddComponent';
-import InventoryDetail from './pages/InventoryDetail';
-import MyInventory from './pages/MyInventory';
+const Auth = lazy(() => import('./pages/Auth'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Projects = lazy(() => import('./pages/Projects'));
+const ProjectDetails = lazy(() => import('./pages/ProjectDetails'));
+const Meetings = lazy(() => import('./pages/Meetings'));
+const ScheduleMeeting = lazy(() => import('./pages/ScheduleMeeting'));
+const AdminPanel = lazy(() => import('./pages/AdminPanel'));
+const CreateProject = lazy(() => import('./pages/CreateProject'));
+const Community = lazy(() => import('./pages/Community'));
+const Profile = lazy(() => import('./pages/Profile'));
+const PublicProfile = lazy(() => import('./pages/PublicProfile'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const Guidelines = lazy(() => import('./pages/Guidelines'));
+const Communication = lazy(() => import('./pages/Communication'));
+const Events = lazy(() => import('./pages/Events'));
+const Apply = lazy(() => import('./pages/Apply'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+const AddComponent = lazy(() => import('./pages/AddComponent'));
+const InventoryDetail = lazy(() => import('./pages/InventoryDetail'));
+const MyInventory = lazy(() => import('./pages/MyInventory'));
 
 // Middleware: Prevent access if not logged in
 const ProtectedRoute = ({ children }) => {
@@ -55,71 +55,86 @@ function App() {
   return (
     <Router>
       <GlobalToastHost />
-      <Routes>
-        {/* Public Route */}
-        <Route path="/login" element={<Auth />} />
-        <Route path="/verify-email/:token" element={<VerifyEmail />} />
-        <Route path="/profile/:collegeId" element={<PublicProfile />} />
+      <Suspense fallback={<RouteLoader />}>
+        <Routes>
+          {/* Public Route */}
+          <Route path="/login" element={<Auth />} />
+          <Route path="/verify-email/:token" element={<VerifyEmail />} />
+          <Route path="/profile/:collegeId" element={<PublicProfile />} />
+          <Route path="/apply" element={<Apply />} />
 
-        {/* Protected Application Routes */}
-        <Route 
-          path="/*" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Routes>
-                  {/* Main Dashboard & Profile */}
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/profile" element={<Profile />} />
-                  
-                  {/* Project Management */}
-                  <Route path="/projects" element={<Projects />} />
-                  <Route path="/projects/:id" element={<ProjectDetails />} />
-                  <Route path="/create-project" element={<CreateProject />} />
-                  
-                  {/* Meetings & Collaboration */}
-                  <Route path="/meetings" element={<Meetings />} />
-                  <Route path="/schedule" element={<ScheduleMeeting />} />
-                  
-                  {/* Community & AI Tools */}
-                  <Route path="/community" element={<Community />} />
-                  <Route path="/ai" element={<Navigate to="/communication" replace />} />
-                  <Route
-                    path="/communication"
-                    element={
-                      <StrictAdminRoute>
-                        <Communication />
-                      </StrictAdminRoute>
-                    }
-                  />
-                  <Route path="/guidelines" element={<Guidelines />} />
-                  
-                  {/* Inventory Management System */}
-                  <Route path="/inventory" element={<Inventory />} />
-                  <Route path="/inventory/add" element={<AddComponent />} />
-                  <Route path="/inventory/my-items" element={<MyInventory />} />
-                  <Route path="/inventory/:id" element={<InventoryDetail />} />
-                  
-                  {/* Admin Specific Control Panel */}
-                  <Route 
-                    path="/admin" 
-                    element={
-                      <AdminRoute>
-                        <AdminPanel />
-                      </AdminRoute>
-                    } 
-                  />
+          {/* Protected Application Routes */}
+          <Route 
+            path="/*" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Routes>
+                    {/* Main Dashboard & Profile */}
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/profile" element={<Profile />} />
+                    
+                    {/* Project Management */}
+                    <Route path="/projects" element={<Projects />} />
+                    <Route path="/projects/:id" element={<ProjectDetails />} />
+                    <Route path="/create-project" element={<CreateProject />} />
+                    
+                    {/* Meetings & Collaboration */}
+                    <Route path="/meetings" element={<Meetings />} />
+                    <Route path="/schedule" element={<ScheduleMeeting />} />
+                    <Route path="/events" element={<Events />} />
+                    
+                    {/* Community & AI Tools */}
+                    <Route path="/community" element={<Community />} />
+                    <Route path="/ai" element={<Navigate to="/communication" replace />} />
+                    <Route
+                      path="/communication"
+                      element={
+                        <StrictAdminRoute>
+                          <Communication />
+                        </StrictAdminRoute>
+                      }
+                    />
+                    <Route path="/guidelines" element={<Guidelines />} />
+                    
+                    {/* Inventory Management System */}
+                    <Route path="/inventory" element={<Inventory />} />
+                    <Route path="/inventory/add" element={<AddComponent />} />
+                    <Route path="/inventory/my-items" element={<MyInventory />} />
+                    <Route path="/inventory/:id" element={<InventoryDetail />} />
+                    
+                    {/* Admin Specific Control Panel */}
+                    <Route 
+                      path="/admin" 
+                      element={
+                        <AdminRoute>
+                          <AdminPanel />
+                        </AdminRoute>
+                      } 
+                    />
 
-                  {/* Fallback to Dashboard */}
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-      </Routes>
+                    {/* Fallback to Dashboard */}
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  </Routes>
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+        </Routes>
+      </Suspense>
     </Router>
   );
 }
 
 export default App;
+
+function RouteLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#07090d]">
+      <div className="inline-flex items-center gap-3 text-xs uppercase tracking-[0.24em] text-blue-300 font-black">
+        <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+        Loading Workspace
+      </div>
+    </div>
+  );
+}

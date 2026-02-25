@@ -7,7 +7,7 @@ const { authorize } = require('../middleware/roleMiddleware');
 // Get all projects and create a new project
 router.route('/')
     .get(protect, getAllProjects)
-    .post(protect, authorize('Admin', 'Head'), createProject);
+    .post(protect, createProject);
 
 // Get a single project by ID
 router.route('/:id')

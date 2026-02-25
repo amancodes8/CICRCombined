@@ -1,4 +1,6 @@
 const Meeting = require('../models/Meeting');
+const User = require('../models/User');
+const { isAdminOrHead, validateHierarchyTeam, parseYear } = require('../utils/hierarchy');
 
 /**
  * @desc    Schedule a new meeting
@@ -14,14 +16,38 @@ exports.scheduleMeeting = async (req, res) => {
             return res.status(400).json({ message: "Please provide all required fields." });
         }
 
-        // 2. Create meeting using 'organizedBy' (matching your Schema)
+        // 2. Enforce hierarchy rules for non-admin roles
+        if (!isAdminOrHead(req.user)) {
+            const actorYear = parseYear(req.user.year);
+            if (!actorYear || actorYear < 2) {
+                return res.status(403).json({ message: 'Only seniors (2nd year and above) can schedule meetings.' });
+            }
+        }
+
+        const participantIds = Array.isArray(participants) ? [...new Set(participants.filter(Boolean))] : [];
+        const participantUsers = participantIds.length
+            ? await User.find({ _id: { $in: participantIds } }).select('year role')
+            : [];
+
+        if (participantIds.length && participantUsers.length !== participantIds.length) {
+            return res.status(400).json({ message: 'Some participants could not be found.' });
+        }
+
+        if (!isAdminOrHead(req.user) && participantUsers.length) {
+            const validation = validateHierarchyTeam(req.user, participantUsers);
+            if (!validation.allowed) {
+                return res.status(403).json({ message: validation.reason });
+            }
+        }
+
+        // 3. Create meeting using 'organizedBy' (matching your Schema)
         const newMeeting = new Meeting({
             title,
             meetingType,
             details, // This contains topic, location, and optionally agenda
             startTime,
             endTime,
-            participants,
+            participants: participantIds,
             organizedBy: req.user.id // Taken from the 'protect' middleware
         });
 

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Users, FolderKanban, 
   Calendar, LogOut, ShieldCheck, FileText, UserSquare2,
-  Package, Menu, X, Radio
+  Package, Menu, X, Radio, Sparkles
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { fetchCommunicationMessages, getMe } from '../api';
@@ -12,6 +12,7 @@ import logo from './logo.png';
 export default function Layout({ children }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
+  const [logoUnavailable, setLogoUnavailable] = useState(false);
   const location = useLocation();
   
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
@@ -93,6 +94,7 @@ export default function Layout({ children }) {
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: FolderKanban, label: "Projects", path: "/projects" },
     { icon: Calendar, label: "Meetings", path: "/meetings" },
+    { icon: Sparkles, label: "Events", path: "/events" },
     { icon: Package, label: "Inventory", path: "/inventory" },
     ...(isStrictAdmin ? [{ icon: Radio, label: "Collab Stream", path: "/communication" }] : []),
     { icon: Users, label: "Community", path: "/community" },
@@ -114,7 +116,18 @@ export default function Layout({ children }) {
           onClick={() => setIsMobileOpen(false)}
           className="group inline-flex items-center gap-3"
         >
-          <img className="h-10 w-10 object-contain" src={logo} alt="CICR logo" />
+          {!logoUnavailable ? (
+            <img
+              className="h-9 w-auto max-w-[124px] object-contain drop-shadow-[0_0_14px_rgba(96,165,250,0.35)]"
+              src={logo}
+              alt="CICR logo"
+              onError={() => setLogoUnavailable(true)}
+            />
+          ) : (
+            <div className="h-9 min-w-[54px] px-3 rounded-lg border border-blue-500/35 inline-flex items-center justify-center text-[10px] uppercase tracking-[0.24em] text-blue-300 font-black">
+              CICR
+            </div>
+          )}
           <motion.h1
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -164,7 +177,7 @@ export default function Layout({ children }) {
 
       {/* Footer Profile Section (This acts as the link to /profile) */}
       <div className="mt-auto pt-6 border-t border-gray-800 space-y-4">
-        <div className="group px-2 py-2 rounded-xl border border-gray-800/70 bg-[#0a0a0c]">
+        <div className="group px-2 py-2 rounded-xl border border-gray-800/70">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-blue-600/10 border border-blue-500/20 rounded-lg flex items-center justify-center text-blue-500 font-black">
               {user.name?.[0] || 'M'}
@@ -198,7 +211,18 @@ export default function Layout({ children }) {
       {/* Mobile Top Nav */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#0a0a0c]/80 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-6 z-30">
         <div className="flex items-center gap-2.5">
-          <img className="h-8 w-8 object-contain" src={logo} alt="CICR logo" />
+          {!logoUnavailable ? (
+            <img
+              className="h-7 w-auto max-w-[88px] object-contain drop-shadow-[0_0_12px_rgba(96,165,250,0.35)]"
+              src={logo}
+              alt="CICR logo"
+              onError={() => setLogoUnavailable(true)}
+            />
+          ) : (
+            <div className="h-7 min-w-[44px] px-2 rounded-md border border-blue-500/35 inline-flex items-center justify-center text-[9px] uppercase tracking-[0.2em] text-blue-300 font-black">
+              CICR
+            </div>
+          )}
           <motion.p
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}

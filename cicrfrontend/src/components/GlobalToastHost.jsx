@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
 
@@ -29,9 +29,10 @@ const toastPalette = {
 
 export default function GlobalToastHost() {
   const [toasts, setToasts] = useState([]);
-  const originalAlertRef = useRef(window.alert);
 
   useEffect(() => {
+    const originalAlert = window.alert;
+
     const pushToast = (message, type) => {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       const toastType = type || inferToastType(message);
@@ -54,7 +55,7 @@ export default function GlobalToastHost() {
 
     return () => {
       window.removeEventListener('app:toast', onToast);
-      window.alert = originalAlertRef.current;
+      window.alert = originalAlert;
     };
   }, []);
 

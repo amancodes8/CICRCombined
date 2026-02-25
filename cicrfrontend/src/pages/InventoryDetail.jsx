@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Cpu, History, User, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { fetchInventory, issueInventoryItem } from '../api';
@@ -10,18 +10,18 @@ export default function InventoryDetail() {
   const [loading, setLoading] = useState(true);
   const [issueData, setIssueData] = useState({ quantity: 1, project: '' });
 
-  useEffect(() => {
-    getItemDetails();
-  }, [id]);
-
-  const getItemDetails = async () => {
+  const getItemDetails = useCallback(async () => {
     try {
       const { data } = await fetchInventory(); // Usually you'd have fetchInventoryById
       const found = data.find(i => i._id === id);
       setItem(found);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    getItemDetails();
+  }, [getItemDetails]);
 
   const handleIssue = async (e) => {
     e.preventDefault();
@@ -35,15 +35,15 @@ export default function InventoryDetail() {
   if (loading) return <div className="h-96 flex items-center justify-center"><Loader2 className="animate-spin text-blue-500" /></div>;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
-      <button onClick={() => navigate('/inventory')} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+    <div className="max-w-5xl mx-auto space-y-8 page-motion-c pro-stagger">
+      <button onClick={() => navigate('/inventory')} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors section-motion section-motion-delay-1">
         <ArrowLeft size={18} /> Back to Inventory
       </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 section-motion section-motion-delay-2">
         {/* Left: Specs & Info */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-[#141417] border border-gray-800 p-8 rounded-3xl">
+          <div className="border border-gray-800 p-8 rounded-3xl pro-hover-lift">
             <div className="flex items-center gap-4 mb-6">
               <div className="p-4 bg-blue-600/10 rounded-2xl text-blue-500"><Cpu size={32} /></div>
               <div>
@@ -69,7 +69,7 @@ export default function InventoryDetail() {
           </div>
 
           {/* Borrowing History */}
-          <div className="bg-[#141417] border border-gray-800 rounded-3xl p-6">
+          <div className="border border-gray-800 rounded-3xl p-6 pro-hover-lift">
             <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><History size={20} /> Issuance History</h3>
             <div className="space-y-4">
               {item.issuedTo?.length > 0 ? item.issuedTo.map((log, idx) => (
@@ -93,7 +93,7 @@ export default function InventoryDetail() {
 
         {/* Right: Issue Form */}
         <div className="space-y-6">
-          <div className="bg-blue-600/5 border border-blue-500/20 p-8 rounded-3xl">
+          <div className="bg-blue-600/5 border border-blue-500/20 p-8 rounded-3xl pro-hover-lift">
             <h3 className="text-xl font-bold mb-4">Issue Component</h3>
             <form onSubmit={handleIssue} className="space-y-4">
               <div>

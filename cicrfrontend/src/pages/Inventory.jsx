@@ -106,9 +106,9 @@ export default function Inventory() {
   );
 
   return (
-    <div className="space-y-10 max-w-7xl mx-auto pb-20">
+    <div className="space-y-10 max-w-7xl mx-auto pb-20 page-motion-a">
       {/* GLOSS HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-end md:items-center  p-8 rounded-[2.5rem] relative overflow-hidden shadow-2xl">
+      <header className="flex flex-col md:flex-row justify-between items-end md:items-center p-8 rounded-[2.5rem] relative overflow-hidden shadow-2xl section-motion section-motion-delay-1">
         <div className="absolute top-0 left-0 w-64 h-64 blur-[100px] rounded-full" />
         <div className="relative z-10">
           <h2 className="text-3xl font-black tracking-tighter text-white">Lab Inventory</h2>
@@ -126,20 +126,20 @@ export default function Inventory() {
       </header>
 
       {/* NEURAL SEARCH */}
-      <div className="relative group">
+      <div className="relative group section-motion section-motion-delay-2">
         <div className="absolute inset-y-0 left-5 flex items-center text-gray-500 group-focus-within:text-blue-500 transition-colors">
           <Search size={22} />
         </div>
         <input 
           type="text" 
           placeholder="Search Parts (e.g. Ultrasonic, STM32, Lipo)..." 
-          className="w-full bg-[#141417]/50 backdrop-blur-md border border-gray-800 p-5 pl-14 rounded-3xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-600/5 transition-all text-white placeholder:text-gray-600 font-medium shadow-inner"
+          className="w-full backdrop-blur-md border border-gray-800 p-5 pl-14 rounded-3xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-600/5 transition-all text-white placeholder:text-gray-600 font-medium shadow-inner"
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
       {/* PARTS BENTO GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 section-motion section-motion-delay-3 pro-stagger">
         {filteredItems.map((item, idx) => (
           <motion.div 
             key={item._id} 
@@ -147,7 +147,7 @@ export default function Inventory() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.05 }}
             whileHover={{ y: -8 }} 
-            className="bg-[#141417] border border-gray-800 p-8 rounded-[2rem] relative overflow-hidden group shadow-2xl transition-all hover:border-blue-500/40"
+            className="border border-gray-800 p-8 rounded-[2rem] relative overflow-hidden group shadow-2xl transition-all hover:border-blue-500/40 pro-hover-lift"
           >
             {/* Stock Pulse Indicator */}
             {item.availableQuantity < 5 && item.availableQuantity > 0 && (
@@ -298,7 +298,7 @@ export default function Inventory() {
 
       {/* EMPTY STATE */}
       {filteredItems.length === 0 && !loading && (
-        <div className="text-center py-32 bg-[#141417]/50 rounded-[3rem] border-2 border-dashed border-gray-800 space-y-4">
+        <div className="text-center py-32 rounded-[3rem] border-2 border-dashed border-gray-800 space-y-4 section-motion section-motion-delay-3">
           <Database className="mx-auto text-gray-800" size={64} />
           <p className="text-gray-500 font-bold tracking-widest uppercase text-xs italic">Cache empty. No parts found.</p>
         </div>
@@ -317,7 +317,7 @@ export default function Inventory() {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative bg-[#141417] border border-gray-800 w-full max-w-lg p-10 rounded-[2.5rem] shadow-3xl overflow-hidden"
+              className="relative border border-gray-800 w-full max-w-lg p-10 rounded-[2.5rem] shadow-3xl overflow-hidden"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 blur-[60px] rounded-full -mr-16 -mt-16" />
               
