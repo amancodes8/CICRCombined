@@ -389,20 +389,9 @@ export default function Layout({ children }) {
             CICR Connect
           </motion.p>
         </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg"
-            title="Logout"
-            aria-label="Logout"
-          >
-            <LogOut size={20} />
-          </button>
-          <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-gray-400">
-            {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
+        <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-gray-400">
+          {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
       </div>
 
       {/* Mobile Sidebar Drawer */}
@@ -426,14 +415,6 @@ export default function Layout({ children }) {
 
       {/* Main Content Area */}
       <main className="flex-1 lg:ml-64 p-4 md:p-8 pt-24 lg:pt-8 min-h-screen relative overflow-x-hidden">
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="hidden lg:inline-flex fixed top-5 right-6 z-30 items-center gap-2 border border-red-500/40 bg-red-500/10 text-red-200 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-[0.16em] hover:bg-red-500/20"
-        >
-          <LogOut size={14} />
-          Logout
-        </button>
         {/* Aesthetic Background Glow */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] rounded-full -z-10 pointer-events-none" />
         
