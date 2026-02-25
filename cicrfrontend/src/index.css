@@ -1,1 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
 @import "tailwindcss";
+
+:root {
+  --font-ui: "Manrope", "Segoe UI", sans-serif;
+  --font-brand: "Space Grotesk", "Avenir Next", sans-serif;
+}
+
+body {
+  font-family: var(--font-ui);
+}
+
+.brand-title {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+@keyframes brandSheen {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes brandFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1px);
+  }
+}
+
+.brand-text-animate {
+  color: transparent;
+  background-image: linear-gradient(100deg, #f8fbff 0%, #7dd3fc 28%, #60a5fa 52%, #22d3ee 74%, #f8fbff 100%);
+  background-size: 220% 220%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  text-shadow: 0 6px 24px rgba(56, 189, 248, 0.25);
+  animation: brandSheen 6.2s linear infinite, brandFloat 3s ease-in-out infinite;
+}
+
+::selection {
+  background: rgba(59, 130, 246, 0.35);
+  color: #f9fafb;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-text-animate {
+    animation: none;
+  }
+}
+
+@keyframes profileGradientSweep {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes profileValuePulse {
+  0%,
+  100% {
+    text-shadow: 0 0 0 rgba(56, 189, 248, 0.2);
+  }
+  50% {
+    text-shadow: 0 0 18px rgba(56, 189, 248, 0.45);
+  }
+}
+
+.profile-title-flow {
+  color: transparent;
+  background-image: linear-gradient(100deg, #67e8f9 0%, #38bdf8 26%, #60a5fa 52%, #818cf8 74%, #67e8f9 100%);
+  background-size: 220% 220%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: profileGradientSweep 7s ease-in-out infinite;
+}
+
+.profile-section-flow {
+  color: transparent;
+  background-image: linear-gradient(100deg, #dbeafe 0%, #7dd3fc 45%, #93c5fd 100%);
+  background-size: 180% 180%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: profileGradientSweep 9s ease-in-out infinite;
+}
+
+.profile-value-flow {
+  color: #93c5fd;
+  animation: profileValuePulse 3.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-title-flow,
+  .profile-section-flow,
+  .profile-value-flow {
+    animation: none;
+  }
+}

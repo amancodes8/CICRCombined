@@ -10,6 +10,7 @@ export default function Auth() {
   const [mode, setMode] = useState('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const isLogin = mode === 'login';
   const isForgot = mode === 'forgot';
@@ -33,6 +34,7 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setNotice('');
 
     try {
       if (isForgot) {
@@ -42,7 +44,7 @@ export default function Auth() {
             collegeId: formData.collegeId,
           });
           setOtpSent(true);
-          alert('OTP sent. Check your email.');
+          setNotice('OTP sent. Check your email.');
           return;
         }
 
@@ -52,7 +54,7 @@ export default function Auth() {
           otp: formData.otp,
           newPassword: formData.newPassword,
         });
-        alert('Password changed successfully. Please sign in.');
+        setNotice('Password changed successfully. Please sign in.');
         setMode('login');
         setOtpSent(false);
         setFormData({
@@ -71,7 +73,7 @@ export default function Auth() {
         window.location.href = '/dashboard';
       } else {
         await register(formData);
-        alert('Registration submitted. Wait for admin approval, then sign in.');
+        setNotice('Registration submitted. Wait for admin approval, then sign in.');
         setMode('login');
         setFormData({
           name: '',
@@ -137,6 +139,17 @@ export default function Auth() {
                 {error}
               </motion.div>
             )}
+            {!error && notice && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-4 rounded-2xl mb-8 flex items-center gap-3 text-xs font-semibold"
+              >
+                <AlertCircle size={18} />
+                {notice}
+              </motion.div>
+            )}
           </AnimatePresence>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -194,7 +207,7 @@ export default function Auth() {
           <div className="text-center mt-10">
             {isLogin && (
               <button
-                onClick={() => { setMode('forgot'); setOtpSent(false); setError(''); }}
+                onClick={() => { setMode('forgot'); setOtpSent(false); setError(''); setNotice(''); }}
                 className="text-xs font-black uppercase tracking-[0.2em] text-gray-600 hover:text-blue-500 transition-all mr-6"
               >
                 Change Password (OTP)
@@ -209,6 +222,7 @@ export default function Auth() {
                   setMode(isLogin ? 'signup' : 'login');
                 }
                 setError('');
+                setNotice('');
               }}
               className="text-lg mt-2 font-serif uppercase tracking-[0.2em] text-white hover:text-blue-500 transition-all"
             >

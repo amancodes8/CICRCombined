@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, MessageCircle, Send, Trash2, UserRound } from 'lucide-react';
+import { CornerUpLeft, Loader2, MessageCircle, Send, Trash2, UserRound, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   createCommunicationMessage,
@@ -43,6 +43,7 @@ export default function Communication() {
   const [mentionOptions, setMentionOptions] = useState([]);
   const [serverError, setServerError] = useState('');
   const [replyTarget, setReplyTarget] = useState(null);
+  const [actionError, setActionError] = useState('');
   const endRef = useRef(null);
   const swipeStartXRef = useRef({});
 
@@ -88,6 +89,12 @@ export default function Communication() {
   useEffect(() => {
     markCommunicationRead();
   }, []);
+
+  useEffect(() => {
+    if (!actionError) return undefined;
+    const timer = setTimeout(() => setActionError(''), 4200);
+    return () => clearTimeout(timer);
+  }, [actionError]);
 
   useEffect(() => {
     const es = createCommunicationStream();
@@ -158,8 +165,9 @@ export default function Communication() {
       setText('');
       setReplyTarget(null);
       setMentionOptions([]);
+      setActionError('');
     } catch (err) {
-      alert(err.response?.data?.message || 'Unable to send message');
+      setActionError(err.response?.data?.message || 'Unable to send message');
     } finally {
       setSending(false);
     }
@@ -175,7 +183,7 @@ export default function Communication() {
         // If already removed/expired, sync UI instead of blocking user with a hard error.
         setMessages((prev) => prev.filter((m) => m._id !== id));
       } else {
-        alert(err.response?.data?.message || 'Unable to delete message');
+        setActionError(err.response?.data?.message || 'Unable to delete message');
       }
     } finally {
       setDeletingId('');
@@ -206,7 +214,7 @@ export default function Communication() {
     <div className="max-w-5xl mx-auto pb-4 md:pb-8">
       <section className="px-1 py-2 md:py-3">
         <p className="text-xs uppercase tracking-widest text-blue-400 font-black">Collab Stream</p>
-        {/* <h1 className="text-2xl md:text-3xl font-black text-white mt-2"></h1> */}
+        <h1 className="text-2xl md:text-3xl font-black text-white mt-1 tracking-tight">Admin Conversation Hub</h1>
         <p className="text-gray-400 text-sm mt-2">Live team chat. Messages auto-expire after 3 days.</p>
       </section>
 
@@ -259,10 +267,11 @@ export default function Communication() {
                         <button
                           type="button"
                           onClick={() => setReplyTarget(m)}
-                          className="text-[10px] md:text-xs text-gray-500 hover:text-blue-400"
-                          title="Reply"
+                          className="inline-flex items-center justify-center w-6 h-6 rounded-md text-gray-500 hover:text-blue-300 hover:bg-blue-500/10 transition-colors"
+                          title="Reply to message"
+                          aria-label="Reply to message"
                         >
-                          Reply
+                          <CornerUpLeft size={13} />
                         </button>
                         <p className="text-[10px] md:text-xs text-gray-500">{fmtDayDateTime(m.createdAt)}</p>
                         {(canModerate ||
@@ -309,11 +318,18 @@ export default function Communication() {
                 </div>
                 <button
                   type="button"
-                  className="text-xs text-gray-400 hover:text-white"
+                  className="inline-flex items-center justify-center h-7 w-7 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
                   onClick={() => setReplyTarget(null)}
+                  title="Cancel reply"
+                  aria-label="Cancel reply"
                 >
-                  Cancel
+                  <X size={14} />
                 </button>
+              </div>
+            )}
+            {actionError && (
+              <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs rounded-xl px-3 py-2">
+                {actionError}
               </div>
             )}
             {mentionOptions.length > 0 && (

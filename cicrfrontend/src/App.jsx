@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
+import GlobalToastHost from './components/GlobalToastHost';
 
 // Pages
 import Auth from './pages/Auth';
@@ -53,6 +54,7 @@ const StrictAdminRoute = ({ children }) => {
 function App() {
   return (
     <Router>
+      <GlobalToastHost />
       <Routes>
         {/* Public Route */}
         <Route path="/login" element={<Auth />} />

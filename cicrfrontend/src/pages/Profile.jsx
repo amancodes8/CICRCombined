@@ -1,388 +1,631 @@
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  User, Phone, BookOpen, Calendar, Save, 
-  Edit2, X, Hash, Mail, Loader2, Award, Briefcase, Link as LinkIcon, Instagram, Facebook
+import { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  Award,
+  BookOpen,
+  Briefcase,
+  Calendar,
+  Copy,
+  Edit2,
+  ExternalLink,
+  Facebook,
+  Github,
+  Hash,
+  Instagram,
+  Link as LinkIcon,
+  Loader2,
+  Mail,
+  Phone,
+  Save,
+  ShieldAlert,
+  SquareUser,
+  User,
+  X,
 } from 'lucide-react';
 import { acknowledgeWarnings, getMe, updateProfile } from '../api';
 
+const dateToInput = (value) => {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+};
+
+const fmtDate = (value) => {
+  if (!value) return 'Not set';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return 'Not set';
+  return d.toLocaleDateString();
+};
+
+const yearsInCicr = (joinedAt) => {
+  if (!joinedAt) return 0;
+  const start = new Date(joinedAt);
+  if (Number.isNaN(start.getTime())) return 0;
+  const now = new Date();
+  let years = now.getFullYear() - start.getFullYear();
+  const monthDiff = now.getMonth() - start.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < start.getDate())) years -= 1;
+  return Math.max(0, years);
+};
+
+const buildFormData = (user = {}) => ({
+  name: user.name || '',
+  phone: user.phone || '',
+  year: user.year || '',
+  branch: (user.branch || '').toUpperCase(),
+  batch: user.batch || '',
+  joinedAt: dateToInput(user.joinedAt),
+  bio: user.bio || '',
+  skillsText: (user.skills || []).join(', '),
+  achievementsText: (user.achievements || []).join('\n'),
+  social: {
+    linkedin: user.social?.linkedin || '',
+    github: user.social?.github || '',
+    portfolio: user.social?.portfolio || '',
+    instagram: user.social?.instagram || '',
+    facebook: user.social?.facebook || '',
+  },
+});
+
+const resolveSocialUrl = (kind, rawValue) => {
+  const raw = String(rawValue || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+
+  const handle = raw.replace(/^@/, '');
+  if (!handle) return '';
+
+  if (kind === 'instagram') return `https://instagram.com/${handle}`;
+  if (kind === 'facebook') return `https://facebook.com/${handle}`;
+  if (kind === 'github') return `https://github.com/${handle}`;
+  if (kind === 'linkedin') return `https://linkedin.com/in/${handle}`;
+  return `https://${handle}`;
+};
+
+const dispatchToast = (message, type = 'info') => {
+  try {
+    window.dispatchEvent(new CustomEvent('app:toast', { detail: { message, type } }));
+  } catch {
+    // fallback if event dispatch is unavailable
+    window.alert(message);
+  }
+};
+
+const MetricCard = ({ label, value, helper }) => (
+  <article className="py-2">
+    <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black">{label}</p>
+    <p className="profile-value-flow text-3xl font-black mt-2">{value}</p>
+    {helper && <p className="text-xs text-gray-500 mt-1">{helper}</p>}
+  </article>
+);
+
+const ProfileRow = ({ icon: Icon, label, value }) => (
+  <div className="flex items-start gap-3 py-1.5">
+    <Icon size={15} className="text-cyan-300 mt-[2px]" />
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">{label}</p>
+      <p className="text-sm text-gray-200 break-words">{value || 'Not added'}</p>
+    </div>
+  </div>
+);
+
+const InputField = ({ icon: Icon, label, value, onChange, placeholder, type = 'text', disabled = false }) => (
+  <div className="space-y-2">
+    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">{label}</label>
+    <div className="relative">
+      <Icon className={`absolute left-4 top-1/2 -translate-y-1/2 ${disabled ? 'text-gray-600' : 'text-cyan-400'}`} size={17} />
+      <input
+        type={type}
+        disabled={disabled}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className="w-full bg-[#0a0f16]/85 p-3.5 pl-11 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 disabled:opacity-60 transition-all text-white placeholder:text-gray-600"
+      />
+    </div>
+  </div>
+);
+
 export default function Profile() {
-  // Get initial data from localStorage
-  const profileData = JSON.parse(localStorage.getItem('profile') || '{}');
-  const userData = profileData.result || profileData;
+  const initialRaw = JSON.parse(localStorage.getItem('profile') || '{}');
+  const initialUser = initialRaw.result || initialRaw;
 
-  const dateToInput = (value) => {
-    if (!value) return '';
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10);
-  };
-
+  const [user, setUser] = useState(initialUser);
+  const [formData, setFormData] = useState(buildFormData(initialUser));
+  const [warnings, setWarnings] = useState(initialUser.warnings || []);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [warnings, setWarnings] = useState(userData.warnings || []);
+  const [copied, setCopied] = useState(false);
 
-  const [formData, setFormData] = useState({
-    name: userData.name || '',
-    phone: userData.phone || '',
-    year: userData.year || '',
-    // UI displays in UPPERCASE
-    branch: (userData.branch || '').toUpperCase(),
-    batch: userData.batch || '',
-    joinedAt: dateToInput(userData.joinedAt),
-    bio: userData.bio || '',
-    skillsText: (userData.skills || []).join(', '),
-    achievementsText: (userData.achievements || []).join('\n'),
-    social: {
-      linkedin: userData.social?.linkedin || '',
-      github: userData.social?.github || '',
-      portfolio: userData.social?.portfolio || '',
-      instagram: userData.social?.instagram || '',
-      facebook: userData.social?.facebook || '',
-    },
-  });
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const publicProfileUrl = user.collegeId ? `${origin}/profile/${user.collegeId}` : '';
+  const skills = Array.isArray(user.skills) ? user.skills : [];
+  const achievements = Array.isArray(user.achievements) ? user.achievements : [];
+
+  const completionScore = useMemo(() => {
+    const checks = [
+      !!user.name,
+      !!user.phone,
+      !!user.year,
+      !!user.branch,
+      !!user.batch,
+      !!user.joinedAt,
+      !!user.bio,
+      skills.length > 0,
+      achievements.length > 0,
+      Object.values(user.social || {}).some((v) => String(v || '').trim()),
+    ];
+    const done = checks.filter(Boolean).length;
+    return Math.round((done / checks.length) * 100);
+  }, [achievements.length, skills.length, user.batch, user.bio, user.branch, user.joinedAt, user.name, user.phone, user.social, user.year]);
+
+  const socialItems = useMemo(
+    () => [
+      { key: 'linkedin', label: 'LinkedIn', icon: LinkIcon, raw: user.social?.linkedin || '' },
+      { key: 'github', label: 'GitHub', icon: Github, raw: user.social?.github || '' },
+      { key: 'portfolio', label: 'Portfolio', icon: ExternalLink, raw: user.social?.portfolio || '' },
+      { key: 'instagram', label: 'Instagram', icon: Instagram, raw: user.social?.instagram || '' },
+      { key: 'facebook', label: 'Facebook', icon: Facebook, raw: user.social?.facebook || '' },
+    ].map((s) => ({ ...s, href: resolveSocialUrl(s.key, s.raw) })),
+    [user.social]
+  );
+
+  const persistProfile = (incoming) => {
+    const existing = JSON.parse(localStorage.getItem('profile') || '{}');
+    const merged = { ...(existing.result || existing), ...incoming };
+    localStorage.setItem('profile', JSON.stringify(merged));
+    return merged;
+  };
+
+  const closeEditor = () => {
+    setFormData(buildFormData(user));
+    setIsEditing(false);
+  };
+
+  const copyPublicProfileUrl = async () => {
+    if (!publicProfileUrl) {
+      dispatchToast('Public profile URL unavailable until college ID is set.', 'error');
+      return;
+    }
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(publicProfileUrl);
+      } else {
+        const temp = document.createElement('textarea');
+        temp.value = publicProfileUrl;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        temp.remove();
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+      dispatchToast('Public profile URL copied.', 'success');
+    } catch {
+      dispatchToast('Unable to copy URL. Please copy manually.', 'error');
+    }
+  };
 
   const handleUpdate = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       const payload = {
-        ...formData,
-        // STORE and COMPARE in lowercase
-        branch: formData.branch.toLowerCase(),
-        skills: formData.skillsText.split(',').map((v) => v.trim()).filter(Boolean),
-        achievements: formData.achievementsText.split('\n').map((v) => v.trim()).filter(Boolean),
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        year: formData.year.trim(),
+        branch: formData.branch.trim().toLowerCase(),
+        batch: formData.batch.trim(),
+        joinedAt: formData.joinedAt || null,
+        bio: formData.bio.trim(),
+        skills: formData.skillsText
+          .split(',')
+          .map((v) => v.trim())
+          .filter(Boolean),
+        achievements: formData.achievementsText
+          .split('\n')
+          .map((v) => v.trim())
+          .filter(Boolean),
+        social: {
+          linkedin: formData.social.linkedin.trim(),
+          github: formData.social.github.trim(),
+          portfolio: formData.social.portfolio.trim(),
+          instagram: formData.social.instagram.trim(),
+          facebook: formData.social.facebook.trim(),
+        },
       };
-      delete payload.skillsText;
-      delete payload.achievementsText;
 
       const { data } = await updateProfile(payload);
-      
-      const normalized = { ...(profileData.result || profileData), ...data };
-      localStorage.setItem('profile', JSON.stringify(normalized));
-      
-      setFormData((prev) => ({
-        ...prev,
-        name: data.name || '',
-        phone: data.phone || '',
-        year: data.year || '',
-        // Format for UI after save
-        branch: (data.branch || '').toUpperCase(),
-        batch: data.batch || '',
-        joinedAt: dateToInput(data.joinedAt),
-        bio: data.bio || '',
-        skillsText: (data.skills || []).join(', '),
-        achievementsText: (data.achievements || []).join('\n'),
-        social: {
-          linkedin: data.social?.linkedin || '',
-          github: data.social?.github || '',
-          portfolio: data.social?.portfolio || '',
-          instagram: data.social?.instagram || '',
-          facebook: data.social?.facebook || '',
-        },
-      }));
-      
+      const merged = persistProfile(data);
+      setUser(merged);
+      setFormData(buildFormData(merged));
+      setWarnings(Array.isArray(merged.warnings) ? merged.warnings : warnings);
       setIsEditing(false);
-      alert('Profile updated successfully!');
+      dispatchToast('Profile updated successfully.', 'success');
     } catch (err) {
-      alert(err.response?.data?.message || 'Update failed');
+      dispatchToast(err.response?.data?.message || 'Profile update failed.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    const loadProfileAndWarnings = async () => {
+    let isActive = true;
+    const loadProfile = async () => {
       try {
         const { data } = await getMe();
-        setFormData((prev) => ({
-          ...prev,
-          name: data.name || '',
-          phone: data.phone || '',
-          year: data.year || '',
-          // Ensure display is UPPERCASE on load
-          branch: (data.branch || '').toUpperCase(),
-          batch: data.batch || '',
-          joinedAt: dateToInput(data.joinedAt),
-          bio: data.bio || '',
-          skillsText: (data.skills || []).join(', '),
-          achievementsText: (data.achievements || []).join('\n'),
-          social: {
-            linkedin: data.social?.linkedin || '',
-            github: data.social?.github || '',
-            portfolio: data.social?.portfolio || '',
-            instagram: data.social?.instagram || '',
-            facebook: data.social?.facebook || '',
-          },
-        }));
-        setWarnings(data.warnings || []);
-        const existing = JSON.parse(localStorage.getItem('profile') || '{}');
-        const merged = { ...(existing.result || existing), ...data };
+        if (!isActive) return;
+
+        let merged = persistProfile(data);
+        setWarnings(Array.isArray(data.warnings) ? data.warnings : []);
+
         if (data.hasUnreadWarning) {
-          await acknowledgeWarnings();
-          merged.hasUnreadWarning = false;
+          await acknowledgeWarnings().catch(() => {});
+          merged = { ...merged, hasUnreadWarning: false };
+          localStorage.setItem('profile', JSON.stringify(merged));
         }
-        localStorage.setItem('profile', JSON.stringify(merged));
-      } catch (err) {
-        // ignore
+
+        if (!isActive) return;
+        setUser(merged);
+        setFormData(buildFormData(merged));
+      } catch {
+        // keep cached profile data
       }
     };
-    loadProfileAndWarnings();
+
+    loadProfile();
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-[#141417] border border-gray-800 rounded-[2.5rem] overflow-hidden shadow-2xl"
-      >
-        <div className="h-32 bg-gradient-to-r from-blue-600 to-purple-600 relative">
-          <div className="absolute -bottom-12 left-10">
-            <div className="w-24 h-24 rounded-3xl bg-[#0a0a0c] border-4 border-[#141417] flex items-center justify-center text-3xl font-black text-blue-500 shadow-xl">
-              {formData.name ? formData.name[0] : 'U'}
+    <div className="max-w-6xl mx-auto pb-10 md:pb-16 space-y-8 px-1 sm:px-0">
+      <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="pt-2">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+          <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-500 flex items-center justify-center text-2xl md:text-3xl font-black text-white shrink-0 shadow-lg shadow-cyan-500/20">
+              {user.name ? user.name[0].toUpperCase() : 'U'}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-[0.24em] text-cyan-300/90 font-black">My Profile</p>
+              <h1 className="profile-title-flow text-3xl md:text-4xl font-black tracking-tight break-words">{user.name || 'Member'}</h1>
+              <div className="mt-2 space-y-1 text-xs text-gray-300">
+                <p className="inline-flex items-center gap-1.5 break-all"><Mail size={12} className="text-cyan-300" /> {user.email || 'No email'}</p>
+                <p className="inline-flex items-center gap-1.5"><SquareUser size={12} className="text-cyan-300" /> {user.role || 'Member'}</p>
+                <p className="inline-flex items-center gap-1.5"><Hash size={12} className="text-cyan-300" /> {user.collegeId || 'No College ID'}</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="pt-16 pb-10 px-10">
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-3xl font-black text-white">{formData.name}</h2>
-              <div className="flex items-center gap-3 mt-1">
-                <p className="text-gray-500 text-sm flex items-center gap-1"><Mail size={14}/> {userData.email}</p>
-                <span className="text-[10px] bg-blue-600/20 text-blue-500 px-2 py-0.5 rounded font-black uppercase tracking-tighter">
-                    {userData.role}
-                </span>
-              </div>
-              {userData.collegeId && (
-                <p className="text-xs text-gray-500 mt-2">
-                  Public Profile URL: {window.location.origin}/profile/{userData.collegeId}
-                </p>
-              )}
-            </div>
-            <button 
-              onClick={() => setIsEditing(!isEditing)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
-                isEditing ? 'bg-gray-800 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+          <div className="w-full lg:w-auto flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={copyPublicProfileUrl}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-500/20 px-3 py-2 text-sm text-cyan-100 hover:bg-cyan-500/30 transition-colors"
             >
-              {isEditing ? <><X size={16} /> Cancel</> : <><Edit2 size={16} /> Edit Profile</>}
+              {copied ? <Save size={14} /> : <Copy size={14} />}
+              {copied ? 'Copied' : 'Copy URL'}
             </button>
+            {publicProfileUrl && (
+              <a
+                href={publicProfileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-500/20 px-3 py-2 text-sm text-blue-100 hover:bg-blue-500/30 transition-colors"
+              >
+                <ExternalLink size={14} />
+                Public View
+              </a>
+            )}
           </div>
-
-          <form onSubmit={handleUpdate} className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Full Name</label>
-              <div className="relative">
-                <User className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isEditing ? 'text-blue-500' : 'text-gray-600'}`} size={18} />
-                <input 
-                  disabled={!isEditing}
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Professional Bio</label>
-              <textarea
-                disabled={!isEditing}
-                value={formData.bio}
-                onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                rows={3}
-                className="w-full bg-[#0a0a0c] border border-gray-800 p-4 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                placeholder="Write your CICR journey, core skills, and interests."
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Briefcase size={12}/> Skills</label>
-              <input
-                disabled={!isEditing}
-                value={formData.skillsText}
-                onChange={(e) => setFormData({ ...formData, skillsText: e.target.value })}
-                className="w-full bg-[#0a0a0c] border border-gray-800 p-4 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                placeholder="React, Node.js, Research, Embedded Systems"
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Award size={12}/> Achievements (one per line)</label>
-              <textarea
-                disabled={!isEditing}
-                value={formData.achievementsText}
-                onChange={(e) => setFormData({ ...formData, achievementsText: e.target.value })}
-                rows={4}
-                className="w-full bg-[#0a0a0c] border border-gray-800 p-4 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                placeholder="Won XYZ hackathon&#10;Published ABC paper"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">LinkedIn URL</label>
-              <div className="relative">
-                <LinkIcon className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isEditing ? 'text-blue-500' : 'text-gray-600'}`} size={18} />
-                <input
-                  disabled={!isEditing}
-                  value={formData.social.linkedin}
-                  onChange={(e) => setFormData({ ...formData, social: { ...formData.social, linkedin: e.target.value } })}
-                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                  placeholder="https://linkedin.com/in/username"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">GitHub URL</label>
-              <div className="relative">
-                <LinkIcon className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isEditing ? 'text-blue-500' : 'text-gray-600'}`} size={18} />
-                <input
-                  disabled={!isEditing}
-                  value={formData.social.github}
-                  onChange={(e) => setFormData({ ...formData, social: { ...formData.social, github: e.target.value } })}
-                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                  placeholder="https://github.com/username"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Phone Number</label>
-              <div className="relative">
-                <Phone className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isEditing ? 'text-blue-500' : 'text-gray-600'}`} size={18} />
-                <input 
-                  disabled={!isEditing}
-                  value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                  placeholder="+91 00000 00000"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Instagram Handle</label>
-              <div className="relative">
-                <Instagram className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isEditing ? 'text-blue-500' : 'text-gray-600'}`} size={18} />
-                <input
-                  disabled={!isEditing}
-                  value={formData.social.instagram}
-                  onChange={(e) => setFormData({ ...formData, social: { ...formData.social, instagram: e.target.value } })}
-                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                  placeholder="@username or instagram.com/username"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Facebook Handle</label>
-              <div className="relative">
-                <Facebook className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isEditing ? 'text-blue-500' : 'text-gray-600'}`} size={18} />
-                <input
-                  disabled={!isEditing}
-                  value={formData.social.facebook}
-                  onChange={(e) => setFormData({ ...formData, social: { ...formData.social, facebook: e.target.value } })}
-                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                  placeholder="@username or facebook.com/username"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Joined CICR Date</label>
-              <div className="relative">
-                <Calendar className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isEditing ? 'text-blue-500' : 'text-gray-600'}`} size={18} />
-                <input
-                  type="date"
-                  disabled={!isEditing}
-                  value={formData.joinedAt}
-                  onChange={(e) => setFormData({ ...formData, joinedAt: e.target.value })}
-                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Year</label>
-              <div className="relative">
-                <Calendar className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isEditing ? 'text-blue-500' : 'text-gray-600'}`} size={18} />
-                <input 
-                  disabled={!isEditing}
-                  value={formData.year}
-                  onChange={(e) => setFormData({...formData, year: e.target.value})}
-                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                  placeholder="e.g. 3"
-                />
-              </div>
-            </div>
-
-            {/* BRANCH FIELD - AUTOMATIC UPPERCASE */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Branch</label>
-              <div className="relative">
-                <BookOpen className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isEditing ? 'text-blue-500' : 'text-gray-600'}`} size={18} />
-                <input 
-                  disabled={!isEditing}
-                  value={formData.branch}
-                  onChange={(e) => setFormData({...formData, branch: e.target.value.toUpperCase()})}
-                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                  placeholder="e.g. CSE"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Batch</label>
-              <div className="relative">
-                <Hash className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isEditing ? 'text-blue-500' : 'text-gray-600'}`} size={18} />
-                <input 
-                  disabled={!isEditing}
-                  value={formData.batch}
-                  onChange={(e) => setFormData({...formData, batch: e.target.value})}
-                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
-                  placeholder="e.g. E16, F5"
-                />
-              </div>
-            </div>
-
-            <AnimatePresence>
-              {isEditing && (
-                <motion.button 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  disabled={loading}
-                  className="md:col-span-2 bg-blue-600 hover:bg-blue-700 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all mt-4 flex items-center justify-center gap-2"
-                >
-                  {loading ? <Loader2 className="animate-spin" /> : <><Save size={18} /> Save Changes</>}
-                </motion.button>
-              )}
-            </AnimatePresence>
-          </form>
         </div>
-      </motion.div>
 
-      {warnings.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-[#1a0f12] border border-red-500/30 rounded-[2rem] p-6"
-        >
-          <h3 className="text-sm font-black uppercase tracking-widest text-red-300 mb-4">Admin Warnings</h3>
-          <div className="space-y-3">
-            {warnings.slice(0, 5).map((warning, idx) => (
-              <div key={idx} className="bg-black/20 border border-red-500/20 rounded-xl p-4">
-                <p className="text-red-100 text-sm">{warning.reason}</p>
-                <p className="text-[10px] text-red-300/70 mt-2 uppercase tracking-widest">
-                  {warning.issuedBy?.name || 'Admin'} • {new Date(warning.issuedAt).toLocaleString()}
-                </p>
-              </div>
+        <p className="mt-5 text-sm md:text-base text-gray-300 leading-relaxed max-w-4xl">
+          {user.bio || 'Add a professional bio to highlight your CICR journey, role interests, and technical strengths.'}
+        </p>
+        <p className="mt-2 text-sm text-cyan-200 break-all">{publicProfileUrl || 'Public profile URL unavailable'}</p>
+      </motion.section>
+
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        <MetricCard label="Profile Completion" value={`${completionScore}%`} helper="Keep this above 85%" />
+        <MetricCard label="Skills Listed" value={skills.length} helper="Technical + domain skills" />
+        <MetricCard label="Achievements" value={achievements.length} helper="Credible accomplishments" />
+        <MetricCard label="Years in CICR" value={yearsInCicr(user.joinedAt)} helper={`Joined ${fmtDate(user.joinedAt)}`} />
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        <article>
+          <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
+            <Briefcase size={17} className="text-cyan-300" />
+            Professional Snapshot
+          </h2>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <ProfileRow icon={Phone} label="Phone" value={user.phone} />
+            <ProfileRow icon={Calendar} label="Year" value={user.year} />
+            <ProfileRow icon={BookOpen} label="Branch" value={(user.branch || '').toUpperCase()} />
+            <ProfileRow icon={Hash} label="Batch" value={user.batch} />
+          </div>
+        </article>
+
+        <article>
+          <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
+            <LinkIcon size={17} className="text-cyan-300" />
+            Social Presence
+          </h2>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
+            {socialItems.map(({ key, label, icon: Icon, raw, href }) => (
+              <a
+                key={key}
+                href={href || undefined}
+                target={href ? '_blank' : undefined}
+                rel={href ? 'noreferrer' : undefined}
+                className={`py-1 inline-flex flex-col min-w-0 ${href ? 'text-cyan-100 hover:text-cyan-300' : 'text-gray-500'}`}
+              >
+                <span className="text-[10px] uppercase tracking-widest font-black inline-flex items-center gap-1.5">
+                  <Icon size={13} className={href ? 'text-cyan-300' : 'text-gray-500'} /> {label}
+                </span>
+                <span className="text-sm mt-1 break-all">{raw || 'Not added'}</span>
+              </a>
             ))}
           </div>
-        </motion.div>
+        </article>
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        <article>
+          <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
+            <Briefcase size={17} className="text-cyan-300" />
+            Skills
+          </h2>
+          <ul className="mt-3 space-y-1.5 text-sm">
+            {skills.length === 0 && <li className="text-gray-500">No skills added yet.</li>}
+            {skills.map((skill) => (
+              <li key={skill} className="text-cyan-100 inline-flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
+                {skill}
+              </li>
+            ))}
+          </ul>
+        </article>
+
+        <article>
+          <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
+            <Award size={17} className="text-cyan-300" />
+            Achievements
+          </h2>
+          <ul className="mt-3 space-y-1.5 text-sm text-gray-200">
+            {achievements.length === 0 && <li className="text-gray-500">No achievements added yet.</li>}
+            {achievements.map((item, idx) => (
+              <li key={`${item}-${idx}`} className="inline-flex items-start gap-2">
+                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-300 shrink-0" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </article>
+      </section>
+
+      {warnings.length > 0 && (
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <h2 className="text-sm font-black uppercase tracking-widest text-red-300 mb-3 inline-flex items-center gap-2">
+            <ShieldAlert size={15} />
+            Admin Warnings
+          </h2>
+          <div className="space-y-3">
+            {warnings.slice(0, 5).map((warning, idx) => (
+              <article key={idx}>
+                <p className="text-sm text-red-100">{warning.reason}</p>
+                <p className="text-[10px] uppercase tracking-widest text-red-300/80 mt-1.5">
+                  {warning.issuedBy?.name || 'Admin'} • {new Date(warning.issuedAt).toLocaleString()}
+                </p>
+              </article>
+            ))}
+          </div>
+        </motion.section>
       )}
+
+      <AnimatePresence>
+        {isEditing && (
+          <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 14 }}>
+            <div className="flex items-center justify-between gap-3 mb-5">
+              <h2 className="profile-section-flow text-xl font-black">Edit Profile Details</h2>
+              <button
+                type="button"
+                onClick={closeEditor}
+                className="inline-flex items-center gap-2 rounded-xl bg-gray-700/40 px-3 py-2 text-sm text-gray-300 hover:text-white"
+              >
+                <X size={14} />
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputField
+                icon={User}
+                label="Full Name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Your full name"
+                disabled={loading}
+              />
+
+              <InputField
+                icon={Phone}
+                label="Phone"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="+91 00000 00000"
+                disabled={loading}
+              />
+
+              <InputField
+                icon={Calendar}
+                label="Year"
+                value={formData.year}
+                onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                placeholder="e.g. 3"
+                disabled={loading}
+              />
+
+              <InputField
+                icon={BookOpen}
+                label="Branch"
+                value={formData.branch}
+                onChange={(e) => setFormData({ ...formData, branch: e.target.value.toUpperCase() })}
+                placeholder="e.g. CSE"
+                disabled={loading}
+              />
+
+              <InputField
+                icon={Hash}
+                label="Batch"
+                value={formData.batch}
+                onChange={(e) => setFormData({ ...formData, batch: e.target.value })}
+                placeholder="e.g. E16, F5"
+                disabled={loading}
+              />
+
+              <InputField
+                icon={Calendar}
+                label="Joined Date"
+                type="date"
+                value={formData.joinedAt}
+                onChange={(e) => setFormData({ ...formData, joinedAt: e.target.value })}
+                disabled={loading}
+              />
+
+              <div className="md:col-span-2 space-y-2">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Professional Bio</label>
+                <textarea
+                  value={formData.bio}
+                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                  rows={3}
+                  disabled={loading}
+                  placeholder="Write your CICR journey, domain strengths, and current focus."
+                  className="w-full bg-[#0a0f16]/85 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 disabled:opacity-60 transition-all text-white placeholder:text-gray-600"
+                />
+              </div>
+
+              <div className="md:col-span-2 space-y-2">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Skills (comma-separated)</label>
+                <input
+                  value={formData.skillsText}
+                  onChange={(e) => setFormData({ ...formData, skillsText: e.target.value })}
+                  disabled={loading}
+                  placeholder="React, Node.js, ML, Embedded Systems"
+                  className="w-full bg-[#0a0f16]/85 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 disabled:opacity-60 transition-all text-white placeholder:text-gray-600"
+                />
+              </div>
+
+              <div className="md:col-span-2 space-y-2">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Achievements (one per line)</label>
+                <textarea
+                  value={formData.achievementsText}
+                  onChange={(e) => setFormData({ ...formData, achievementsText: e.target.value })}
+                  rows={4}
+                  disabled={loading}
+                  placeholder="Won XYZ hackathon&#10;Published ABC paper"
+                  className="w-full bg-[#0a0f16]/85 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 disabled:opacity-60 transition-all text-white placeholder:text-gray-600"
+                />
+              </div>
+
+              <InputField
+                icon={LinkIcon}
+                label="LinkedIn"
+                value={formData.social.linkedin}
+                onChange={(e) => setFormData({ ...formData, social: { ...formData.social, linkedin: e.target.value } })}
+                placeholder="linkedin.com/in/username"
+                disabled={loading}
+              />
+
+              <InputField
+                icon={Github}
+                label="GitHub"
+                value={formData.social.github}
+                onChange={(e) => setFormData({ ...formData, social: { ...formData.social, github: e.target.value } })}
+                placeholder="github.com/username"
+                disabled={loading}
+              />
+
+              <InputField
+                icon={ExternalLink}
+                label="Portfolio"
+                value={formData.social.portfolio}
+                onChange={(e) => setFormData({ ...formData, social: { ...formData.social, portfolio: e.target.value } })}
+                placeholder="yourdomain.com"
+                disabled={loading}
+              />
+
+              <InputField
+                icon={Instagram}
+                label="Instagram"
+                value={formData.social.instagram}
+                onChange={(e) => setFormData({ ...formData, social: { ...formData.social, instagram: e.target.value } })}
+                placeholder="@username"
+                disabled={loading}
+              />
+
+              <div className="md:col-span-2">
+                <InputField
+                  icon={Facebook}
+                  label="Facebook"
+                  value={formData.social.facebook}
+                  onChange={(e) => setFormData({ ...formData, social: { ...formData.social, facebook: e.target.value } })}
+                  placeholder="@username"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="md:col-span-2 flex flex-col sm:flex-row sm:justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeEditor}
+                  disabled={loading}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gray-700/40 px-4 py-2.5 text-sm text-gray-300 hover:text-white disabled:opacity-60"
+                >
+                  <X size={14} />
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-500/20 px-4 py-2.5 text-sm text-cyan-100 hover:bg-cyan-500/30 disabled:opacity-60"
+                >
+                  {loading ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </motion.section>
+        )}
+      </AnimatePresence>
+
+      <section className="pt-1">
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Keep your profile current so collaborators can find your expertise quickly and contact you directly.
+        </p>
+        <div className="mt-4 flex flex-col sm:flex-row gap-2">
+          <button
+            type="button"
+            onClick={() => setIsEditing((prev) => !prev)}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-500/20 px-4 py-2.5 text-sm text-cyan-100 hover:bg-cyan-500/30"
+          >
+            {isEditing ? <X size={14} /> : <Edit2 size={14} />}
+            {isEditing ? 'Close Editor' : 'Edit Profile'}
+          </button>
+          <button
+            type="button"
+            onClick={copyPublicProfileUrl}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-500/20 px-4 py-2.5 text-sm text-blue-100 hover:bg-blue-500/30"
+          >
+            <Copy size={14} />
+            Copy Public URL
+          </button>
+        </div>
+      </section>
     </div>
   );
 }

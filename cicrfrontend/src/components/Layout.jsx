@@ -5,14 +5,14 @@ import {
   Calendar, LogOut, ShieldCheck, FileText, UserSquare2,
   Package, Menu, X, Radio
 } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { fetchCommunicationMessages, getMe } from '../api';
+import logo from './logo.png';
 
 export default function Layout({ children }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
   
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const [user, setUser] = useState(profile.result || profile);
@@ -103,11 +103,28 @@ export default function Layout({ children }) {
   const SidebarContent = () => (
     <>
       {/* Brand Logo */}
-      <div className="flex items-center space-x-3 mb-10 px-2">
-        <img className='w-10 h-8' src="logo.png" alt="logo"/>
-        {/* <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold italic shadow-lg shadow-blue-600/20 text-white"><img src="./logo.png" alt="" /></div> */}
-        <h1 className="text-xl font-bold tracking-tight text-white">CICR Connect</h1>
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: 'easeOut' }}
+        className="mb-10 px-2"
+      >
+        <Link
+          to="/dashboard"
+          onClick={() => setIsMobileOpen(false)}
+          className="group inline-flex items-center gap-3"
+        >
+          <img className="h-10 w-10 object-contain" src={logo} alt="CICR logo" />
+          <motion.h1
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="brand-title brand-text-animate text-[1.22rem] leading-tight"
+          >
+            CICR Connect
+          </motion.h1>
+        </Link>
+      </motion.div>
       
       {/* Main Navigation */}
       <nav className="flex-1 space-y-2">
@@ -180,7 +197,17 @@ export default function Layout({ children }) {
 
       {/* Mobile Top Nav */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#0a0a0c]/80 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-6 z-30">
-        <span className="font-bold text-blue-500">CICR Connect</span>
+        <div className="flex items-center gap-2.5">
+          <img className="h-8 w-8 object-contain" src={logo} alt="CICR logo" />
+          <motion.p
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="brand-title brand-text-animate text-[1rem] tracking-wide"
+          >
+            CICR Connect
+          </motion.p>
+        </div>
         <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-gray-400">
           {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
