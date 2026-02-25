@@ -26,6 +26,10 @@ export default function AdminPanel() {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [resetCopied, setResetCopied] = useState(false);
+  const [selectedResetUserId, setSelectedResetUserId] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetCodeData, setResetCodeData] = useState(null);
   const [pendingActions, setPendingActions] = useState([]);
   const [applications, setApplications] = useState([]);
   const [appFilter, setAppFilter] = useState('All');
@@ -117,13 +121,33 @@ export default function AdminPanel() {
   };
 
   const handleGenerateResetCode = async (userId, displayName) => {
+    if (!userId) return;
+    setResetLoading(true);
     try {
       const { data } = await generatePasswordResetCode(userId);
-      alert(
-        `Reset code for ${displayName || data?.user?.name || 'user'}: ${data.resetCode}\nValid for ${data.validForMinutes || 15} minutes.`
-      );
+      setSelectedResetUserId(userId);
+      setResetCodeData({
+        resetCode: data?.resetCode || '',
+        validForMinutes: data?.validForMinutes || 15,
+        userName: displayName || data?.user?.name || 'Member',
+        collegeId: data?.user?.collegeId || '',
+      });
+      setResetCopied(false);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to generate reset code');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const copyResetCode = async () => {
+    if (!resetCodeData?.resetCode) return;
+    try {
+      await navigator.clipboard.writeText(resetCodeData.resetCode);
+      setResetCopied(true);
+      setTimeout(() => setResetCopied(false), 1600);
+    } catch (err) {
+      alert('Unable to copy reset code');
     }
   };
 
@@ -221,6 +245,8 @@ export default function AdminPanel() {
       (u.isVerified || String(u.approvalStatus || '').toLowerCase() === 'approved')
   );
 
+  const resetEligibleUsers = users.filter((u) => String(u.approvalStatus || '').toLowerCase() !== 'rejected');
+
   const filteredApplications = applications.filter((app) => {
     const matchesStatus = appFilter === 'All' || app.status === appFilter;
     const query = appSearch.trim().toLowerCase();
@@ -301,6 +327,75 @@ export default function AdminPanel() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <section className="border border-cyan-500/25 rounded-[2rem] p-6 md:p-8 section-motion section-motion-delay-2">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl border border-cyan-500/40">
+              <KeyRound size={18} className="text-cyan-300" />
+            </div>
+            <div>
+              <h3 className="text-lg md:text-xl font-black text-white">Password Reset Code Generator</h3>
+              <p className="text-xs text-gray-400 mt-1">
+                Use when email OTP is unavailable. Generates a one-time code valid for 15 minutes.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+          <select
+            value={selectedResetUserId}
+            onChange={(e) => setSelectedResetUserId(e.target.value)}
+            className="w-full bg-[#0a0a0c] border border-gray-800 rounded-xl px-4 py-3 text-sm text-gray-200 outline-none focus:border-cyan-400/60"
+          >
+            <option value="">Select user for reset code</option>
+            {resetEligibleUsers.map((u) => (
+              <option key={u._id} value={u._id}>
+                {u.name} ({u.collegeId || 'NO-ID'})
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={() => {
+              const selected = resetEligibleUsers.find((u) => String(u._id) === String(selectedResetUserId));
+              handleGenerateResetCode(selectedResetUserId, selected?.name);
+            }}
+            disabled={!selectedResetUserId || resetLoading}
+            className="px-5 py-3 rounded-xl border border-cyan-500/45 bg-cyan-500/10 text-cyan-100 text-xs font-black uppercase tracking-widest disabled:opacity-50 inline-flex items-center justify-center gap-2"
+          >
+            {resetLoading ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
+            Generate Reset Code
+          </button>
+        </div>
+
+        {resetCodeData?.resetCode && (
+          <div className="mt-4 border border-gray-800 rounded-xl p-4 bg-[#0a0a0c]/60">
+            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">
+              Reset code for {resetCodeData.userName}
+              {resetCodeData.collegeId ? ` (${resetCodeData.collegeId})` : ''}
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <code className="px-3 py-2 rounded-lg bg-black/40 border border-gray-700 text-cyan-200 font-mono text-lg tracking-[0.25em]">
+                {resetCodeData.resetCode}
+              </code>
+              <button
+                type="button"
+                onClick={copyResetCode}
+                className="p-2 rounded-lg border border-gray-700 text-gray-300 hover:text-white hover:border-cyan-500/40"
+                title="Copy reset code"
+              >
+                {resetCopied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+              </button>
+            </div>
+            <p className="mt-2 text-[10px] uppercase tracking-widest text-amber-300">
+              Valid for {resetCodeData.validForMinutes} minutes. Share securely with the user.
+            </p>
+          </div>
+        )}
+      </section>
 
       {pendingActions.length > 0 && (
         <div className="border border-amber-500/30 rounded-[2rem] p-6 md:p-8 section-motion section-motion-delay-2">

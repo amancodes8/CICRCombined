@@ -117,22 +117,6 @@ export default function Dashboard() {
         <Stat label="Years In CICR" value={insights?.member?.yearsInCICR ?? 0} />
       </section>
 
-      {isAdminOrHead && (
-        <section className="border border-gray-800 rounded-[2rem] p-6 md:p-8 section-motion section-motion-delay-2">
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles size={16} className="text-blue-400" />
-            <h3 className="text-lg font-black text-white">Recruitment Snapshot</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-            <Stat label="Total Applications" value={applicationStats.total} />
-            <Stat label="New" value={applicationStats.new} />
-            <Stat label="Interview" value={applicationStats.interview} />
-            <Stat label="Accepted" value={applicationStats.accepted} />
-            <Stat label="Selected" value={applicationStats.selected} />
-          </div>
-        </section>
-      )}
-
       {member && (
         <section className="border-b-white border-b-1  p-6 md:p-6 section-motion section-motion-delay-2">
           <div className="flex items-center justify-between gap-4 mb-5">
@@ -210,6 +194,22 @@ export default function Dashboard() {
           ))}
         </div>
       </section>
+
+      {isAdminOrHead && (
+        <section className="border border-gray-800 rounded-[2rem] p-6 md:p-8 section-motion section-motion-delay-3">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles size={16} className="text-blue-400" />
+            <h3 className="text-lg font-black text-white">Recruitment Snapshot</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+            <Stat label="Total Applications" value={applicationStats.total} />
+            <Stat label="New" value={applicationStats.new} />
+            <Stat label="Interview" value={applicationStats.interview} />
+            <Stat label="Accepted" value={applicationStats.accepted} />
+            <Stat label="Selected" value={applicationStats.selected} />
+          </div>
+        </section>
+      )}
     </div>
   );
 }
