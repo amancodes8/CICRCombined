@@ -842,14 +842,16 @@ export default function AdminPanel() {
                       >
                         <KeyRound size={18} />
                       </button>
-                      <button 
-                        onClick={() => handleDelete(u._id)}
-                        disabled={String(u._id) === currentUserId}
-                        className="p-4 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all disabled:opacity-40 disabled:hover:text-gray-600 disabled:hover:bg-transparent"
-                        title={String(u._id) === currentUserId ? 'Self-deletion is blocked' : 'Delete user'}
-                      >
-                        <Trash2 size={22} />
-                      </button>
+                      {!['admin', 'head'].includes(String(u.role || '').toLowerCase()) && (
+                        <button 
+                          onClick={() => handleDelete(u._id)}
+                          disabled={String(u._id) === currentUserId}
+                          className="p-4 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all disabled:opacity-40 disabled:hover:text-gray-600 disabled:hover:bg-transparent"
+                          title={String(u._id) === currentUserId ? 'Self-deletion is blocked' : 'Delete user'}
+                        >
+                          <Trash2 size={22} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
