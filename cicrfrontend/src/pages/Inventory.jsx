@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { adjustInventoryStock, adjustInventoryStockById, fetchInventory, issueInventoryItem } from '../api';
+import PageHeader from '../components/PageHeader';
 
 export default function Inventory() {
   const [items, setItems] = useState([]);
@@ -106,23 +107,21 @@ export default function Inventory() {
   );
 
   return (
-    <div className="space-y-10 max-w-7xl mx-auto pb-20 page-motion-a">
-      {/* GLOSS HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-end md:items-center p-8 rounded-[2.5rem] relative overflow-hidden shadow-2xl section-motion section-motion-delay-1">
-        <div className="absolute top-0 left-0 w-64 h-64 blur-[100px] rounded-full" />
-        <div className="relative z-10">
-          <h2 className="text-3xl font-black tracking-tighter text-white">Lab Inventory</h2>
-          <p className="text-gray-500 font-medium">Manage society components and shared robotics resources</p>
-        </div>
-
-        {isAdmin && (
-          <Link 
-            to="/inventory/add" 
-            className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl flex items-center gap-3 font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 active:scale-95"
-          >
-            <Plus size={18} /> Add Part
-          </Link>
-        )}
+    <div className="ui-page space-y-10 pb-20 page-motion-a">
+      <header className="section-motion section-motion-delay-1">
+        <PageHeader
+          eyebrow="Inventory Operations"
+          title="Lab Inventory"
+          subtitle="Manage society components, stock levels, and issuance records."
+          icon={Database}
+          actions={
+            isAdmin ? (
+              <Link to="/inventory/add" className="btn btn-primary">
+                <Plus size={14} /> Add Part
+              </Link>
+            ) : null
+          }
+        />
       </header>
 
       {/* NEURAL SEARCH */}

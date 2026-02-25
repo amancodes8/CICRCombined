@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   fetchMembers,
@@ -16,10 +16,11 @@ import {
   broadcastNotification,
 } from '../api';
 import CicrAssistant from '../components/CicrAssistant';
+import PageHeader from '../components/PageHeader';
 import { 
   Shield, Trash2, UserPlus, Copy, Check, 
   Search, Mail, Send, Loader2, UserCheck, GraduationCap, Fingerprint,
-  Briefcase, ClipboardCheck, Crown, FileText, Flag, KeyRound, Megaphone, ScrollText
+  Briefcase, ClipboardCheck, Crown, FileText, Flag, KeyRound, Megaphone, ScrollText, Download, ArrowUpDown, UserCog
 } from 'lucide-react';
 
 const APPLICATION_STATUSES = ['New', 'InReview', 'Interview', 'Accepted', 'Selected', 'Rejected'];
@@ -35,7 +36,11 @@ const statusBadgeClass = (status) => {
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(localStorage.getItem('admin_users_search') || '');
+  const [adminTab, setAdminTab] = useState(localStorage.getItem('admin_panel_tab') || 'users');
+  const [sortBy, setSortBy] = useState(localStorage.getItem('admin_users_sort') || 'name_asc');
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -66,6 +71,18 @@ export default function AdminPanel() {
     loadApplications();
     loadAuditLogs();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('admin_users_search', searchTerm);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    localStorage.setItem('admin_panel_tab', adminTab);
+  }, [adminTab]);
+
+  useEffect(() => {
+    localStorage.setItem('admin_users_sort', sortBy);
+  }, [sortBy]);
 
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const currentUser = profile.result || profile;
@@ -306,10 +323,111 @@ export default function AdminPanel() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const filteredUsers = users.filter(u => 
-    u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.collegeId?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter((u) => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      u.name?.toLowerCase().includes(query) ||
+      u.collegeId?.toLowerCase().includes(query) ||
+      u.email?.toLowerCase().includes(query)
+    );
+  });
+
+  const sortedUsers = useMemo(() => {
+    const [key, dir] = String(sortBy || 'name_asc').split('_');
+    const factor = dir === 'desc' ? -1 : 1;
+
+    const read = (row) => {
+      if (key === 'role') return String(row.role || '');
+      if (key === 'year') return Number(row.year || 0);
+      if (key === 'approval') return String(row.approvalStatus || (row.isVerified ? 'Approved' : 'Pending'));
+      return String(row.name || '');
+    };
+
+    return [...filteredUsers].sort((a, b) => {
+      const va = read(a);
+      const vb = read(b);
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * factor;
+      return String(va).localeCompare(String(vb)) * factor;
+    });
+  }, [filteredUsers, sortBy]);
+
+  useEffect(() => {
+    setSelectedUserIds((prev) => prev.filter((id) => sortedUsers.some((row) => String(row._id) === String(id))));
+  }, [sortedUsers]);
+
+  const allVisibleSelected =
+    sortedUsers.length > 0 && sortedUsers.every((row) => selectedUserIds.includes(String(row._id)));
+
+  const toggleSort = (field) => {
+    setSortBy((prev) => {
+      const [currentField, currentDir] = String(prev || 'name_asc').split('_');
+      if (currentField === field) return `${field}_${currentDir === 'asc' ? 'desc' : 'asc'}`;
+      return `${field}_asc`;
+    });
+  };
+
+  const sortIndicator = (field) => {
+    const [currentField, currentDir] = String(sortBy || 'name_asc').split('_');
+    if (currentField !== field) return '↕';
+    return currentDir === 'asc' ? '↑' : '↓';
+  };
+
+  const toggleSelectAllUsers = () => {
+    if (allVisibleSelected) {
+      setSelectedUserIds([]);
+      return;
+    }
+    setSelectedUserIds(sortedUsers.map((row) => String(row._id)));
+  };
+
+  const toggleSelectUser = (userId) => {
+    const id = String(userId);
+    setSelectedUserIds((prev) => (prev.includes(id) ? prev.filter((row) => row !== id) : [...prev, id]));
+  };
+
+  const handleBulkApproveUsers = async () => {
+    if (selectedUserIds.length === 0) return;
+    if (!window.confirm(`Approve ${selectedUserIds.length} selected user(s)?`)) return;
+
+    setBulkBusy(true);
+    try {
+      for (const userId of selectedUserIds) {
+        await updateUserByAdmin(userId, { approvalStatus: 'Approved', isVerified: true });
+      }
+      await loadUsers();
+      setSelectedUserIds([]);
+      alert('Selected users approved.');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Bulk approval failed for one or more users.');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleExportUsers = () => {
+    const headers = ['Name', 'CollegeID', 'Email', 'Role', 'Year', 'Approval'];
+    const rows = sortedUsers.map((row) => [
+      row.name || '',
+      row.collegeId || '',
+      row.email || '',
+      row.role || '',
+      row.year || '',
+      row.approvalStatus || (row.isVerified ? 'Approved' : 'Pending'),
+    ]);
+    const csv = [headers, ...rows]
+      .map((line) => line.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `cicr-users-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
+  };
 
   const adminUsers = users.filter(
     (u) =>
@@ -331,75 +449,96 @@ export default function AdminPanel() {
   });
 
   return (
-    <div className="space-y-6 md:space-y-10 max-w-7xl mx-auto pb-20 px-4 sm:px-6 lg:px-8 overflow-x-hidden page-motion-d">
-      
-    
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 section-motion section-motion-delay-1">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600/20 rounded-lg">
-              <Shield size={24} className="text-blue-500" />
-            </div>
-            <h2 className="text-3xl md:text-3xl font-black tracking-tighter text-white">Admin</h2>
-          </div>
-          <p className="text-gray-500 font-medium md:text-lg">Authorization & Member Lifecycle Management</p>
-        </div>
-        <button 
-          onClick={handleGenerateInvite}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl flex items-center justify-center gap-3 font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 w-full sm:w-auto active:scale-95"
-        >
-          <UserPlus size={18} /> Generate Access Key
-        </button>
+    <div className="ui-page space-y-6 md:space-y-10 max-w-7xl pb-20 px-4 sm:px-6 lg:px-8 overflow-x-hidden page-motion-d">
+      <div className="section-motion section-motion-delay-1">
+        <PageHeader
+          eyebrow="Admin Operations"
+          title="Admin Control Center"
+          subtitle="Authorization, recruitment workflow, auditability, and organization-wide communication controls."
+          icon={Shield}
+          actions={
+            <button onClick={handleGenerateInvite} className="btn btn-primary">
+              <UserPlus size={14} /> Generate Access Key
+            </button>
+          }
+        />
       </div>
 
-      <AnimatePresence>
-        {inviteCode && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0, y: -20 }}
-            animate={{ height: 'auto', opacity: 1, y: 0 }}
-            exit={{ height: 0, opacity: 0, y: -20 }}
-            className="border border-blue-500/30 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl overflow-hidden relative"
+      <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-800 p-1 section-motion section-motion-delay-1">
+        {[
+          { id: 'users', label: 'Users', icon: UserCog },
+          { id: 'recruitment', label: 'Recruitment', icon: ClipboardCheck },
+          { id: 'broadcast', label: 'Broadcast', icon: Megaphone },
+          { id: 'audit', label: 'Audit', icon: ScrollText },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setAdminTab(tab.id)}
+            className={`px-4 py-2 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-[0.16em] inline-flex items-center gap-2 ${
+              adminTab === tab.id
+                ? 'text-white border border-blue-500/45 bg-blue-500/10'
+                : 'text-gray-500 hover:text-gray-200'
+            }`}
           >
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-[100px] -mr-20 -mt-20" />
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-10">
-              <div className="text-center lg:text-left space-y-2">
-                <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em]">Key Authorized</span>
-                <div className="flex items-center justify-center lg:justify-start gap-5">
-                  <h3 className="text-4xl md:text-6xl font-black font-mono tracking-[0.2em] text-white italic">{inviteCode}</h3>
-                  <button onClick={copyToClipboard} className="p-3 bg-[#0a0a0c] border border-gray-800 rounded-xl hover:border-blue-500 transition-all">
-                    {copied ? <Check size={20} className="text-green-500" /> : <Copy size={20} className="text-gray-400" />}
-                  </button>
-                </div>
-              </div>
+            <tab.icon size={13} />
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-              <div className="space-y-4">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest text-center lg:text-left">Dispatch encrypted code to email</p>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" size={20} />
-                    <input 
-                      type="email"
-                      placeholder="recipient@college.edu"
-                      value={recipientEmail}
-                      onChange={(e) => setRecipientEmail(e.target.value)}
-                      className="w-full bg-[#0a0a0c] border border-gray-800 p-5 pl-12 rounded-2xl outline-none focus:border-blue-500 transition-all text-white font-bold"
-                    />
+      {adminTab === 'users' && (
+        <AnimatePresence>
+          {inviteCode && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0, y: -20 }}
+              animate={{ height: 'auto', opacity: 1, y: 0 }}
+              exit={{ height: 0, opacity: 0, y: -20 }}
+              className="border border-blue-500/30 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl overflow-hidden relative"
+            >
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-[100px] -mr-20 -mt-20" />
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-10">
+                <div className="text-center lg:text-left space-y-2">
+                  <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em]">Key Authorized</span>
+                  <div className="flex items-center justify-center lg:justify-start gap-5">
+                    <h3 className="text-4xl md:text-6xl font-black font-mono tracking-[0.2em] text-white italic">{inviteCode}</h3>
+                    <button onClick={copyToClipboard} className="p-3 bg-[#0a0a0c] border border-gray-800 rounded-xl hover:border-blue-500 transition-all">
+                      {copied ? <Check size={20} className="text-green-500" /> : <Copy size={20} className="text-gray-400" />}
+                    </button>
                   </div>
-                  <button 
-                    onClick={handleSendInvite}
-                    disabled={isSending}
-                    className="bg-white text-black hover:bg-blue-600 hover:text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                  >
-                    {isSending ? <Loader2 className="animate-spin" size={18} /> : <><Send size={18} /> Dispatch</>}
-                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest text-center lg:text-left">Dispatch encrypted code to email</p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" size={20} />
+                      <input 
+                        type="email"
+                        placeholder="recipient@college.edu"
+                        value={recipientEmail}
+                        onChange={(e) => setRecipientEmail(e.target.value)}
+                        className="w-full bg-[#0a0a0c] border border-gray-800 p-5 pl-12 rounded-2xl outline-none focus:border-blue-500 transition-all text-white font-bold"
+                      />
+                    </div>
+                    <button 
+                      onClick={handleSendInvite}
+                      disabled={isSending}
+                      className="bg-white text-black hover:bg-blue-600 hover:text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {isSending ? <Loader2 className="animate-spin" size={18} /> : <><Send size={18} /> Dispatch</>}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
 
+      {adminTab === 'users' && (
+      <>
       <section className="border border-cyan-500/25 rounded-[2rem] p-6 md:p-8 section-motion section-motion-delay-2">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -494,7 +633,10 @@ export default function AdminPanel() {
           </div>
         </div>
       )}
+      </>
+      )}
 
+      {adminTab === 'recruitment' && (
       <section className="border border-gray-800 rounded-[2.5rem] p-6 md:p-8 space-y-5 section-motion section-motion-delay-2">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -576,13 +718,20 @@ export default function AdminPanel() {
                     Latest note: {app.notes[0].text}
                   </p>
                 )}
-                {app.history?.[0]?.status && (
-                  <p className="text-[10px] text-gray-500 border border-gray-800/70 rounded-lg px-3 py-2 uppercase tracking-wider">
-                    Last update: {app.history[0].status}
-                    {app.history[0].changedBy?.name ? ` by ${app.history[0].changedBy.name}` : ''}
-                    {app.history[0].changedAt ? ` • ${new Date(app.history[0].changedAt).toLocaleString()}` : ''}
-                    {app.history[0].note ? ` • ${app.history[0].note}` : ''}
-                  </p>
+                {app.history?.length > 0 && (
+                  <div className="text-[10px] text-gray-500 border border-gray-800/70 rounded-lg px-3 py-2 uppercase tracking-wider">
+                    <p className="font-black text-gray-400 mb-1">Status Timeline</p>
+                    <div className="space-y-1.5">
+                      {app.history.slice(0, 3).map((step, stepIdx) => (
+                        <p key={`${app._id}-history-${stepIdx}`}>
+                          {step.status}
+                          {step.changedBy?.name ? ` by ${step.changedBy.name}` : ''}
+                          {step.changedAt ? ` • ${new Date(step.changedAt).toLocaleString()}` : ''}
+                          {step.note ? ` • ${step.note}` : ''}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -637,8 +786,11 @@ export default function AdminPanel() {
         )}
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-5 section-motion section-motion-delay-3">
-        <article className="border border-gray-800 rounded-[1.8rem] p-6 space-y-4">
+      )}
+
+      {adminTab === 'broadcast' && (
+      <section className="grid grid-cols-1 gap-5 section-motion section-motion-delay-3">
+        <article className="border border-gray-800 rounded-[1.8rem] p-6 space-y-4 max-w-4xl">
           <div className="flex items-center gap-3">
             <Megaphone size={18} className="text-cyan-300" />
             <div>
@@ -703,8 +855,12 @@ export default function AdminPanel() {
             </button>
           </form>
         </article>
+      </section>
+      )}
 
-        <article className="border border-gray-800 rounded-[1.8rem] p-6 space-y-4">
+      {adminTab === 'audit' && (
+      <section className="grid grid-cols-1 gap-5 section-motion section-motion-delay-3">
+        <article className="border border-gray-800 rounded-[1.8rem] p-6 space-y-4 max-w-4xl">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <ScrollText size={18} className="text-amber-300" />
@@ -746,132 +902,177 @@ export default function AdminPanel() {
           )}
         </article>
       </section>
+      )}
 
-      {/* --- MEMBER DIRECTORY --- */}
-      <div className="backdrop-blur-xl border border-gray-800 rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl section-motion section-motion-delay-3">
-        <div className="p-8 md:p-12 border-b border-gray-800 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div className="flex items-center gap-4">
-            <UserCheck className="text-blue-500" size={28} />
-            <h3 className="text-2xl font-black text-white uppercase tracking-tight">Active Directory</h3>
-          </div>
-          <div className="relative w-full lg:w-96 group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={20} />
-            <input 
-              type="text" 
-              placeholder="Search by name or Reg No..."
-              className="w-full bg-[#0a0a0c] border border-gray-800 rounded-2xl py-4 pl-14 pr-6 text-sm outline-none focus:border-blue-500 transition-all text-white font-medium"
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
+      {adminTab === 'users' && (
+        <>
+          <div className="ui-table-shell section-motion section-motion-delay-3">
+            <div className="p-5 md:p-6 border-b border-gray-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <UserCheck className="text-blue-500" size={22} />
+                <div>
+                  <h3 className="text-xl font-black text-white">Member Directory</h3>
+                  <p className="text-xs text-gray-500">Sortable table with approval and role controls.</p>
+                </div>
+              </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[700px]">
-            <thead className="text-[10px] text-gray-500 uppercase tracking-[0.3em] bg-[#0a0a0c]/80 font-black">
-              <tr>
-                <th className="p-8">Member Identity</th>
-                <th className="p-8 text-center">Security Level</th>
-                <th className="p-8 text-center">Approval</th>
-                <th className="p-8 text-right">Operations</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800/50">
-              {filteredUsers.map((u) => (
-                <tr key={u._id} className="hover:bg-white/[0.02] transition-colors group">
-                  <td className="p-8">
-                    <div className="flex items-center gap-6">
-                      <div className="w-14 h-14 rounded-2xl bg-[#0a0a0c] border border-gray-800 flex items-center justify-center font-black text-blue-500 group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 text-xl shadow-inner">
-                        {u.name ? u.name[0] : '?'}
-                      </div>
-                      <div className="space-y-1">
-                        <p className="font-black text-gray-100 text-lg tracking-tight group-hover:text-blue-400 transition-colors">{u.name}</p>
-                        <div className="flex items-center gap-3">
-                          <span className="flex items-center gap-1 text-[10px] text-gray-500 font-bold uppercase tracking-wider bg-gray-800/40 px-2 py-0.5 rounded">
-                            <Fingerprint size={10} className="text-blue-500" /> {u.collegeId || 'NO-REG'}
-                          </span>
-                          <span className="flex items-center gap-1 text-[10px] text-gray-500 font-bold uppercase tracking-wider bg-gray-800/40 px-2 py-0.5 rounded">
-                            <GraduationCap size={10} className="text-amber-500" /> Year {u.year || 'N/A'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-8 text-center">
-                    <select 
-                      value={u.role}
-                      onChange={(e) => handleRoleChange(u._id, e.target.value)}
-                      className="bg-[#0a0a0c] border border-gray-800 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl px-5 py-3 outline-none focus:border-blue-500 transition-all text-blue-400 cursor-pointer hover:bg-gray-900"
-                    >
-                      <option value="User">User</option>
-                      <option value="Head">Head</option>
-                      <option value="Admin">Admin</option>
-                      <option value="Alumni">Alumni</option>
-                    </select>
-                  </td>
-                  <td className="p-8 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <span className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 py-2 rounded-xl border ${
-                        u.approvalStatus === 'Approved'
-                          ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
-                          : u.approvalStatus === 'Rejected'
-                            ? 'text-red-400 border-red-500/40 bg-red-500/10'
-                            : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
-                      }`}>
-                        {u.approvalStatus || (u.isVerified ? 'Approved' : 'Pending')}
-                      </span>
-                      <button
-                        onClick={() => handleApprovalChange(u._id, 'Approved')}
-                        className="px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleApprovalChange(u._id, 'Rejected')}
-                        className="px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl bg-red-600/20 text-red-300 hover:bg-red-600/30"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </td>
-                  <td className="p-8 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <button
-                        onClick={() => handleGenerateResetCode(u._id, u.name)}
-                        className="p-3 text-gray-500 hover:text-blue-300 hover:bg-blue-500/10 rounded-xl transition-all"
-                        title="Generate password reset code"
-                      >
-                        <KeyRound size={18} />
-                      </button>
-                      {!['admin', 'head'].includes(String(u.role || '').toLowerCase()) && (
-                        <button 
-                          onClick={() => handleDelete(u._id)}
-                          disabled={String(u._id) === currentUserId}
-                          className="p-4 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all disabled:opacity-40 disabled:hover:text-gray-600 disabled:hover:bg-transparent"
-                          title={String(u._id) === currentUserId ? 'Self-deletion is blocked' : 'Delete user'}
-                        >
-                          <Trash2 size={22} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          
-          {filteredUsers.length === 0 && !loading && (
-            <div className="p-32 text-center text-gray-600">
-              <Shield className="mx-auto mb-4 opacity-10" size={64} />
-              <p className="font-black uppercase tracking-[0.3em] text-xs italic">No data records found in directory</p>
+              <div className="w-full xl:w-auto flex flex-col sm:flex-row gap-2">
+                <div className="relative min-w-[280px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search name, reg no, email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="ui-input pl-10"
+                  />
+                </div>
+                <button type="button" onClick={handleBulkApproveUsers} disabled={bulkBusy || selectedUserIds.length === 0} className="btn btn-secondary">
+                  {bulkBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                  Approve Selected
+                </button>
+                <button type="button" onClick={handleExportUsers} className="btn btn-ghost">
+                  <Download size={13} />
+                  Export CSV
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      <CicrAssistant
-        title="Admin CICR Intelligence Console"
-        placeholder="Ask member-level questions (college ID/email), roles, events, contributions..."
-      />
+            {selectedUserIds.length > 0 && (
+              <div className="px-5 py-2 border-b border-gray-800 text-xs text-cyan-200 uppercase tracking-widest">
+                {selectedUserIds.length} user(s) selected
+              </div>
+            )}
+
+            <div className="overflow-x-auto max-h-[72vh]">
+              <table className="w-full text-left border-collapse min-w-[860px]">
+                <thead className="ui-table-head sticky top-0 z-10">
+                  <tr>
+                    <th className="p-4 w-10 text-center">
+                      <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllUsers} />
+                    </th>
+                    <th className="p-4">
+                      <button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1">
+                        Member <ArrowUpDown size={11} /> {sortIndicator('name')}
+                      </button>
+                    </th>
+                    <th className="p-4 text-center">
+                      <button type="button" onClick={() => toggleSort('role')} className="inline-flex items-center gap-1">
+                        Role <ArrowUpDown size={11} /> {sortIndicator('role')}
+                      </button>
+                    </th>
+                    <th className="p-4 text-center">
+                      <button type="button" onClick={() => toggleSort('year')} className="inline-flex items-center gap-1">
+                        Year <ArrowUpDown size={11} /> {sortIndicator('year')}
+                      </button>
+                    </th>
+                    <th className="p-4 text-center">
+                      <button type="button" onClick={() => toggleSort('approval')} className="inline-flex items-center gap-1">
+                        Approval <ArrowUpDown size={11} /> {sortIndicator('approval')}
+                      </button>
+                    </th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800/50">
+                  {sortedUsers.map((u) => (
+                    <tr key={u._id} className="hover:bg-white/[0.02] transition-colors group">
+                      <td className="p-4 text-center align-top">
+                        <input
+                          type="checkbox"
+                          checked={selectedUserIds.includes(String(u._id))}
+                          onChange={() => toggleSelectUser(u._id)}
+                        />
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-[#0a0a0c] border border-gray-800 flex items-center justify-center font-black text-blue-500">
+                            {u.name ? u.name[0] : '?'}
+                          </div>
+                          <div className="space-y-1">
+                            <p className="font-black text-gray-100 text-sm tracking-tight">{u.name}</p>
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                                <Fingerprint size={10} className="text-blue-500" /> {u.collegeId || 'NO-REG'}
+                              </span>
+                              <span className="text-[10px] text-gray-600">{u.email || 'No email'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <select
+                          value={u.role}
+                          onChange={(e) => handleRoleChange(u._id, e.target.value)}
+                          className="bg-[#0a0a0c] border border-gray-800 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl px-3 py-2 outline-none focus:border-blue-500 text-blue-300"
+                        >
+                          <option value="User">User</option>
+                          <option value="Head">Head</option>
+                          <option value="Admin">Admin</option>
+                          <option value="Alumni">Alumni</option>
+                        </select>
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-gray-400">
+                          <GraduationCap size={12} className="text-amber-400" /> {u.year || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="p-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className={`text-[10px] font-black uppercase tracking-[0.18em] px-2.5 py-1.5 rounded-xl border ${
+                            u.approvalStatus === 'Approved'
+                              ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
+                              : u.approvalStatus === 'Rejected'
+                                ? 'text-red-400 border-red-500/40 bg-red-500/10'
+                                : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
+                          }`}>
+                            {u.approvalStatus || (u.isVerified ? 'Approved' : 'Pending')}
+                          </span>
+                          <button onClick={() => handleApprovalChange(u._id, 'Approved')} className="btn btn-ghost !px-2 !py-1">Approve</button>
+                          <button onClick={() => handleApprovalChange(u._id, 'Rejected')} className="btn btn-danger !px-2 !py-1">Reject</button>
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            onClick={() => handleGenerateResetCode(u._id, u.name)}
+                            className="p-2 text-gray-500 hover:text-blue-300 hover:bg-blue-500/10 rounded-xl transition-all"
+                            title="Generate password reset code"
+                          >
+                            <KeyRound size={16} />
+                          </button>
+                          {!['admin', 'head'].includes(String(u.role || '').toLowerCase()) && (
+                            <button
+                              onClick={() => handleDelete(u._id)}
+                              disabled={String(u._id) === currentUserId}
+                              className="p-2.5 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all disabled:opacity-40"
+                              title={String(u._id) === currentUserId ? 'Self-deletion is blocked' : 'Delete user'}
+                            >
+                              <Trash2 size={17} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {sortedUsers.length === 0 && !loading && (
+                <div className="p-20 text-center text-gray-600">
+                  <Shield className="mx-auto mb-4 opacity-20" size={44} />
+                  <p className="font-black uppercase tracking-[0.24em] text-[10px]">No users found for current filters</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <CicrAssistant
+            title="Admin CICR Intelligence Console"
+            placeholder="Ask member-level questions (college ID/email), roles, events, contributions..."
+          />
+        </>
+      )}
     </div>
   );
 }

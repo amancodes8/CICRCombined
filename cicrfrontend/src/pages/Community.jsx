@@ -41,6 +41,7 @@ import {
   updateIssueTicket,
   warnPostUser,
 } from '../api';
+import PageHeader from '../components/PageHeader';
 
 const ISSUE_CATEGORIES = ['General', 'Technical', 'Infrastructure', 'Event', 'Academic', 'Safety'];
 const ISSUE_PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
@@ -85,6 +86,39 @@ const priorityClassName = (priority) => {
   if (priority === 'High') return 'text-orange-300 border-orange-500/35';
   if (priority === 'Medium') return 'text-amber-300 border-amber-500/35';
   return 'text-gray-300 border-gray-600';
+};
+
+const buildIssueTimeline = (issue = {}) => {
+  const rows = [];
+  rows.push({
+    id: `created-${issue._id}`,
+    label: 'Submitted',
+    detail: issue.createdBy?.name ? `by ${issue.createdBy.name}` : 'by member',
+    at: issue.createdAt,
+  });
+
+  if (issue.status && issue.status !== 'Open') {
+    rows.push({
+      id: `status-${issue._id}`,
+      label: prettyIssueStatus(issue.status),
+      detail: issue.resolvedBy?.name ? `by ${issue.resolvedBy.name}` : 'status updated',
+      at: issue.resolvedAt || issue.updatedAt,
+    });
+  }
+
+  if (issue.adminNote) {
+    rows.push({
+      id: `note-${issue._id}`,
+      label: 'Admin Note',
+      detail: issue.adminNote.slice(0, 90),
+      at: issue.updatedAt,
+    });
+  }
+
+  return rows
+    .filter((item) => item.at)
+    .sort((a, b) => new Date(a.at) - new Date(b.at))
+    .slice(-4);
 };
 
 export default function Community() {
@@ -347,39 +381,33 @@ export default function Community() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 md:py-8 space-y-8 md:space-y-10 min-h-screen overflow-x-hidden page-motion-a">
-      <header className="space-y-5 section-motion section-motion-delay-1">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.24em] text-cyan-300 font-black">
-              <Globe size={14} />
-              Community Workspace
-            </div>
-            <h1 className="mt-2 text-3xl md:text-4xl font-black tracking-tight heading-flow">CICR Community</h1>
-            <p className="mt-2 text-sm text-gray-400 max-w-2xl">
-              Professional collaboration board, verified member directory, and issue reporting line to admin.
-            </p>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-800 p-1 self-start md:self-auto">
-            {[
-              { id: 'feed', icon: MessageSquare, label: 'Feed' },
-              { id: 'directory', icon: Users, label: 'Directory' },
-              { id: 'issues', icon: Bug, label: 'Issues' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 md:px-5 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-[0.18em] inline-flex items-center gap-2 transition-colors ${
-                  activeTab === tab.id
-                    ? 'text-white border border-blue-500/45 bg-blue-500/10'
-                    : 'text-gray-500 hover:text-gray-200'
-                }`}
-              >
-                <tab.icon size={14} />
-                {tab.label}
-              </button>
-            ))}
-          </div>
+    <div className="ui-page max-w-7xl px-4 py-6 md:py-8 space-y-8 md:space-y-10 min-h-screen overflow-x-hidden page-motion-a">
+      <header className="space-y-4 section-motion section-motion-delay-1">
+        <PageHeader
+          eyebrow="Community Workspace"
+          title="CICR Community"
+          subtitle="Professional collaboration board, verified member directory, and private issue reporting line to admin."
+          icon={Globe}
+        />
+        <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-800 p-1 self-start md:self-auto">
+          {[
+            { id: 'feed', icon: MessageSquare, label: 'Feed' },
+            { id: 'directory', icon: Users, label: 'Directory' },
+            { id: 'issues', icon: Bug, label: 'Issues' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 md:px-5 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-[0.18em] inline-flex items-center gap-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'text-white border border-blue-500/45 bg-blue-500/10'
+                  : 'text-gray-500 hover:text-gray-200'
+              }`}
+            >
+              <tab.icon size={14} />
+              {tab.label}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -829,6 +857,21 @@ export default function Community() {
                             Admin note: {issue.adminNote}
                           </p>
                         ) : null}
+                        <div className="mt-3 border border-gray-800/75 rounded-lg px-2.5 py-2">
+                          <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Timeline</p>
+                          <div className="mt-2 space-y-1.5">
+                            {buildIssueTimeline(issue).map((step) => (
+                              <div key={step.id} className="flex items-start gap-2 text-[10px]">
+                                <CircleDashed size={11} className="text-blue-300 mt-0.5 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-gray-200 uppercase tracking-wide">{step.label}</p>
+                                  <p className="text-gray-500 truncate">{step.detail}</p>
+                                  <p className="text-gray-600">{fmtDateTime(step.at)}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </article>
                     ))}
 
@@ -914,6 +957,22 @@ export default function Community() {
                             Admin note: {issue.adminNote}
                           </p>
                         ) : null}
+
+                        <div className="mt-3 border border-gray-800/75 rounded-lg px-2.5 py-2">
+                          <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Timeline</p>
+                          <div className="mt-2 space-y-1.5">
+                            {buildIssueTimeline(issue).map((step) => (
+                              <div key={step.id} className="flex items-start gap-2 text-[10px]">
+                                <CircleDashed size={11} className="text-blue-300 mt-0.5 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-gray-200 uppercase tracking-wide">{step.label}</p>
+                                  <p className="text-gray-500 truncate">{step.detail}</p>
+                                  <p className="text-gray-600">{fmtDateTime(step.at)}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
 
                         <div className="mt-3 pt-3 border-t border-gray-800 flex flex-wrap gap-2">
                           <button

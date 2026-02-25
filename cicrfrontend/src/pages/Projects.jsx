@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchProjects } from '../api';
+import PageHeader from '../components/PageHeader';
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
@@ -54,30 +55,23 @@ export default function Projects() {
   );
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 page-motion-b">
-      
-      {/* GLOSS HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-4 section-motion section-motion-delay-1">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Rocket className="text-blue-500" size={24} />
-            <h2 className="text-3xl md:text-3xl font-black tracking-tighter text-white ">Projects</h2>
-          </div>
-          <p className="text-gray-500 font-medium text-sm md:text-base">Track lab innovations and team deployments</p>
-        </div>
-        
-        {canCreate ? (
-          <Link 
-            to="/create-project" 
-            className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl flex items-center justify-center gap-3 font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 active:scale-95"
-          >
-            <Plus size={18} /> Initiate Project
-          </Link>
-        ) : (
-          <div className="w-full md:w-auto border border-amber-500/30 text-amber-200 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-center">
-            Seniors only
-          </div>
-        )}
+    <div className="ui-page space-y-8 px-4 sm:px-6 lg:px-8 pb-20 page-motion-b">
+      <header className="pt-4 section-motion section-motion-delay-1">
+        <PageHeader
+          eyebrow="Project Workspace"
+          title="Projects"
+          subtitle="Track lab innovations, ownership, and delivery status."
+          icon={Rocket}
+          actions={
+            canCreate ? (
+              <Link to="/create-project" className="btn btn-primary">
+                <Plus size={14} /> Initiate Project
+              </Link>
+            ) : (
+              <div className="btn btn-ghost">Seniors only</div>
+            )
+          }
+        />
       </header>
 
       {/* FILTER TERMINAL */}

@@ -15,6 +15,7 @@ import {
   Users,
 } from 'lucide-react';
 import { fetchMeetings, fetchMyInsights, fetchPosts, fetchProjects, fetchApplications } from '../api';
+import PageHeader from '../components/PageHeader';
 
 const fmtDate = (d) => new Date(d).toLocaleDateString();
 const fmtTime = (d) => new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -92,22 +93,22 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto pb-16 space-y-8 page-motion-a">
-      <section className="p-6 md:p-10 relative overflow-hidden section-motion section-motion-delay-1">
-        <div className="absolute -top-16 right-0 w-72 h-72 bg-blue-600/10 blur-[100px] rounded-full" />
-        <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.3em] text-blue-400 font-black">CICR Dashboard</p>
-            <h2 className="text-4xl md:text-4xl font-black text-white mt-2 tracking-tight">Recent Activities</h2>
-            <p className="text-gray-400 mt-3 text-sm md:text-base">Events, meetings, projects and discussions on one page.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => scrollTo(recentRef)} className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-widest">Recent</button>
-            <button onClick={() => scrollTo(meetingsRef)} className="px-4 py-2 rounded-xl border border-gray-700 text-gray-300 text-xs font-black uppercase tracking-widest">Meetings</button>
-            <button onClick={() => scrollTo(projectsRef)} className="px-4 py-2 rounded-xl border border-gray-700 text-gray-300 text-xs font-black uppercase tracking-widest">Projects</button>
-            <button onClick={() => scrollTo(discussionsRef)} className="px-4 py-2 rounded-xl border border-gray-700 text-gray-300 text-xs font-black uppercase tracking-widest">Discussions</button>
-          </div>
-        </div>
+    <div className="ui-page pb-16 space-y-8 page-motion-a">
+      <section className="section-motion section-motion-delay-1">
+        <PageHeader
+          eyebrow="CICR Dashboard"
+          title="Recent Activities"
+          subtitle="Events, meetings, projects, and discussions in one operational view."
+          icon={Activity}
+          actions={
+            <>
+              <button onClick={() => scrollTo(recentRef)} className="btn btn-primary">Recent</button>
+              <button onClick={() => scrollTo(meetingsRef)} className="btn btn-secondary">Meetings</button>
+              <button onClick={() => scrollTo(projectsRef)} className="btn btn-secondary">Projects</button>
+              <button onClick={() => scrollTo(discussionsRef)} className="btn btn-secondary">Discussions</button>
+            </>
+          }
+        />
       </section>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 section-motion section-motion-delay-2 pro-stagger">

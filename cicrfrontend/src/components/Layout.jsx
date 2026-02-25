@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Users, FolderKanban, 
   Calendar, ShieldCheck, FileText, UserSquare2,
-  Package, Menu, X, Radio, Sparkles, Bell, CheckCheck, GitBranchPlus
+  Package, Menu, X, Radio, Sparkles, Bell, CheckCheck, GitBranchPlus, Search, PlusCircle
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -14,9 +14,27 @@ import {
   markNotificationRead,
 } from '../api';
 import logo from './logo.png';
+import CommandPalette from './CommandPalette';
 
 const COMMUNICATION_CONVERSATION_ID = 'admin-stream';
 const COMMUNICATION_LAST_SEEN_KEY = `communication_last_seen_at_${COMMUNICATION_CONVERSATION_ID}`;
+const ROUTE_LABELS = {
+  dashboard: 'Dashboard',
+  projects: 'Projects',
+  meetings: 'Meetings',
+  schedule: 'Schedule Meeting',
+  hierarchy: 'Mentorship Ops',
+  events: 'Events',
+  inventory: 'Inventory',
+  community: 'Community',
+  profile: 'Profile',
+  guidelines: 'Guidelines',
+  admin: 'Admin Panel',
+  communication: 'Collab Stream',
+  apply: 'Application',
+  'create-project': 'Create Project',
+  add: 'Add',
+};
 
 export default function Layout({ children }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -26,6 +44,7 @@ export default function Layout({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isCommandOpen, setIsCommandOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -142,6 +161,7 @@ export default function Layout({ children }) {
 
   useEffect(() => {
     setNotificationsOpen(false);
+    setIsCommandOpen(false);
   }, [location.pathname]);
 
   const openNotifications = () => {
@@ -181,6 +201,25 @@ export default function Layout({ children }) {
     }
   };
 
+  const openCommandPalette = useCallback(() => {
+    setNotificationsOpen(false);
+    setIsMobileOpen(false);
+    setIsCommandOpen(true);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      const key = String(event.key || '').toLowerCase();
+      if ((event.metaKey || event.ctrlKey) && key === 'k') {
+        event.preventDefault();
+        openCommandPalette();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [openCommandPalette]);
+
   const handleLogoError = () => {
     if (logoMode === 'bundle') {
       setLogoMode('public');
@@ -190,18 +229,98 @@ export default function Layout({ children }) {
   };
 
   // Profile icon removed from here as requested
-  const navLinks = [
-    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-    { icon: FolderKanban, label: "Projects", path: "/projects" },
-    { icon: Calendar, label: "Meetings", path: "/meetings" },
-    { icon: GitBranchPlus, label: "Mentorship Ops", path: "/hierarchy" },
-    { icon: Sparkles, label: "Events", path: "/events" },
-    { icon: Package, label: "Inventory", path: "/inventory" },
-    ...(isStrictAdmin ? [{ icon: Radio, label: "Collab Stream", path: "/communication" }] : []),
-    { icon: Users, label: "Community", path: "/community" },
-    { icon: UserSquare2, label: "Profile", path: "/profile" },
-    { icon: FileText, label: "Guidelines", path: "/guidelines" },
-  ];
+  const navLinks = useMemo(
+    () => [
+      { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+      { icon: FolderKanban, label: "Projects", path: "/projects" },
+      { icon: Calendar, label: "Meetings", path: "/meetings" },
+      { icon: GitBranchPlus, label: "Mentorship Ops", path: "/hierarchy" },
+      { icon: Sparkles, label: "Events", path: "/events" },
+      { icon: Package, label: "Inventory", path: "/inventory" },
+      ...(isStrictAdmin ? [{ icon: Radio, label: "Collab Stream", path: "/communication" }] : []),
+      { icon: Users, label: "Community", path: "/community" },
+      { icon: UserSquare2, label: "Profile", path: "/profile" },
+      { icon: FileText, label: "Guidelines", path: "/guidelines" },
+    ],
+    [isStrictAdmin]
+  );
+
+  const commandItems = useMemo(() => {
+    const primary = navLinks.map((item) => ({
+      id: `nav-${item.path}`,
+      label: item.label,
+      subtitle: `Go to ${item.label}`,
+      icon: item.icon,
+      keywords: `${item.label} ${item.path}`,
+      onSelect: () => navigate(item.path),
+    }));
+
+    const ops = [
+      {
+        id: 'cmd-notifications',
+        label: 'Open Notifications',
+        subtitle: 'Review latest alerts',
+        icon: Bell,
+        keywords: 'notifications inbox alerts',
+        onSelect: () => setNotificationsOpen(true),
+      },
+      {
+        id: 'cmd-create-project',
+        label: 'Create Project',
+        subtitle: 'Open project initiation flow',
+        icon: PlusCircle,
+        keywords: 'create project new',
+        onSelect: () => navigate('/create-project'),
+      },
+      {
+        id: 'cmd-profile',
+        label: 'Open My Profile',
+        subtitle: 'Manage personal account details',
+        icon: UserSquare2,
+        keywords: 'profile settings account',
+        onSelect: () => navigate('/profile'),
+      },
+    ];
+
+    if (user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'head') {
+      ops.push({
+        id: 'cmd-admin',
+        label: 'Open Admin Panel',
+        subtitle: 'Access operations controls',
+        icon: ShieldCheck,
+        keywords: 'admin approvals recruitment users audit',
+        onSelect: () => navigate('/admin'),
+      });
+    }
+
+    return [...primary, ...ops];
+  }, [navLinks, navigate, user.role]);
+
+  const breadcrumbs = useMemo(() => {
+    const segments = location.pathname.split('/').filter(Boolean);
+    if (segments.length === 0) return [{ label: 'Dashboard', path: '/dashboard' }];
+
+    let accPath = '';
+    const rows = segments.map((segment, idx) => {
+      accPath += `/${segment}`;
+      let label = ROUTE_LABELS[segment];
+
+      if (!label) {
+        if (segments[0] === 'projects' && idx === 1) label = 'Project Details';
+        else if (segments[0] === 'inventory' && idx === 1 && segments[1] !== 'add' && segments[1] !== 'my-items')
+          label = 'Component Details';
+        else if (segments[0] === 'profile' && idx === 1) label = 'Public Profile';
+        else label = segment.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      }
+
+      return {
+        label,
+        path: accPath,
+      };
+    });
+
+    return rows;
+  }, [location.pathname]);
 
   const SidebarContent = () => (
     <>
@@ -303,6 +422,20 @@ export default function Layout({ children }) {
           )}
         </AnimatePresence>
       </div>
+
+      <div className="mb-4 px-2">
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          className="w-full inline-flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-800 text-gray-300 hover:border-blue-500/40 hover:text-white transition-colors"
+        >
+          <span className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.14em] font-black">
+            <Search size={14} className="text-cyan-300" />
+            Command Palette
+          </span>
+          <span className="text-[10px] uppercase tracking-widest text-gray-500">Ctrl/⌘ K</span>
+        </button>
+      </div>
       
       {/* Main Navigation */}
       <nav className="flex-1 space-y-2">
@@ -392,9 +525,19 @@ export default function Layout({ children }) {
             CICR Connect
           </motion.p>
         </div>
-        <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-gray-400">
-          {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={openCommandPalette}
+            className="p-2 text-gray-400 hover:text-white"
+            aria-label="Open command palette"
+          >
+            <Search size={20} />
+          </button>
+          <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-gray-400 hover:text-white" aria-label="Toggle menu">
+            {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Sidebar Drawer */}
@@ -420,6 +563,37 @@ export default function Layout({ children }) {
       <main className="flex-1 lg:ml-64 p-4 md:p-8 pt-24 lg:pt-8 min-h-screen relative overflow-x-hidden">
         {/* Aesthetic Background Glow */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] rounded-full -z-10 pointer-events-none" />
+
+        <div className="mb-4 md:mb-6 flex items-center justify-between gap-3">
+          <nav className="inline-flex items-center flex-wrap gap-2 text-[10px] md:text-xs uppercase tracking-widest text-gray-500">
+            <Link to="/dashboard" className="hover:text-gray-200 transition-colors">
+              Home
+            </Link>
+            {breadcrumbs.map((crumb, idx) => {
+              const isLast = idx === breadcrumbs.length - 1;
+              return (
+                <span key={`${crumb.path}-${idx}`} className="inline-flex items-center gap-2">
+                  <span>/</span>
+                  {isLast ? (
+                    <span className="text-gray-200">{crumb.label}</span>
+                  ) : (
+                    <Link to={crumb.path} className="hover:text-gray-200 transition-colors">
+                      {crumb.label}
+                    </Link>
+                  )}
+                </span>
+              );
+            })}
+          </nav>
+          <button
+            type="button"
+            onClick={openCommandPalette}
+            className="hidden md:inline-flex items-center gap-2 border border-gray-800 rounded-lg px-2.5 py-1.5 text-[10px] uppercase tracking-widest text-gray-400 hover:text-gray-200 hover:border-gray-700"
+          >
+            <Search size={12} />
+            Ctrl/⌘ K
+          </button>
+        </div>
         
         <motion.div
           key={location.pathname}
@@ -430,6 +604,8 @@ export default function Layout({ children }) {
           {children}
         </motion.div>
       </main>
+
+      <CommandPalette open={isCommandOpen} onClose={() => setIsCommandOpen(false)} commands={commandItems} />
     </div>
   );
 }

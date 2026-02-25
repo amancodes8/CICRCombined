@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { 
   Calendar, Plus, Video, MapPin, 
-  Clock, Loader2, ChevronRight, History 
+  Clock, ChevronRight, History 
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fetchMeetings } from '../api';
+import PageHeader from '../components/PageHeader';
+import { DataEmpty, DataLoading } from '../components/DataState';
 
 export default function Meetings() {
   const [meetings, setMeetings] = useState([]);
@@ -40,28 +42,26 @@ export default function Meetings() {
 
   if (loading) return (
     <div className="h-96 flex items-center justify-center">
-      <Loader2 className="animate-spin text-blue-500" size={40} />
+      <DataLoading label="Loading meetings..." />
     </div>
   );
 
   return (
-    <div className="space-y-10 max-w-6xl mx-auto page-motion-b pro-stagger">
-      {/* Header Section */}
-      <header className="flex justify-between items-center section-motion section-motion-delay-1">
-        <div>
-          <h2 className="text-3xl font-bold">Meetings</h2>
-          <p className="text-gray-400 mt-1">Manage your sessions and attendance</p>
-        </div>
-
-        {/* ONLY Admin or Head can see the Schedule button */}
-        {canSchedule && (
-          <Link 
-            to="/schedule" 
-            className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl flex items-center gap-2 font-bold transition-all shadow-lg shadow-blue-600/20"
-          >
-            <Plus size={20} /> Schedule New
-          </Link>
-        )}
+    <div className="ui-page space-y-10 page-motion-b pro-stagger">
+      <header className="section-motion section-motion-delay-1">
+        <PageHeader
+          eyebrow="Meeting Operations"
+          title="Meetings"
+          subtitle="Manage upcoming sessions, coordination calls, and attendance context."
+          icon={Calendar}
+          actions={
+            canSchedule ? (
+              <Link to="/schedule" className="btn btn-primary">
+                <Plus size={14} /> Schedule New
+              </Link>
+            ) : null
+          }
+        />
       </header>
 
       {/* Upcoming Meetings */}
@@ -73,9 +73,7 @@ export default function Meetings() {
           {upcoming.length > 0 ? upcoming.map(m => (
             <MeetingCard key={m._id} meeting={m} isPast={false} />
           )) : (
-            <p className="text-gray-500 italic p-6 rounded-2xl border border-dashed border-gray-800 text-center">
-              No upcoming meetings scheduled.
-            </p>
+            <DataEmpty label="No upcoming meetings scheduled." />
           )}
         </div>
       </section>
@@ -89,7 +87,7 @@ export default function Meetings() {
           {past.length > 0 ? past.map(m => (
             <MeetingCard key={m._id} meeting={m} isPast={true} />
           )) : (
-            <p className="text-gray-500 text-sm">No past records found.</p>
+            <DataEmpty label="No past records found." />
           )}
         </div>
       </section>

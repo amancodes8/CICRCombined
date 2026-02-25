@@ -5,7 +5,9 @@ import {
   BookOpen,
   Briefcase,
   Calendar,
+  CheckCircle2,
   Copy,
+  Circle,
   Edit2,
   ExternalLink,
   Facebook,
@@ -168,6 +170,18 @@ export default function Profile() {
     return Math.round((done / checks.length) * 100);
   }, [achievements.length, skills.length, user.batch, user.bio, user.branch, user.joinedAt, user.name, user.phone, user.social, user.year]);
 
+  const profileChecklist = useMemo(
+    () => [
+      { id: 'identity', label: 'Identity details', done: Boolean(user.name && user.phone && user.collegeId) },
+      { id: 'academic', label: 'Academic context', done: Boolean(user.year && user.branch && user.batch) },
+      { id: 'about', label: 'Professional bio', done: Boolean(user.bio) },
+      { id: 'skills', label: 'Skills listed', done: skills.length > 0 },
+      { id: 'achievements', label: 'Achievements listed', done: achievements.length > 0 },
+      { id: 'social', label: 'Social links', done: Object.values(user.social || {}).some((v) => String(v || '').trim()) },
+    ],
+    [achievements.length, skills.length, user.batch, user.bio, user.branch, user.collegeId, user.name, user.phone, user.social, user.year]
+  );
+
   const socialItems = useMemo(
     () => [
       { key: 'linkedin', label: 'LinkedIn', icon: LinkIcon, raw: user.social?.linkedin || '' },
@@ -327,7 +341,7 @@ export default function Profile() {
 
   return (
     <div className="max-w-6xl mx-auto pb-10 md:pb-16 space-y-8 px-1 sm:px-0 page-motion-c">
-      <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="pt-2 section-motion section-motion-delay-1">
+      <motion.section id="about" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="pt-2 section-motion section-motion-delay-1">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
           <div className="flex items-start gap-3 sm:gap-4 min-w-0">
             <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-500 flex items-center justify-center text-2xl md:text-3xl font-black text-white shrink-0 shadow-lg shadow-cyan-500/20">
@@ -373,6 +387,39 @@ export default function Profile() {
         <p className="mt-2 text-sm text-cyan-200 break-all">{publicProfileUrl || 'Public profile URL unavailable'}</p>
       </motion.section>
 
+      <section className="grid grid-cols-1 xl:grid-cols-12 gap-5 section-motion section-motion-delay-2">
+        <article className="xl:col-span-7 ui-surface-soft p-4 md:p-5">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 font-black">Section Jump Links</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[
+              { id: 'about', label: 'About' },
+              { id: 'snapshot', label: 'Snapshot' },
+              { id: 'skills', label: 'Skills' },
+              { id: 'achievements', label: 'Achievements' },
+              { id: 'security', label: 'Security' },
+            ].map((item) => (
+              <a key={item.id} href={`#${item.id}`} className="btn btn-ghost !w-auto !px-3 !py-1.5">
+                {item.label}
+              </a>
+            ))}
+          </div>
+        </article>
+
+        <article className="xl:col-span-5 ui-surface-soft p-4 md:p-5">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 font-black">Completion Checklist</p>
+          <div className="mt-3 space-y-2">
+            {profileChecklist.map((item) => (
+              <div key={item.id} className="flex items-center justify-between text-sm">
+                <span className={item.done ? 'text-gray-200' : 'text-gray-500'}>{item.label}</span>
+                <span className={item.done ? 'text-emerald-300' : 'text-gray-600'}>
+                  {item.done ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                </span>
+              </div>
+            ))}
+          </div>
+        </article>
+      </section>
+
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 section-motion section-motion-delay-2 pro-stagger">
         <MetricCard label="Profile Completion" value={`${completionScore}%`} helper="Keep this above 85%" />
         <MetricCard label="Skills Listed" value={skills.length} helper="Technical + domain skills" />
@@ -380,7 +427,7 @@ export default function Profile() {
         <MetricCard label="Years in CICR" value={yearsInCicr(user.joinedAt)} helper={`Joined ${fmtDate(user.joinedAt)}`} />
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-8 section-motion section-motion-delay-2">
+      <section id="snapshot" className="grid grid-cols-1 xl:grid-cols-2 gap-8 section-motion section-motion-delay-2">
         <article>
           <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
             <Briefcase size={17} className="text-cyan-300" />
@@ -394,7 +441,7 @@ export default function Profile() {
           </div>
         </article>
 
-        <article>
+        <article id="social">
           <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
             <LinkIcon size={17} className="text-cyan-300" />
             Social Presence
@@ -419,7 +466,7 @@ export default function Profile() {
       </section>
 
       <section className="grid grid-cols-1 xl:grid-cols-2 gap-8 section-motion section-motion-delay-3">
-        <article>
+        <article id="skills">
           <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
             <Briefcase size={17} className="text-cyan-300" />
             Skills
@@ -435,7 +482,7 @@ export default function Profile() {
           </ul>
         </article>
 
-        <article>
+        <article id="achievements">
           <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
             <Award size={17} className="text-cyan-300" />
             Achievements
@@ -471,7 +518,7 @@ export default function Profile() {
         </motion.section>
       )}
 
-      <section className="section-motion section-motion-delay-3">
+      <section id="security" className="section-motion section-motion-delay-3">
         <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
           <Lock size={17} className="text-cyan-300" />
           Password & Security
@@ -702,7 +749,7 @@ export default function Profile() {
         )}
       </AnimatePresence>
 
-      <section className="pt-1 section-motion section-motion-delay-3">
+      <section className="pt-1 section-motion section-motion-delay-3 mobile-sticky-action">
         <p className="text-sm text-gray-300 leading-relaxed">
           Keep your profile current so collaborators can find your expertise quickly and contact you directly.
         </p>

@@ -248,14 +248,16 @@ export default function Apply() {
             autoComplete="off"
           />
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="inline-flex items-center gap-2 border border-blue-500/40 text-blue-100 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-[0.16em] hover:bg-blue-500/10 disabled:opacity-60"
-          >
-            {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
-            Submit Application
-          </button>
+          <div className="mobile-sticky-action">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn btn-primary !px-5 !py-3"
+            >
+              {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
+              Submit Application
+            </button>
+          </div>
         </motion.form>
 
         {loading && (

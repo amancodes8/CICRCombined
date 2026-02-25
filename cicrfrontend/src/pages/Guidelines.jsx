@@ -1,4 +1,5 @@
 import { CalendarCheck2, ShieldCheck, Sparkles, Users, Wrench } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 
 const guidelineSections = [
   {
@@ -41,18 +42,20 @@ const guidelineSections = [
 
 export default function Guidelines() {
   return (
-    <div className="max-w-6xl mx-auto pb-10 md:pb-14 space-y-6 page-motion-d">
-      <section className="p-7 md:p-10 section-motion section-motion-delay-1">
-        <p className="text-[10px] uppercase tracking-[0.26em] text-cyan-300 font-black">CICR Handbook</p>
-        <h1 className="text-3xl md:text-4xl font-black text-white mt-3 tracking-tight">Operational Guidelines</h1>
-        <p className="text-gray-300/90 mt-3 max-w-3xl text-sm md:text-base leading-relaxed">
-          This page defines the baseline operating standards for CICR projects, communication, and collaboration.
-          Follow these rules to keep execution fast, secure, and professional.
-        </p>
-        <div className="mt-5 inline-flex items-center gap-2 text-xs text-cyan-200 border border-cyan-400/20 rounded-full px-3 py-1.5">
-          <Sparkles size={14} />
-          Updated for current workflow standards
-        </div>
+    <div className="ui-page max-w-6xl pb-10 md:pb-14 space-y-6 page-motion-d">
+      <section className="section-motion section-motion-delay-1">
+        <PageHeader
+          eyebrow="CICR Handbook"
+          title="Operational Guidelines"
+          subtitle="Baseline operating standards for CICR projects, communication, and collaboration. Follow these rules to keep execution fast, secure, and professional."
+          icon={ShieldCheck}
+          badge={
+            <>
+              <Sparkles size={13} className="text-cyan-300" />
+              Updated for current workflow standards
+            </>
+          }
+        />
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 pro-stagger section-motion section-motion-delay-2">

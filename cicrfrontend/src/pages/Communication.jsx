@@ -8,6 +8,7 @@ import {
   fetchCommunicationMessages,
   fetchMentionCandidates,
 } from '../api';
+import PageHeader from '../components/PageHeader';
 
 const fmtDayDateTime = (d) =>
   new Date(d).toLocaleString([], { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -27,6 +28,16 @@ const userColor = (seed) => {
   for (let i = 0; i < raw.length; i += 1) hash = raw.charCodeAt(i) + ((hash << 5) - hash);
   const hue = Math.abs(hash) % 360;
   return `hsl(${hue} 80% 65%)`;
+};
+
+const isGroupedMessage = (current, previous) => {
+  if (!current || !previous) return false;
+  if (String(current?.sender?._id || '') !== String(previous?.sender?._id || '')) return false;
+  if (Boolean(current?.sender?.isAI) !== Boolean(previous?.sender?.isAI)) return false;
+  const currentTs = new Date(current.createdAt).getTime();
+  const previousTs = new Date(previous.createdAt).getTime();
+  if (!Number.isFinite(currentTs) || !Number.isFinite(previousTs)) return false;
+  return currentTs - previousTs <= 5 * 60 * 1000;
 };
 
 const COMMUNICATION_CONVERSATION_ID = 'admin-stream';
@@ -277,11 +288,14 @@ export default function Communication() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto pb-4 md:pb-8 page-motion-d">
+    <div className="ui-page max-w-5xl pb-4 md:pb-8 page-motion-d">
       <section className="px-1 py-2 md:py-3 section-motion section-motion-delay-1">
-        <p className="text-xs uppercase tracking-widest text-blue-400 font-black">Collab Stream</p>
-        <h1 className="text-2xl md:text-3xl font-black text-white mt-1 tracking-tight">Admin Conversation Hub</h1>
-        <p className="text-gray-400 text-sm mt-2">Live team chat. Message retention follows server policy.</p>
+        <PageHeader
+          eyebrow="Collab Stream"
+          title="Admin Conversation Hub"
+          subtitle="Live team chat for CICR admin operations. Message retention follows server policy."
+          icon={MessageCircle}
+        />
       </section>
 
       <section className="flex flex-col h-[calc(100vh-190px)] md:h-[calc(100vh-180px)] min-h-[460px] section-motion section-motion-delay-2">
@@ -314,13 +328,16 @@ export default function Communication() {
             )}
             {sortedMessages.length === 0 && <p className="text-sm text-gray-500">No messages yet.</p>}
             <AnimatePresence initial={false}>
-              {sortedMessages.map((m) => (
+              {sortedMessages.map((m, index) => {
+                const prev = sortedMessages[index - 1];
+                const grouped = isGroupedMessage(m, prev);
+                return (
                 <motion.div
                   key={m._id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className={`flex ${String(m.sender?._id) === String(currentUserId) ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${String(m.sender?._id) === String(currentUserId) ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-3'}`}
                 >
                   <motion.div
                     whileHover={{ y: -1 }}
@@ -334,7 +351,8 @@ export default function Communication() {
                         : 'bg-[#111217] border-gray-700/70'
                     }`}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5 sm:gap-2 md:gap-3">
+                    {!grouped ? (
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5 sm:gap-2 md:gap-3">
                       <p className="text-xs md:text-sm text-gray-100 inline-flex items-center gap-1 min-w-0">
                         <UserRound size={13} className={`${m.sender?.isAI ? 'text-emerald-400' : 'text-blue-400'} shrink-0 mt-[1px]`} />
                         <span className="font-semibold break-all" style={{ color: userColor(m.sender?.collegeId || m.sender?.name) }}>
@@ -368,6 +386,35 @@ export default function Communication() {
                         )}
                       </div>
                     </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <p className="text-[10px] text-gray-500">{fmtDayDateTime(m.createdAt)}</p>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setReplyTarget(m)}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-md text-gray-500 hover:text-blue-300 hover:bg-blue-500/10 transition-colors"
+                            title="Reply to message"
+                            aria-label="Reply to message"
+                          >
+                            <CornerUpLeft size={13} />
+                          </button>
+                          {(canModerate ||
+                            String(m.sender?._id) === String(currentUserId) ||
+                            (m.sender?.isAI && String(m.replyTo?.senderCollegeId || '') === String(user?.collegeId || ''))) && (
+                            <button
+                              type="button"
+                              onClick={() => removeMessage(m._id)}
+                              disabled={deletingId === m._id}
+                              className="text-gray-500 hover:text-red-400 disabled:opacity-50"
+                              title="Delete message"
+                            >
+                              {deletingId === m._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     {m.replyTo?.text && (
                       <div className="mt-2 rounded-xl border border-gray-700/70 bg-black/25 px-2.5 py-1.5">
                         <p className="text-[10px] text-blue-300 font-semibold">
@@ -379,7 +426,8 @@ export default function Communication() {
                     <p className="text-sm md:text-[15px] text-gray-200 mt-1.5 md:mt-2 break-words">{decorateMentions(m.text)}</p>
                   </motion.div>
                 </motion.div>
-              ))}
+                );
+              })}
             </AnimatePresence>
             <div ref={endRef} />
           </div>

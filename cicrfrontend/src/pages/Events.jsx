@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { CalendarDays, CheckCircle2, Clock4, MapPin, Plus, ShieldCheck, Sparkles, Trash2, Users } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Clock4, MapPin, Plus, Sparkles, Trash2, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createEvent, deleteEvent, fetchEvents, updateEvent } from '../api';
+import PageHeader from '../components/PageHeader';
+import { DataEmpty, DataLoading } from '../components/DataState';
 
 const EVENT_TYPES = ['Orientation', 'Workshop', 'Recruitment', 'Competition', 'Seminar', 'Internal'];
 
@@ -119,24 +121,26 @@ export default function Events() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-16 page-motion-b">
-      <motion.header
+    <div className="ui-page max-w-6xl space-y-8 pb-16 page-motion-b">
+      <motion.section
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45 }}
-        className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 section-motion section-motion-delay-1"
+        className="section-motion section-motion-delay-1"
       >
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.3em] text-blue-400 font-black">CICR Events</p>
-          <h2 className="text-3xl md:text-4xl font-black text-white mt-2">Events & Recruitment Drives</h2>
-          <p className="text-gray-500 mt-2 text-sm max-w-2xl">
-            Track workshops, orientation sessions, and recruitment pipelines. Open events can host applications from new members.
-          </p>
-        </div>
-        <div className="inline-flex items-center gap-2 text-xs text-gray-400 border border-gray-800 rounded-xl px-3 py-2">
-          <Sparkles size={14} className="text-blue-400" /> {openEvents.length} active events
-        </div>
-      </motion.header>
+        <PageHeader
+          eyebrow="CICR Events"
+          title="Events & Recruitment Drives"
+          subtitle="Track workshops, orientation sessions, and recruitment pipelines. Open events can host applications from new members."
+          icon={CalendarDays}
+          badge={
+            <>
+              <Sparkles size={13} className="text-blue-300" />
+              {openEvents.length} active events
+            </>
+          }
+        />
+      </motion.section>
 
       {isAdminOrHead && (
         <motion.form
@@ -223,7 +227,7 @@ export default function Events() {
       )}
 
       {loading ? (
-        <div className="h-64 flex items-center justify-center text-gray-500">Loading events...</div>
+        <div className="h-64 flex items-center justify-center"><DataLoading label="Loading events..." /></div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 section-motion section-motion-delay-3 pro-stagger">
           {events.map((event) => (
@@ -303,8 +307,8 @@ export default function Events() {
       )}
 
       {!loading && events.length === 0 && (
-        <div className="border border-dashed border-gray-800 rounded-[2rem] p-10 text-center text-gray-500 section-motion section-motion-delay-3">
-          No events created yet.
+        <div className="section-motion section-motion-delay-3">
+          <DataEmpty label="No events created yet." />
         </div>
       )}
     </div>
