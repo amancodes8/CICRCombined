@@ -105,6 +105,29 @@ const getMemberInsights = async (req, res) => {
     res.json(insights);
 };
 
+const getDirectoryMembers = async (_req, res) => {
+    const users = await User.find({
+        $or: [{ approvalStatus: 'Approved' }, { isVerified: true }],
+    })
+        .select('name email collegeId role branch year batch joinedAt')
+        .sort({ name: 1 })
+        .lean();
+
+    const directory = users.map((u) => ({
+        _id: u._id,
+        name: u.name || '',
+        email: u.email || '',
+        collegeId: u.collegeId || '',
+        role: u.role || 'User',
+        branch: String(u.branch || '').toUpperCase(),
+        year: u.year ?? null,
+        batch: u.batch || '',
+        joinedAt: u.joinedAt || null,
+    }));
+
+    res.json(directory);
+};
+
 const getPublicProfileByCollegeId = async (req, res) => {
     const collegeId = String(req.params.collegeId || '').trim();
     if (!collegeId) {
@@ -161,6 +184,7 @@ module.exports = {
     updateUserProfile,
     getMyInsights,
     getMemberInsights,
+    getDirectoryMembers,
     getPublicProfileByCollegeId,
     acknowledgeWarnings,
 };

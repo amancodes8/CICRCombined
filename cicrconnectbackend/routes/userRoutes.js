@@ -5,6 +5,7 @@ const {
   updateUserProfile,
   getMyInsights,
   getMemberInsights,
+  getDirectoryMembers,
   getPublicProfileByCollegeId,
   acknowledgeWarnings,
 } = require('../controllers/userController');
@@ -19,6 +20,7 @@ router.route('/profile')
     .get(protect, getUserProfile)
     .put(protect, updateUserProfile);
 
+router.get('/directory', protect, getDirectoryMembers);
 router.get('/insights/me', protect, getMyInsights);
 router.get('/insights/member/:identifier', protect, authorize('Admin', 'Head'), getMemberInsights);
 router.get('/public/:collegeId', getPublicProfileByCollegeId);

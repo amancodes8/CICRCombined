@@ -32,6 +32,7 @@ export const getMe = () => API.get('/auth/me');
 
 // Updates personal details (Year, Phone, Branch, Batch)
 export const updateProfile = (data) => API.put('/auth/profile', data);
+export const fetchDirectoryMembers = () => API.get('/users/directory');
 export const fetchMyInsights = () => API.get('/users/insights/me');
 export const fetchMemberInsights = (identifier) => API.get(`/users/insights/member/${encodeURIComponent(identifier)}`);
 export const fetchPublicProfile = (collegeId) => API.get(`/users/public/${encodeURIComponent(collegeId)}`);
