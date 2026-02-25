@@ -14,6 +14,7 @@ import {
   Instagram,
   Link as LinkIcon,
   Loader2,
+  Lock,
   Mail,
   Phone,
   Save,
