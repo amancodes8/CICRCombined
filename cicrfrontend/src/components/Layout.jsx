@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Users, FolderKanban, 
-  Calendar, LogOut, ShieldCheck, FileText, UserSquare2,
+  Calendar, ShieldCheck, FileText, UserSquare2,
   Package, Menu, X, Radio, Sparkles, Bell, CheckCheck, GitBranchPlus
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -14,6 +14,9 @@ import {
   markNotificationRead,
 } from '../api';
 import logo from './logo.png';
+
+const COMMUNICATION_CONVERSATION_ID = 'admin-stream';
+const COMMUNICATION_LAST_SEEN_KEY = `communication_last_seen_at_${COMMUNICATION_CONVERSATION_ID}`;
 
 export default function Layout({ children }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -58,6 +61,8 @@ export default function Layout({ children }) {
 
     const isChatOpen = location.pathname.startsWith('/communication');
     if (isChatOpen) {
+      localStorage.setItem(COMMUNICATION_LAST_SEEN_KEY, String(Date.now()));
+      // Keep legacy key for compatibility with existing local state.
       localStorage.setItem('communication_last_seen_at', String(Date.now()));
       setHasUnreadChat(false);
       return;
@@ -71,13 +76,21 @@ export default function Layout({ children }) {
 
     const checkUnread = async () => {
       try {
-        const { data } = await fetchCommunicationMessages(1);
-        const latest = Array.isArray(data) ? data[data.length - 1] : null;
+        const { data } = await fetchCommunicationMessages({
+          limit: 1,
+          conversationId: COMMUNICATION_CONVERSATION_ID,
+        });
+        const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+        const latest = rows[rows.length - 1];
         if (!latest?.createdAt) {
           setHasUnreadChat(false);
           return;
         }
-        const lastSeen = Number(localStorage.getItem('communication_last_seen_at') || 0);
+        const lastSeen = Number(
+          localStorage.getItem(COMMUNICATION_LAST_SEEN_KEY) ||
+            localStorage.getItem('communication_last_seen_at') ||
+            0
+        );
         const latestTime = new Date(latest.createdAt).getTime();
         const isOwnMessage = String(latest.sender?._id || '') === String(user._id || '');
         setHasUnreadChat(!isOwnMessage && latestTime > lastSeen);
@@ -174,11 +187,6 @@ export default function Layout({ children }) {
       return;
     }
     setLogoMode('fallback');
-  };
-
-  const handleLogout = () => {
-    localStorage.clear();
-    window.location.href = '/login';
   };
 
   // Profile icon removed from here as requested
@@ -349,11 +357,6 @@ export default function Layout({ children }) {
           </div>
         </div>
 
-        {/* Logout Button */}
-        <button onClick={handleLogout} className="flex items-center space-x-3 p-3 text-red-400 hover:bg-red-500/10 rounded-xl w-full group transition-all">
-          <LogOut size={20} className="group-hover:translate-x-1 transition-transform" />
-          <span className="font-medium">Logout</span>
-        </button>
       </div>
     </>
   );

@@ -29,7 +29,13 @@ const userColor = (seed) => {
   return `hsl(${hue} 80% 65%)`;
 };
 
-const markCommunicationRead = (timestamp = Date.now()) => {
+const COMMUNICATION_CONVERSATION_ID = 'admin-stream';
+const getCommunicationSeenKey = (conversationId = COMMUNICATION_CONVERSATION_ID) =>
+  `communication_last_seen_at_${conversationId}`;
+
+const markCommunicationRead = (timestamp = Date.now(), conversationId = COMMUNICATION_CONVERSATION_ID) => {
+  localStorage.setItem(getCommunicationSeenKey(conversationId), String(timestamp));
+  // Keep legacy key for compatibility with existing clients.
   localStorage.setItem('communication_last_seen_at', String(timestamp));
   window.dispatchEvent(new Event('communication-read-updated'));
 };
@@ -37,6 +43,9 @@ const markCommunicationRead = (timestamp = Date.now()) => {
 export default function Communication() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState('');
+  const [loadingMore, setLoadingMore] = useState(false);
   const [sending, setSending] = useState(false);
   const [deletingId, setDeletingId] = useState('');
   const [text, setText] = useState('');
@@ -46,6 +55,8 @@ export default function Communication() {
   const [actionError, setActionError] = useState('');
   const endRef = useRef(null);
   const swipeStartXRef = useRef({});
+  const scrollContainerRef = useRef(null);
+  const prependScrollSnapshotRef = useRef(null);
 
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const user = profile.result || profile;
@@ -62,11 +73,19 @@ export default function Communication() {
   useEffect(() => {
     const load = async () => {
       try {
-        const { data } = await fetchCommunicationMessages(120);
-        const normalized = Array.isArray(data) ? data : [];
+        const { data } = await fetchCommunicationMessages({
+          limit: 80,
+          conversationId: COMMUNICATION_CONVERSATION_ID,
+        });
+        const normalized = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
         setMessages(normalized);
+        setHasMore(Boolean(data?.hasMore));
+        setNextCursor(String(data?.nextCursor || ''));
         const latest = normalized[normalized.length - 1];
-        markCommunicationRead(latest?.createdAt ? new Date(latest.createdAt).getTime() : Date.now());
+        markCommunicationRead(
+          latest?.createdAt ? new Date(latest.createdAt).getTime() : Date.now(),
+          COMMUNICATION_CONVERSATION_ID
+        );
         setServerError('');
       } catch (err) {
         const status = err?.response?.status;
@@ -83,11 +102,19 @@ export default function Communication() {
   }, []);
 
   useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (container && prependScrollSnapshotRef.current !== null) {
+      const previousHeight = prependScrollSnapshotRef.current;
+      prependScrollSnapshotRef.current = null;
+      const nextHeight = container.scrollHeight;
+      container.scrollTop += nextHeight - previousHeight;
+      return;
+    }
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [sortedMessages.length]);
 
   useEffect(() => {
-    markCommunicationRead();
+    markCommunicationRead(Date.now(), COMMUNICATION_CONVERSATION_ID);
   }, []);
 
   useEffect(() => {
@@ -97,13 +124,17 @@ export default function Communication() {
   }, [actionError]);
 
   useEffect(() => {
-    const es = createCommunicationStream();
+    const es = createCommunicationStream(COMMUNICATION_CONVERSATION_ID);
     const handler = (evt) => {
       try {
         const payload = JSON.parse(evt.data);
+        if (payload?.conversationId && payload.conversationId !== COMMUNICATION_CONVERSATION_ID) return;
         setMessages((prev) => {
           if (prev.some((m) => m._id === payload._id)) return prev;
-          markCommunicationRead(payload?.createdAt ? new Date(payload.createdAt).getTime() : Date.now());
+          markCommunicationRead(
+            payload?.createdAt ? new Date(payload.createdAt).getTime() : Date.now(),
+            COMMUNICATION_CONVERSATION_ID
+          );
           return [...prev, payload];
         });
       } catch {
@@ -144,6 +175,37 @@ export default function Communication() {
     return () => clearTimeout(timer);
   }, [text]);
 
+  const loadOlderMessages = async () => {
+    if (!hasMore || loadingMore || !nextCursor) return;
+
+    const scrollContainer = scrollContainerRef.current;
+    if (scrollContainer) {
+      prependScrollSnapshotRef.current = scrollContainer.scrollHeight;
+    }
+
+    setLoadingMore(true);
+    try {
+      const { data } = await fetchCommunicationMessages({
+        limit: 80,
+        before: nextCursor,
+        conversationId: COMMUNICATION_CONVERSATION_ID,
+      });
+      const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+      setMessages((prev) => {
+        const existing = new Set(prev.map((row) => String(row._id)));
+        const olderRows = rows.filter((row) => !existing.has(String(row._id)));
+        return [...olderRows, ...prev];
+      });
+      setHasMore(Boolean(data?.hasMore));
+      setNextCursor(String(data?.nextCursor || ''));
+    } catch (err) {
+      setActionError(err?.response?.data?.message || 'Unable to load older messages');
+      prependScrollSnapshotRef.current = null;
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const replaceCurrentMention = (collegeId) => {
     setText((prev) => prev.replace(/@([a-zA-Z0-9._-]{1,40})$/, `@${collegeId} `));
     setMentionOptions([]);
@@ -159,9 +221,13 @@ export default function Communication() {
       const { data } = await createCommunicationMessage({
         text: body,
         replyToId: replyTarget?._id,
+        conversationId: COMMUNICATION_CONVERSATION_ID,
       });
       setMessages((prev) => (prev.some((m) => m._id === data._id) ? prev : [...prev, data]));
-      markCommunicationRead(data?.createdAt ? new Date(data.createdAt).getTime() : Date.now());
+      markCommunicationRead(
+        data?.createdAt ? new Date(data.createdAt).getTime() : Date.now(),
+        COMMUNICATION_CONVERSATION_ID
+      );
       setText('');
       setReplyTarget(null);
       setMentionOptions([]);
@@ -215,7 +281,7 @@ export default function Communication() {
       <section className="px-1 py-2 md:py-3 section-motion section-motion-delay-1">
         <p className="text-xs uppercase tracking-widest text-blue-400 font-black">Collab Stream</p>
         <h1 className="text-2xl md:text-3xl font-black text-white mt-1 tracking-tight">Admin Conversation Hub</h1>
-        <p className="text-gray-400 text-sm mt-2">Live team chat. Messages auto-expire after 3 days.</p>
+        <p className="text-gray-400 text-sm mt-2">Live team chat. Message retention follows server policy.</p>
       </section>
 
       <section className="flex flex-col h-[calc(100vh-190px)] md:h-[calc(100vh-180px)] min-h-[460px] section-motion section-motion-delay-2">
@@ -232,7 +298,20 @@ export default function Communication() {
             <Loader2 className="animate-spin text-blue-500" />
           </div>
         ) : (
-          <div className="mt-3 flex-1 min-h-0 overflow-y-auto pr-0.5 space-y-2.5 md:space-y-3">
+          <div ref={scrollContainerRef} className="mt-3 flex-1 min-h-0 overflow-y-auto pr-0.5 space-y-2.5 md:space-y-3">
+            {hasMore && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={loadOlderMessages}
+                  disabled={loadingMore}
+                  className="text-xs text-blue-300 hover:text-blue-200 disabled:opacity-60 inline-flex items-center gap-1.5 border border-blue-500/30 rounded-full px-3 py-1"
+                >
+                  {loadingMore ? <Loader2 size={12} className="animate-spin" /> : null}
+                  {loadingMore ? 'Loading older...' : 'Load older messages'}
+                </button>
+              </div>
+            )}
             {sortedMessages.length === 0 && <p className="text-sm text-gray-500">No messages yet.</p>}
             <AnimatePresence initial={false}>
               {sortedMessages.map((m) => (

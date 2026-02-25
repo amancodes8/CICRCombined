@@ -2,6 +2,13 @@ const mongoose = require('mongoose');
 
 const CommunicationMessageSchema = new mongoose.Schema(
   {
+    conversationId: {
+      type: String,
+      default: 'admin-stream',
+      trim: true,
+      maxlength: 80,
+      index: true,
+    },
     text: {
       type: String,
       required: true,
@@ -35,7 +42,15 @@ const CommunicationMessageSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Auto-delete message documents after 3 days.
-CommunicationMessageSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 3 });
+const retentionDaysRaw = Number(process.env.COMMUNICATION_RETENTION_DAYS || 3);
+const retentionDays =
+  Number.isFinite(retentionDaysRaw) && retentionDaysRaw > 0 ? retentionDaysRaw : 3;
+
+// Auto-delete message documents after configured retention period.
+CommunicationMessageSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: Math.round(60 * 60 * 24 * retentionDays) }
+);
+CommunicationMessageSchema.index({ conversationId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('CommunicationMessage', CommunicationMessageSchema);

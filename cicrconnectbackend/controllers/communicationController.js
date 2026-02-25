@@ -1,17 +1,80 @@
 const CommunicationMessage = require('../models/CommunicationMessage');
 const User = require('../models/User');
 const Project = require('../models/Project');
+const mongoose = require('mongoose');
 const { geminiGenerate } = require('../utils/geminiClient');
 
-const sseClients = new Set();
+const sseClients = new Map();
 const userLastMessageAt = new Map();
 const AI_MENTION_TOKEN = '@cicrai';
+const DEFAULT_CONVERSATION_ID = 'admin-stream';
 const DOMAIN_SCOPE_HINT =
   'You must answer only CICR-related topics and technology domains: robotics, programming, software, hardware, AI/ML, cybersecurity, IoT, embedded, electronics, networking, product building, and project workflows. If question is outside this scope or nonsense, refuse briefly and ask a relevant CICR/tech question instead.';
 const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const CONVERSATION_ID_REGEX = /^[a-zA-Z0-9:_-]{2,80}$/;
+const sanitizeConversationId = (value) => {
+  const normalized = String(value || '').trim();
+  if (!normalized) return DEFAULT_CONVERSATION_ID;
+  return CONVERSATION_ID_REGEX.test(normalized) ? normalized : DEFAULT_CONVERSATION_ID;
+};
+const buildConversationFilter = (conversationId) => {
+  const normalizedConversationId = sanitizeConversationId(conversationId);
+  if (normalizedConversationId !== DEFAULT_CONVERSATION_ID) {
+    return { conversationId: normalizedConversationId };
+  }
+  // Backward compatibility for legacy messages created before conversationId was introduced.
+  return {
+    $or: [
+      { conversationId: normalizedConversationId },
+      { conversationId: { $exists: false } },
+      { conversationId: null },
+      { conversationId: '' },
+    ],
+  };
+};
+const buildCursor = (message) => {
+  if (!message?.createdAt || !message?._id) return null;
+  const millis = new Date(message.createdAt).getTime();
+  if (!Number.isFinite(millis)) return null;
+  return `${millis}_${String(message._id)}`;
+};
+const parseCursor = async (rawCursor) => {
+  const raw = String(rawCursor || '').trim();
+  if (!raw) return null;
+
+  const [millisRaw, idRaw] = raw.split('_');
+  const millis = Number(millisRaw);
+  if (Number.isFinite(millis) && mongoose.Types.ObjectId.isValid(idRaw)) {
+    const createdAt = new Date(millis);
+    if (!Number.isNaN(createdAt.getTime())) {
+      return {
+        createdAt,
+        _id: new mongoose.Types.ObjectId(idRaw),
+      };
+    }
+  }
+
+  if (mongoose.Types.ObjectId.isValid(raw)) {
+    const doc = await CommunicationMessage.findById(raw).select('_id createdAt').lean();
+    if (doc?._id && doc?.createdAt) {
+      return {
+        createdAt: new Date(doc.createdAt),
+        _id: doc._id,
+      };
+    }
+  }
+
+  const asDate = new Date(raw);
+  if (!Number.isNaN(asDate.getTime())) {
+    return { createdAt: asDate };
+  }
+
+  return null;
+};
 
 const serializeMessage = (messageDoc) => ({
   _id: messageDoc._id,
+  conversationId: sanitizeConversationId(messageDoc.conversationId),
   text: messageDoc.text,
   sender:
     messageDoc.sender
@@ -42,10 +105,16 @@ const serializeMessage = (messageDoc) => ({
   createdAt: messageDoc.createdAt,
 });
 
-const broadcast = (event, payload) => {
+const broadcast = (event, payload, conversationId = DEFAULT_CONVERSATION_ID) => {
   const data = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
-  for (const res of sseClients) {
-    res.write(data);
+  const targetConversationId = sanitizeConversationId(conversationId);
+  for (const [res, clientConversationId] of sseClients.entries()) {
+    if (clientConversationId !== targetConversationId) continue;
+    try {
+      res.write(data);
+    } catch {
+      sseClients.delete(res);
+    }
   }
 };
 
@@ -68,6 +137,7 @@ const askGemini = async (prompt) => {
 
 const queueAiReply = async (message) => {
   try {
+    const conversationId = sanitizeConversationId(message.conversationId);
     const lower = String(message.text || '').toLowerCase();
     if (!lower.includes(AI_MENTION_TOKEN)) return;
 
@@ -77,7 +147,7 @@ const queueAiReply = async (message) => {
 
     if (!question) return;
 
-    const recent = await CommunicationMessage.find({})
+    const recent = await CommunicationMessage.find(buildConversationFilter(conversationId))
       .sort({ createdAt: -1 })
       .limit(12)
       .populate('sender', 'name collegeId role')
@@ -111,6 +181,7 @@ const queueAiReply = async (message) => {
 
     const answer = await askGemini(prompt);
     const aiMsg = await CommunicationMessage.create({
+      conversationId,
       text: `@cicrai ${answer}`,
       senderMeta: {
         name: 'CICR AI',
@@ -127,7 +198,7 @@ const queueAiReply = async (message) => {
     });
 
     const payload = serializeMessage(aiMsg);
-    broadcast('new-message', payload);
+    broadcast('new-message', payload, conversationId);
   } catch (err) {
     // Avoid crashing user chat flow for AI failures.
     console.error('queueAiReply error:', err.message);
@@ -154,33 +225,68 @@ const performDelete = async (req, id) => {
   }
 
   await CommunicationMessage.findByIdAndDelete(message._id);
-  broadcast('delete-message', { _id: String(message._id) });
+  broadcast('delete-message', { _id: String(message._id) }, sanitizeConversationId(message.conversationId));
   return { success: true, _id: String(message._id) };
 };
 
 const listMessages = async (req, res) => {
+  const conversationId = sanitizeConversationId(req.query.conversationId);
   const limitRaw = Number(req.query.limit || 100);
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 200) : 100;
+  const cursor = await parseCursor(req.query.before);
 
-  const messages = await CommunicationMessage.find({})
-    .sort({ createdAt: -1 })
-    .limit(limit)
+  const filter = { $and: [buildConversationFilter(conversationId)] };
+  if (cursor?.createdAt && cursor?._id) {
+    filter.$and.push({
+      $or: [
+        { createdAt: { $lt: cursor.createdAt } },
+        { createdAt: cursor.createdAt, _id: { $lt: cursor._id } },
+      ],
+    });
+  } else if (cursor?.createdAt) {
+    filter.$and.push({ createdAt: { $lt: cursor.createdAt } });
+  }
+
+  const rows = await CommunicationMessage.find(filter)
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit + 1)
     .populate('sender', 'name collegeId role')
     .populate('mentions', 'name collegeId')
     .lean();
 
-  res.json(messages.reverse().map(serializeMessage));
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor = hasMore ? buildCursor(page[page.length - 1]) : null;
+
+  res.json({
+    conversationId,
+    items: page.reverse().map(serializeMessage),
+    hasMore,
+    nextCursor,
+  });
 };
 
 const streamMessages = async (req, res) => {
+  const conversationId = sanitizeConversationId(req.query.conversationId);
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
   res.write('retry: 10000\n\n');
+  res.write(`event: ready\ndata: ${JSON.stringify({ conversationId })}\n\n`);
 
-  sseClients.add(res);
+  sseClients.set(res, conversationId);
+  const heartbeat = setInterval(() => {
+    try {
+      res.write('event: ping\ndata: {}\n\n');
+    } catch {
+      clearInterval(heartbeat);
+      sseClients.delete(res);
+    }
+  }, 25000);
+
   req.on('close', () => {
+    clearInterval(heartbeat);
     sseClients.delete(res);
   });
 };
@@ -201,6 +307,7 @@ const createMessage = async (req, res) => {
   if (text.length > 1000) {
     return res.status(400).json({ message: 'Message must be 1000 characters or less' });
   }
+  const conversationId = sanitizeConversationId(req.body.conversationId);
 
   // Basic spam guard to reduce server load and feed abuse.
   const now = Date.now();
@@ -218,7 +325,10 @@ const createMessage = async (req, res) => {
 
   let replyTo = undefined;
   if (req.body.replyToId) {
-    const parent = await CommunicationMessage.findById(req.body.replyToId)
+    const parent = await CommunicationMessage.findOne({
+      _id: req.body.replyToId,
+      ...buildConversationFilter(conversationId),
+    })
       .populate('sender', 'name collegeId')
       .lean();
     if (parent) {
@@ -232,6 +342,7 @@ const createMessage = async (req, res) => {
   }
 
   const created = await CommunicationMessage.create({
+    conversationId,
     text,
     sender: req.user._id,
     mentions: mentionUsers.map((u) => u._id),
@@ -243,7 +354,7 @@ const createMessage = async (req, res) => {
     .populate('mentions', 'name collegeId');
 
   const payload = serializeMessage(fullMessage);
-  broadcast('new-message', payload);
+  broadcast('new-message', payload, conversationId);
   queueAiReply(fullMessage);
 
   res.status(201).json(payload);

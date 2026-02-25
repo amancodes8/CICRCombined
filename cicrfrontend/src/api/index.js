@@ -110,6 +110,7 @@ export const deleteInventoryItem = (id) => API.delete(`/inventory/${id}`);
 export const summarize = (data) => API.post('/chatbot/summarize', data);
 export const askCicrAssistant = async (payload) => {
   const question = String(payload?.question || '').trim();
+  const conversationId = 'admin-stream';
   try {
     return await API.post('/chatbot/query', payload);
   } catch (err) {
@@ -126,14 +127,18 @@ export const askCicrAssistant = async (payload) => {
         }
 
         const startTime = Date.now();
-        await API.post('/communication/messages', { text: `@cicrai ${question}` });
+        await API.post('/communication/messages', { text: `@cicrai ${question}`, conversationId });
 
         const timeoutMs = 15000;
         const intervalMs = 1200;
         while (Date.now() - startTime < timeoutMs) {
           await new Promise((resolve) => setTimeout(resolve, intervalMs));
-          const { data } = await API.get('/communication/messages?limit=60');
-          const rows = Array.isArray(data) ? data : [];
+          const params = new URLSearchParams({
+            limit: '60',
+            conversationId,
+          });
+          const { data } = await API.get(`/communication/messages?${params.toString()}`);
+          const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
           const aiMessage = [...rows]
             .reverse()
             .find((m) => {
@@ -162,7 +167,23 @@ export const askCicrAssistant = async (payload) => {
 };
 
 // Communication stream
-export const fetchCommunicationMessages = (limit = 100) => API.get(`/communication/messages?limit=${limit}`);
+export const fetchCommunicationMessages = (options = 100) => {
+  const normalized =
+    typeof options === 'number'
+      ? { limit: options }
+      : options && typeof options === 'object'
+      ? options
+      : {};
+
+  const limitRaw = Number(normalized.limit ?? 100);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 100;
+  const query = new URLSearchParams({ limit: String(limit) });
+
+  if (normalized.before) query.set('before', String(normalized.before));
+  if (normalized.conversationId) query.set('conversationId', String(normalized.conversationId));
+
+  return API.get(`/communication/messages?${query.toString()}`);
+};
 export const createCommunicationMessage = (payload) => API.post('/communication/messages', payload);
 export const deleteCommunicationMessage = async (id) => {
   const attempts = [
@@ -197,11 +218,14 @@ export const deleteCommunicationMessage = async (id) => {
   throw lastErr;
 };
 export const fetchMentionCandidates = (q = '') => API.get(`/communication/mentions?q=${encodeURIComponent(q)}`);
-export const createCommunicationStream = () => {
+export const createCommunicationStream = (conversationId = 'admin-stream') => {
   const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/+$/, '');
   const token = localStorage.getItem('token');
-  const query = token ? `?token=${encodeURIComponent(token)}` : '';
-  return new EventSource(`${base}/communication/stream${query}`);
+  const params = new URLSearchParams();
+  if (token) params.set('token', token);
+  if (conversationId) params.set('conversationId', conversationId);
+  const query = params.toString();
+  return new EventSource(`${base}/communication/stream${query ? `?${query}` : ''}`);
 };
 
 // Issue tickets
