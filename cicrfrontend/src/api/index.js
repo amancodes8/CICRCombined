@@ -189,7 +189,9 @@ export const deleteCommunicationMessage = async (id) => {
 export const fetchMentionCandidates = (q = '') => API.get(`/communication/mentions?q=${encodeURIComponent(q)}`);
 export const createCommunicationStream = () => {
   const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/+$/, '');
-  return new EventSource(`${base}/communication/stream`);
+  const token = localStorage.getItem('token');
+  const query = token ? `?token=${encodeURIComponent(token)}` : '';
+  return new EventSource(`${base}/communication/stream${query}`);
 };
 
 export default API;

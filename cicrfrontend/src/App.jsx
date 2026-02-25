@@ -40,6 +40,16 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
+// Middleware: Prevent access if not Admin
+const StrictAdminRoute = ({ children }) => {
+  const profile = JSON.parse(localStorage.getItem('profile') || '{}');
+  const user = profile.result || profile;
+  const isStrictAdmin = user.role?.toLowerCase() === 'admin';
+
+  if (!isStrictAdmin) return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
 function App() {
   return (
     <Router>
@@ -71,8 +81,15 @@ function App() {
                   
                   {/* Community & AI Tools */}
                   <Route path="/community" element={<Community />} />
-                  <Route path="/communication" element={<Communication />} />
                   <Route path="/ai" element={<Navigate to="/communication" replace />} />
+                  <Route
+                    path="/communication"
+                    element={
+                      <StrictAdminRoute>
+                        <Communication />
+                      </StrictAdminRoute>
+                    }
+                  />
                   <Route path="/guidelines" element={<Guidelines />} />
                   
                   {/* Inventory Management System */}

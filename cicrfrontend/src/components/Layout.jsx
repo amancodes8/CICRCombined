@@ -16,6 +16,7 @@ export default function Layout({ children }) {
   
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const [user, setUser] = useState(profile.result || profile);
+  const isStrictAdmin = user.role?.toLowerCase() === 'admin';
 
   useEffect(() => {
     const syncProfile = async () => {
@@ -33,6 +34,11 @@ export default function Layout({ children }) {
   }, []);
 
   useEffect(() => {
+    if (!isStrictAdmin) {
+      setHasUnreadChat(false);
+      return;
+    }
+
     const isChatOpen = location.pathname.startsWith('/communication');
     if (isChatOpen) {
       localStorage.setItem('communication_last_seen_at', String(Date.now()));
@@ -75,7 +81,7 @@ export default function Layout({ children }) {
       clearInterval(poll);
       window.removeEventListener('communication-read-updated', onReadUpdated);
     };
-  }, [location.pathname, user._id]);
+  }, [isStrictAdmin, location.pathname, user._id]);
 
   const handleLogout = () => {
     localStorage.clear();
@@ -88,7 +94,7 @@ export default function Layout({ children }) {
     { icon: FolderKanban, label: "Projects", path: "/projects" },
     { icon: Calendar, label: "Meetings", path: "/meetings" },
     { icon: Package, label: "Inventory", path: "/inventory" },
-    { icon: Radio, label: "Collab Stream", path: "/communication" },
+    ...(isStrictAdmin ? [{ icon: Radio, label: "Collab Stream", path: "/communication" }] : []),
     { icon: Users, label: "Community", path: "/community" },
     { icon: UserSquare2, label: "Profile", path: "/profile" },
     { icon: FileText, label: "Guidelines", path: "/guidelines" },
