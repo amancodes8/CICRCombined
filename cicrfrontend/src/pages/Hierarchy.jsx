@@ -172,10 +172,10 @@ export default function Hierarchy() {
     <div className="max-w-7xl mx-auto pb-16 space-y-8 page-motion-b">
       <header className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 section-motion section-motion-delay-1">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.3em] text-blue-400 font-black">Hierarchy Operations</p>
-          <h1 className="text-3xl md:text-4xl font-black text-white mt-2">Senior-Junior Coordination</h1>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-blue-400 font-black">Team Operations</p>
+          <h1 className="text-3xl md:text-4xl font-black text-white mt-2">Mentorship Task Management</h1>
           <p className="text-gray-400 mt-2 text-sm max-w-3xl">
-            Seniors can assign structured work to junior members for meetings, projects, and onboarding operations.
+            Assign, track, and review member responsibilities across meetings, projects, and onboarding workflows.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3 w-full lg:w-auto">

@@ -32,6 +32,26 @@ const addApprovalIfMissing = (action, approverId) => {
 
 const canExecuteAdminAction = (action) => action.approvals.length >= REQUIRED_ADMIN_APPROVALS;
 
+const isSelfTarget = (req, targetUser) => {
+  const actorIds = new Set(
+    [req.user?._id, req.user?.id]
+      .filter(Boolean)
+      .map((value) => String(value))
+  );
+  const targetId = String(targetUser?._id || '');
+  if (targetId && actorIds.has(targetId)) return true;
+
+  const actorEmail = String(req.user?.email || '').trim().toLowerCase();
+  const targetEmail = String(targetUser?.email || '').trim().toLowerCase();
+  if (actorEmail && targetEmail && actorEmail === targetEmail) return true;
+
+  const actorCollegeId = String(req.user?.collegeId || '').trim().toUpperCase();
+  const targetCollegeId = String(targetUser?.collegeId || '').trim().toUpperCase();
+  if (actorCollegeId && targetCollegeId && actorCollegeId === targetCollegeId) return true;
+
+  return false;
+};
+
 /**
  * @desc    Generate a new invitation code
  */
@@ -186,7 +206,7 @@ exports.deleteUser = async (req, res) => {
     }
 
     // Prevent self-deletion from admin panel.
-    if (String(targetUser._id) === String(req.user.id)) {
+    if (isSelfTarget(req, targetUser)) {
       return res.status(400).json({ success: false, message: 'You cannot delete your own account' });
     }
 
@@ -316,6 +336,14 @@ exports.updateUserByAdmin = async (req, res) => {
       approvalStatus: targetUser.approvalStatus,
       isVerified: targetUser.isVerified,
     };
+
+    if (
+      isSelfTarget(req, targetUser) &&
+      Object.prototype.hasOwnProperty.call(payload, 'role') &&
+      payload.role !== targetUser.role
+    ) {
+      return res.status(400).json({ success: false, message: 'You cannot change your own role from admin panel' });
+    }
 
     const isAdminDemotion = targetUser.role === 'Admin' && payload.role && payload.role !== 'Admin';
     if (isAdminDemotion) {

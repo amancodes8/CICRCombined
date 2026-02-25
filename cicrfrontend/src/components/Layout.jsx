@@ -186,7 +186,7 @@ export default function Layout({ children }) {
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: FolderKanban, label: "Projects", path: "/projects" },
     { icon: Calendar, label: "Meetings", path: "/meetings" },
-    { icon: GitBranchPlus, label: "Hierarchy", path: "/hierarchy" },
+    { icon: GitBranchPlus, label: "Mentorship Ops", path: "/hierarchy" },
     { icon: Sparkles, label: "Events", path: "/events" },
     { icon: Package, label: "Inventory", path: "/inventory" },
     ...(isStrictAdmin ? [{ icon: Radio, label: "Collab Stream", path: "/communication" }] : []),

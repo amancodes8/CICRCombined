@@ -67,6 +67,10 @@ export default function AdminPanel() {
     loadAuditLogs();
   }, []);
 
+  const profile = JSON.parse(localStorage.getItem('profile') || '{}');
+  const currentUser = profile.result || profile;
+  const currentUserId = String(currentUser?._id || '');
+
   const loadUsers = async () => {
     try {
       const { data } = await fetchMembers();
@@ -143,6 +147,10 @@ export default function AdminPanel() {
   };
 
   const handleDelete = async (userId) => {
+    if (String(userId) === currentUserId) {
+      alert('You cannot delete your own account from admin panel.');
+      return;
+    }
     if (!window.confirm("Are you sure? This action is permanent.")) return;
     try {
       const { data } = await deleteUser(userId);
@@ -836,7 +844,9 @@ export default function AdminPanel() {
                       </button>
                       <button 
                         onClick={() => handleDelete(u._id)}
-                        className="p-4 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all"
+                        disabled={String(u._id) === currentUserId}
+                        className="p-4 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all disabled:opacity-40 disabled:hover:text-gray-600 disabled:hover:bg-transparent"
+                        title={String(u._id) === currentUserId ? 'Self-deletion is blocked' : 'Delete user'}
                       >
                         <Trash2 size={22} />
                       </button>
