@@ -8,7 +8,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { fetchProjects } from '../api';
 
 export default function Projects() {
-  const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); 
@@ -71,7 +70,7 @@ export default function Projects() {
       </header>
 
       {/* FILTER TERMINAL */}
-      <div className="flex flex-col lg:flex-row gap-4 items-center justify-between bg-[#141417] p-3 md:p-4 rounded-[1.5rem] md:rounded-[2rem] border border-gray-800 shadow-2xl">
+      <div className="flex flex-col lg:flex-row gap-4 items-center justify-between  p-3 md:p-4  shadow-2xl">
         <div className="relative w-full lg:w-96 group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={18} />
           <input 
@@ -110,8 +109,7 @@ export default function Projects() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
               key={project._id}
-              className="bg-[#141417] border border-gray-800 rounded-[2rem] p-8 flex flex-col hover:bg-[#1a1a1f] hover:border-blue-500/50 transition-all group relative overflow-hidden shadow-xl cursor-pointer"
-              onClick={() => navigate(`/projects/${project._id}`)}
+              className="bg-[#141417] border border-gray-800 rounded-[2rem] p-8 flex flex-col hover:bg-[#1a1a1f] hover:border-blue-500/50 transition-all group relative overflow-hidden shadow-xl"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-3xl" />
               
@@ -125,14 +123,14 @@ export default function Projects() {
                 </div>
               </div>
 
-              <div className="flex-1">
+              <Link to={`/projects/${project._id}`} className="flex-1">
                 <h3 className="text-2xl font-black mb-3 text-white tracking-tight group-hover:text-blue-400 transition-colors">
                   {project.title}
                 </h3>
                 <p className="text-gray-500 text-sm font-medium leading-relaxed line-clamp-3 mb-8">
                   {project.description}
                 </p>
-              </div>
+              </Link>
 
               <div className="pt-6 border-t border-gray-800 flex items-center justify-between mt-auto">
                 <div className="flex items-center gap-4">
@@ -150,9 +148,12 @@ export default function Projects() {
                   </div>
                 </div>
                 
-                <div className="w-10 h-10 rounded-full bg-[#0a0a0c] border border-gray-800 flex items-center justify-center text-gray-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-lg">
+                <Link 
+                  to={`/projects/${project._id}`}
+                  className="w-10 h-10 rounded-full bg-[#0a0a0c] border border-gray-800 flex items-center justify-center text-gray-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-lg"
+                >
                   <ChevronRight size={20} />
-                </div>
+                </Link>
               </div>
             </motion.div>
           ))}

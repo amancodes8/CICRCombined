@@ -143,7 +143,7 @@ export default function AdminPanel() {
             <div className="p-2 bg-blue-600/20 rounded-lg">
               <Shield size={24} className="text-blue-500" />
             </div>
-            <h2 className="text-3xl md:text-3xl font-black tracking-tighter text-white">Control Center</h2>
+            <h2 className="text-3xl md:text-3xl font-black tracking-tighter text-white">Amdin</h2>
           </div>
           <p className="text-gray-500 font-medium md:text-lg">Authorization & Member Lifecycle Management</p>
         </div>

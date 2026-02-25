@@ -108,8 +108,8 @@ export default function Inventory() {
   return (
     <div className="space-y-10 max-w-7xl mx-auto pb-20">
       {/* GLOSS HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-end md:items-center  p-8 rounded-[2.5rem] border border-gray-800 relative overflow-hidden shadow-2xl">
-        <div className="absolute top-0 left-0 w-64 h-64 bg-blue-600/5 blur-[100px] rounded-full" />
+      <header className="flex flex-col md:flex-row justify-between items-end md:items-center  p-8 rounded-[2.5rem] relative overflow-hidden shadow-2xl">
+        <div className="absolute top-0 left-0 w-64 h-64 blur-[100px] rounded-full" />
         <div className="relative z-10">
           <h2 className="text-3xl font-black tracking-tighter text-white">Lab Inventory</h2>
           <p className="text-gray-500 font-medium">Manage society components and shared robotics resources</p>
