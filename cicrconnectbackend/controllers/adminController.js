@@ -370,3 +370,33 @@ exports.approveAdminAction = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+exports.generatePasswordResetCode = async (req, res) => {
+  try {
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const resetCode = `${Math.floor(100000 + Math.random() * 900000)}`;
+    const hashed = crypto.createHash('sha256').update(resetCode).digest('hex');
+
+    targetUser.passwordResetOtp = hashed;
+    targetUser.passwordResetOtpExpires = Date.now() + 15 * 60 * 1000;
+    await targetUser.save({ validateBeforeSave: false });
+
+    return res.json({
+      success: true,
+      resetCode,
+      validForMinutes: 15,
+      user: {
+        _id: targetUser._id,
+        name: targetUser.name,
+        collegeId: targetUser.collegeId,
+      },
+    });
+  } catch (err) {
+    console.error('❌ generatePasswordResetCode error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

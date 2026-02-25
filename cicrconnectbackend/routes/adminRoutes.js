@@ -8,6 +8,7 @@ const {
     updateUserByAdmin,
     getPendingAdminActions,
     approveAdminAction,
+    generatePasswordResetCode,
 } = require('../controllers/adminController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -27,6 +28,7 @@ router.get('/users', getAllUsers);
 router.route('/users/:id')
     .put(updateUserByAdmin)
     .delete(deleteUser);
+router.post('/users/:id/password-reset-code', generatePasswordResetCode);
 
 router.get('/actions/pending', getPendingAdminActions);
 router.post('/actions/:actionId/approve', approveAdminAction);

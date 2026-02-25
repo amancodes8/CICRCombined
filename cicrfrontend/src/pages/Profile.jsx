@@ -22,7 +22,7 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { acknowledgeWarnings, getMe, updateProfile } from '../api';
+import { acknowledgeWarnings, changePassword, getMe, updateProfile } from '../api';
 
 const dateToInput = (value) => {
   if (!value) return '';
@@ -137,6 +137,12 @@ export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const publicProfileUrl = user.collegeId ? `${origin}/profile/${user.collegeId}` : '';
@@ -248,6 +254,37 @@ export default function Profile() {
       dispatchToast(err.response?.data?.message || 'Profile update failed.', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    const currentPassword = String(passwordForm.currentPassword || '').trim();
+    const newPassword = String(passwordForm.newPassword || '').trim();
+    const confirmPassword = String(passwordForm.confirmPassword || '').trim();
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      dispatchToast('Please fill all password fields.', 'error');
+      return;
+    }
+    if (newPassword.length < 6) {
+      dispatchToast('New password must be at least 6 characters.', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      dispatchToast('New password and confirm password do not match.', 'error');
+      return;
+    }
+
+    setPasswordBusy(true);
+    try {
+      await changePassword({ currentPassword, newPassword });
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      dispatchToast('Password changed successfully.', 'success');
+    } catch (err) {
+      dispatchToast(err.response?.data?.message || 'Unable to change password.', 'error');
+    } finally {
+      setPasswordBusy(false);
     }
   };
 
@@ -426,6 +463,61 @@ export default function Profile() {
           </div>
         </motion.section>
       )}
+
+      <section className="section-motion section-motion-delay-3">
+        <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
+          <Lock size={17} className="text-cyan-300" />
+          Password & Security
+        </h2>
+        <p className="mt-2 text-xs text-gray-500">
+          Change your password from here anytime. If you forget it and email OTP is unavailable, ask Admin/Head for a reset code.
+        </p>
+        <form onSubmit={handlePasswordChange} className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Current Password</label>
+            <input
+              type="password"
+              value={passwordForm.currentPassword}
+              onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+              className="w-full bg-[#0a0f16]/85 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 text-white placeholder:text-gray-600"
+              placeholder="Current password"
+              disabled={passwordBusy}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">New Password</label>
+            <input
+              type="password"
+              value={passwordForm.newPassword}
+              onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+              className="w-full bg-[#0a0f16]/85 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 text-white placeholder:text-gray-600"
+              placeholder="Minimum 6 characters"
+              disabled={passwordBusy}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Confirm Password</label>
+            <input
+              type="password"
+              value={passwordForm.confirmPassword}
+              onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+              className="w-full bg-[#0a0f16]/85 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 text-white placeholder:text-gray-600"
+              placeholder="Re-enter new password"
+              disabled={passwordBusy}
+            />
+          </div>
+          <div className="md:col-span-3 flex justify-end">
+            <button
+              type="submit"
+              disabled={passwordBusy}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-500/20 px-4 py-2.5 text-sm text-cyan-100 hover:bg-cyan-500/30 disabled:opacity-60"
+            >
+              {passwordBusy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              Update Password
+            </button>
+          </div>
+        </form>
+      </section>
 
       <AnimatePresence>
         {isEditing && (

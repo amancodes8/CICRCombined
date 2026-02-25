@@ -27,6 +27,8 @@ export const register = (formData) => API.post('/auth/register', formData);
 export const verifyEmail = (token) => API.get(`/auth/verifyemail/${token}`);
 export const sendPasswordResetOtp = (payload) => API.post('/auth/password/send-otp', payload);
 export const resetPasswordWithOtp = (payload) => API.post('/auth/password/reset-with-otp', payload);
+export const resetPasswordWithCode = (payload) => API.post('/auth/password/reset-with-code', payload);
+export const changePassword = (payload) => API.put('/auth/password/change', payload);
 
 // Fetches the logged-in user's own data
 export const getMe = () => API.get('/auth/me');
@@ -50,6 +52,7 @@ export const approveAdminAction = (actionId) => API.post(`/admin/actions/${actio
 // Invitation System
 export const generateInvite = () => API.post('/admin/invite');
 export const sendInviteEmail = (data) => API.post('/admin/send-invite', data);
+export const generatePasswordResetCode = (id) => API.post(`/admin/users/${id}/password-reset-code`);
 
 // Project management
 export const fetchProjects = () => API.get('/projects');

@@ -6,8 +6,10 @@ const {
   loginUser,
   getMe,
   verifyEmail,
+  resetPasswordWithCode,
   sendPasswordResetOtp,
   resetPasswordWithOtp,
+  changePassword,
   updateProfile
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
@@ -62,6 +64,28 @@ router.post(
   ],
   validateRequest,
   resetPasswordWithOtp
+);
+router.post(
+  '/password/reset-with-code',
+  passwordLimiter,
+  [
+    body('collegeId').trim().notEmpty().withMessage('College ID is required'),
+    body('resetCode').trim().isLength({ min: 6, max: 10 }).withMessage('Reset code is required'),
+    body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  ],
+  validateRequest,
+  resetPasswordWithCode
+);
+router.put(
+  '/password/change',
+  protect,
+  passwordLimiter,
+  [
+    body('currentPassword').notEmpty().withMessage('Current password is required'),
+    body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  ],
+  validateRequest,
+  changePassword
 );
 router.get('/me', protect, getMe);
 router.put('/profile', protect, updateProfile);

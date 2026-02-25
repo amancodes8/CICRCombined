@@ -103,6 +103,70 @@ const verifyEmail = async (req, res) => {
   });
 };
 
+const resetPasswordWithCode = async (req, res) => {
+  const { collegeId, resetCode, newPassword } = req.body;
+  const normalizedCollegeId = normalizeCollegeId(collegeId);
+
+  if (!normalizedCollegeId || !resetCode || !newPassword) {
+    return res.status(400).json({ message: 'College ID, reset code, and new password are required' });
+  }
+
+  if (String(newPassword).length < 6) {
+    return res.status(400).json({ message: 'Password must be at least 6 characters' });
+  }
+
+  const hashedCode = crypto.createHash('sha256').update(String(resetCode)).digest('hex');
+
+  const user = await User.findOne({
+    collegeId: normalizedCollegeId,
+    passwordResetOtp: hashedCode,
+    passwordResetOtpExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return res.status(400).json({ message: 'Invalid or expired reset code' });
+  }
+
+  user.password = newPassword;
+  user.passwordResetOtp = undefined;
+  user.passwordResetOtpExpires = undefined;
+  await user.save();
+
+  return res.json({ success: true, message: 'Password changed successfully. Please sign in.' });
+};
+
+const changePassword = async (req, res) => {
+  const currentPassword = String(req.body.currentPassword || '');
+  const newPassword = String(req.body.newPassword || '');
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ message: 'Current password and new password are required.' });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ message: 'New password must be at least 6 characters.' });
+  }
+  if (currentPassword === newPassword) {
+    return res.status(400).json({ message: 'New password must be different from current password.' });
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const matches = await user.matchPassword(currentPassword);
+  if (!matches) {
+    return res.status(400).json({ message: 'Current password is incorrect.' });
+  }
+
+  user.password = newPassword;
+  user.passwordResetOtp = undefined;
+  user.passwordResetOtpExpires = undefined;
+  await user.save();
+
+  return res.json({ success: true, message: 'Password updated successfully.' });
+};
+
 const sendPasswordResetOtp = async (req, res) => {
   const { email, collegeId } = req.body;
   const normalizedEmail = normalizeEmail(email);
@@ -219,8 +283,10 @@ module.exports = {
   registerUser,
   loginUser,
   verifyEmail,
+  resetPasswordWithCode,
   sendPasswordResetOtp,
   resetPasswordWithOtp,
+  changePassword,
   getMe,
   updateProfile,
 };

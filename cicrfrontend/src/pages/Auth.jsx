@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { login, register, sendPasswordResetOtp, resetPasswordWithOtp } from '../api';
+import { login, register, sendPasswordResetOtp, resetPasswordWithOtp, resetPasswordWithCode } from '../api';
 import { 
   AlertCircle, Loader2, User, Mail, 
   Lock, Fingerprint, Ticket, ArrowRight 
@@ -15,6 +15,7 @@ export default function Auth() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [otpSent, setOtpSent] = useState(false);
+  const [forgotMethod, setForgotMethod] = useState('emailOtp');
   const isLogin = mode === 'login';
   const isForgot = mode === 'forgot';
   
@@ -25,6 +26,7 @@ export default function Auth() {
     collegeId: '',
     inviteCode: '',
     otp: '',
+    resetCode: '',
     newPassword: ''
   });
 
@@ -159,34 +161,58 @@ export default function Auth() {
 
     try {
       if (isForgot) {
-        if (!otpSent) {
-          await sendPasswordResetOtp({
+        if (forgotMethod === 'emailOtp') {
+          if (!otpSent) {
+            await sendPasswordResetOtp({
+              email: formData.email,
+              collegeId: formData.collegeId,
+            });
+            setOtpSent(true);
+            setNotice('OTP sent. Check your email.');
+            return;
+          }
+
+          await resetPasswordWithOtp({
             email: formData.email,
             collegeId: formData.collegeId,
+            otp: formData.otp,
+            newPassword: formData.newPassword,
           });
-          setOtpSent(true);
-          setNotice('OTP sent. Check your email.');
-          return;
+          setNotice('Password changed successfully. Please sign in.');
+          setMode('login');
+          setOtpSent(false);
+          setForgotMethod('emailOtp');
+          setFormData({
+            name: '',
+            email: formData.email,
+            password: '',
+            collegeId: '',
+            inviteCode: '',
+            otp: '',
+            resetCode: '',
+            newPassword: ''
+          });
+        } else {
+          await resetPasswordWithCode({
+            collegeId: formData.collegeId,
+            resetCode: formData.resetCode,
+            newPassword: formData.newPassword,
+          });
+          setNotice('Password changed successfully. Please sign in.');
+          setMode('login');
+          setOtpSent(false);
+          setForgotMethod('emailOtp');
+          setFormData({
+            name: '',
+            email: '',
+            password: '',
+            collegeId: '',
+            inviteCode: '',
+            otp: '',
+            resetCode: '',
+            newPassword: ''
+          });
         }
-
-        await resetPasswordWithOtp({
-          email: formData.email,
-          collegeId: formData.collegeId,
-          otp: formData.otp,
-          newPassword: formData.newPassword,
-        });
-        setNotice('Password changed successfully. Please sign in.');
-        setMode('login');
-        setOtpSent(false);
-        setFormData({
-          name: '',
-          email: formData.email,
-          password: '',
-          collegeId: '',
-          inviteCode: '',
-          otp: '',
-          newPassword: ''
-        });
       } else if (isLogin) {
         const response = await login({ email: formData.email, password: formData.password });
         localStorage.setItem('token', response.data.token);
@@ -203,6 +229,7 @@ export default function Auth() {
           collegeId: '',
           inviteCode: '',
           otp: '',
+          resetCode: '',
           newPassword: ''
         });
       }
@@ -239,7 +266,11 @@ export default function Auth() {
             </h2>
             <p className="text-gray-500 mt-3 text-sm font-medium tracking-wide uppercase">
               {isForgot
-                ? (otpSent ? 'Enter OTP and new password' : 'Get OTP on your email')
+                ? (
+                    forgotMethod === 'emailOtp'
+                      ? (otpSent ? 'Enter OTP and new password' : 'Get OTP on your email')
+                      : 'Use admin-issued reset code'
+                  )
                 : (isLogin ? 'Welcome to CICR' : 'Create your CICR profile')}
             </p>
           </header>
@@ -285,18 +316,70 @@ export default function Auth() {
               )}
             </AnimatePresence>
 
-            <InputGroup icon={Mail} name="email" type="email" placeholder="Email Address" value={formData.email} onChange={handleChange} />
+            {(!isForgot || forgotMethod === 'emailOtp') && (
+              <InputGroup icon={Mail} name="email" type="email" placeholder="Email Address" value={formData.email} onChange={handleChange} />
+            )}
             {isForgot && (
-              <InputGroup icon={Hash} name="collegeId" placeholder="College ID" value={formData.collegeId} onChange={handleChange} />
+              <>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotMethod('emailOtp');
+                      setOtpSent(false);
+                      setNotice('');
+                      setError('');
+                    }}
+                    className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
+                      forgotMethod === 'emailOtp'
+                        ? 'border-blue-500/50 text-blue-200 bg-blue-500/10'
+                        : 'border-white/10 text-gray-500'
+                    }`}
+                  >
+                    Email OTP
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotMethod('resetCode');
+                      setOtpSent(false);
+                      setNotice('');
+                      setError('');
+                    }}
+                    className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
+                      forgotMethod === 'resetCode'
+                        ? 'border-blue-500/50 text-blue-200 bg-blue-500/10'
+                        : 'border-white/10 text-gray-500'
+                    }`}
+                  >
+                    Reset Code
+                  </button>
+                </div>
+                {forgotMethod === 'emailOtp' && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-200">
+                      Warning: Email OTP not available. Please use Reset Code.
+                    </p>
+                  </div>
+                )}
+                <InputGroup icon={Hash} name="collegeId" placeholder="College ID" value={formData.collegeId} onChange={handleChange} />
+              </>
             )}
 
             {!isForgot && (
               <InputGroup icon={Lock} name="password" type="password" placeholder="Password" value={formData.password} onChange={handleChange} />
             )}
 
-            {isForgot && otpSent && (
+            {isForgot && forgotMethod === 'emailOtp' && otpSent && (
               <>
                 <InputGroup icon={Ticket} name="otp" placeholder="6-digit OTP" value={formData.otp} onChange={handleChange} />
+                <InputGroup icon={Lock} name="newPassword" type="password" placeholder="New Password" value={formData.newPassword} onChange={handleChange} />
+              </>
+            )}
+
+            {isForgot && forgotMethod === 'resetCode' && (
+              <>
+                <InputGroup icon={Ticket} name="resetCode" placeholder="Admin-issued reset code" value={formData.resetCode} onChange={handleChange} />
                 <InputGroup icon={Lock} name="newPassword" type="password" placeholder="New Password" value={formData.newPassword} onChange={handleChange} />
               </>
             )}
@@ -313,7 +396,11 @@ export default function Auth() {
               ) : (
                 <>
                   {isForgot
-                    ? (otpSent ? 'Change Password' : 'Send OTP')
+                    ? (
+                        forgotMethod === 'emailOtp'
+                          ? (otpSent ? 'Change Password' : 'Send OTP')
+                          : 'Reset Password'
+                      )
                     : (isLogin ? 'Authenticate' : 'Complete Entry')}
                   <ArrowRight size={18} />
                 </>
@@ -327,7 +414,7 @@ export default function Auth() {
                 onClick={() => { setMode('forgot'); setOtpSent(false); setError(''); setNotice(''); }}
                 className="text-xs font-black uppercase tracking-[0.2em] text-gray-600 hover:text-blue-500 transition-all mr-6"
               >
-                Change Password (OTP)
+                Forgot Password
               </button>
             )}
             <button
@@ -335,6 +422,7 @@ export default function Auth() {
                 if (isForgot) {
                   setMode('login');
                   setOtpSent(false);
+                  setForgotMethod('emailOtp');
                 } else {
                   setMode(isLogin ? 'signup' : 'login');
                 }

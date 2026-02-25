@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchMembers, updateUserByAdmin, deleteUser, generateInvite, sendInviteEmail, fetchPendingAdminActions, approveAdminAction, fetchApplications, updateApplication, sendApplicationInvite } from '../api';
+import { fetchMembers, updateUserByAdmin, deleteUser, generateInvite, sendInviteEmail, fetchPendingAdminActions, approveAdminAction, fetchApplications, updateApplication, sendApplicationInvite, generatePasswordResetCode } from '../api';
 import CicrAssistant from '../components/CicrAssistant';
 import { 
   Shield, Trash2, UserPlus, Copy, Check, 
   Search, Mail, Send, Loader2, UserCheck, GraduationCap, Fingerprint,
-  Briefcase, ClipboardCheck, Crown, FileText, Flag
+  Briefcase, ClipboardCheck, Crown, FileText, Flag, KeyRound
 } from 'lucide-react';
 
 const APPLICATION_STATUSES = ['New', 'InReview', 'Interview', 'Accepted', 'Selected', 'Rejected'];
@@ -113,6 +113,17 @@ export default function AdminPanel() {
       setUsers(users.filter(u => u._id !== userId));
     } catch (err) {
       alert(err.response?.data?.message || "Error deleting user");
+    }
+  };
+
+  const handleGenerateResetCode = async (userId, displayName) => {
+    try {
+      const { data } = await generatePasswordResetCode(userId);
+      alert(
+        `Reset code for ${displayName || data?.user?.name || 'user'}: ${data.resetCode}\nValid for ${data.validForMinutes || 15} minutes.`
+      );
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to generate reset code');
     }
   };
 
@@ -546,12 +557,21 @@ export default function AdminPanel() {
                     </div>
                   </td>
                   <td className="p-8 text-right">
-                    <button 
-                      onClick={() => handleDelete(u._id)}
-                      className="p-4 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all"
-                    >
-                      <Trash2 size={22} />
-                    </button>
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        onClick={() => handleGenerateResetCode(u._id, u.name)}
+                        className="p-3 text-gray-500 hover:text-blue-300 hover:bg-blue-500/10 rounded-xl transition-all"
+                        title="Generate password reset code"
+                      >
+                        <KeyRound size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(u._id)}
+                        className="p-4 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all"
+                      >
+                        <Trash2 size={22} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
