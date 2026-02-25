@@ -1,11 +1,25 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchMembers, updateUserByAdmin, deleteUser, generateInvite, sendInviteEmail, fetchPendingAdminActions, approveAdminAction, fetchApplications, updateApplication, sendApplicationInvite, generatePasswordResetCode } from '../api';
+import {
+  fetchMembers,
+  updateUserByAdmin,
+  deleteUser,
+  generateInvite,
+  sendInviteEmail,
+  fetchPendingAdminActions,
+  approveAdminAction,
+  fetchApplications,
+  updateApplication,
+  sendApplicationInvite,
+  generatePasswordResetCode,
+  fetchAuditLogs,
+  broadcastNotification,
+} from '../api';
 import CicrAssistant from '../components/CicrAssistant';
 import { 
   Shield, Trash2, UserPlus, Copy, Check, 
   Search, Mail, Send, Loader2, UserCheck, GraduationCap, Fingerprint,
-  Briefcase, ClipboardCheck, Crown, FileText, Flag, KeyRound
+  Briefcase, ClipboardCheck, Crown, FileText, Flag, KeyRound, Megaphone, ScrollText
 } from 'lucide-react';
 
 const APPLICATION_STATUSES = ['New', 'InReview', 'Interview', 'Accepted', 'Selected', 'Rejected'];
@@ -35,11 +49,22 @@ export default function AdminPanel() {
   const [appFilter, setAppFilter] = useState('All');
   const [appSearch, setAppSearch] = useState('');
   const [appLoading, setAppLoading] = useState(true);
+  const [auditRows, setAuditRows] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(true);
+  const [broadcastBusy, setBroadcastBusy] = useState(false);
+  const [broadcastForm, setBroadcastForm] = useState({
+    title: '',
+    message: '',
+    role: 'all',
+    type: 'info',
+    link: '/dashboard',
+  });
 
   useEffect(() => {
     loadUsers();
     loadPendingActions();
     loadApplications();
+    loadAuditLogs();
   }, []);
 
   const loadUsers = async () => {
@@ -71,6 +96,18 @@ export default function AdminPanel() {
       setApplications([]);
     } finally {
       setAppLoading(false);
+    }
+  };
+
+  const loadAuditLogs = async () => {
+    setAuditLoading(true);
+    try {
+      const { data } = await fetchAuditLogs({ limit: 60 });
+      setAuditRows(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setAuditRows([]);
+    } finally {
+      setAuditLoading(false);
     }
   };
 
@@ -225,6 +262,33 @@ export default function AdminPanel() {
       alert(err.response?.data?.message || "Failed to send email");
     } finally { 
       setIsSending(false); 
+    }
+  };
+
+  const handleBroadcast = async (e) => {
+    e.preventDefault();
+    const payload = {
+      title: broadcastForm.title.trim(),
+      message: broadcastForm.message.trim(),
+      role: broadcastForm.role,
+      type: broadcastForm.type,
+      link: broadcastForm.link.trim(),
+    };
+    if (!payload.title || !payload.message) {
+      alert('Broadcast title and message are required.');
+      return;
+    }
+
+    setBroadcastBusy(true);
+    try {
+      const { data } = await broadcastNotification(payload);
+      alert(`Broadcast sent to ${data?.recipientCount || 0} members.`);
+      setBroadcastForm((prev) => ({ ...prev, title: '', message: '' }));
+      loadAuditLogs();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Unable to send broadcast.');
+    } finally {
+      setBroadcastBusy(false);
     }
   };
 
@@ -563,6 +627,116 @@ export default function AdminPanel() {
             No applications found for the selected filter.
           </div>
         )}
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-5 section-motion section-motion-delay-3">
+        <article className="border border-gray-800 rounded-[1.8rem] p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <Megaphone size={18} className="text-cyan-300" />
+            <div>
+              <h3 className="text-lg font-black text-white">Admin Broadcast</h3>
+              <p className="text-xs text-gray-500">Send a system-wide notification to selected member groups.</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleBroadcast} className="space-y-3">
+            <input
+              value={broadcastForm.title}
+              onChange={(e) => setBroadcastForm((prev) => ({ ...prev, title: e.target.value }))}
+              placeholder="Announcement title"
+              className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0a0a0c] text-sm text-white outline-none focus:border-cyan-500/60"
+              maxLength={140}
+            />
+            <textarea
+              value={broadcastForm.message}
+              onChange={(e) => setBroadcastForm((prev) => ({ ...prev, message: e.target.value }))}
+              placeholder="Announcement message"
+              rows={4}
+              className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0a0a0c] text-sm text-white outline-none focus:border-cyan-500/60 resize-none"
+              maxLength={1600}
+            />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <select
+                value={broadcastForm.role}
+                onChange={(e) => setBroadcastForm((prev) => ({ ...prev, role: e.target.value }))}
+                className="border border-gray-800 rounded-xl px-3 py-2 bg-[#0a0a0c] text-xs text-gray-300"
+              >
+                <option value="all">All Members</option>
+                <option value="Admin">Admins</option>
+                <option value="Head">Heads</option>
+                <option value="User">Users</option>
+                <option value="Alumni">Alumni</option>
+              </select>
+              <select
+                value={broadcastForm.type}
+                onChange={(e) => setBroadcastForm((prev) => ({ ...prev, type: e.target.value }))}
+                className="border border-gray-800 rounded-xl px-3 py-2 bg-[#0a0a0c] text-xs text-gray-300"
+              >
+                <option value="info">Info</option>
+                <option value="success">Success</option>
+                <option value="warning">Warning</option>
+                <option value="error">Error</option>
+                <option value="action">Action</option>
+              </select>
+              <input
+                value={broadcastForm.link}
+                onChange={(e) => setBroadcastForm((prev) => ({ ...prev, link: e.target.value }))}
+                placeholder="/dashboard"
+                className="border border-gray-800 rounded-xl px-3 py-2 bg-[#0a0a0c] text-xs text-gray-300 outline-none focus:border-cyan-500/60"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={broadcastBusy}
+              className="inline-flex items-center gap-2 border border-cyan-500/40 text-cyan-100 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-cyan-500/10 disabled:opacity-60"
+            >
+              {broadcastBusy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+              Send Broadcast
+            </button>
+          </form>
+        </article>
+
+        <article className="border border-gray-800 rounded-[1.8rem] p-6 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <ScrollText size={18} className="text-amber-300" />
+              <div>
+                <h3 className="text-lg font-black text-white">Audit Trail</h3>
+                <p className="text-xs text-gray-500">Recent privileged actions across admin operations.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={loadAuditLogs}
+              className="text-[10px] uppercase tracking-widest border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {auditLoading ? (
+            <div className="text-sm text-gray-500">Loading audit log...</div>
+          ) : (
+            <div className="max-h-[360px] overflow-auto space-y-2 pr-1">
+              {auditRows.map((row) => (
+                <div key={row._id} className="border border-gray-800 rounded-xl px-3 py-2.5">
+                  <p className="text-xs text-white font-semibold">{row.action}</p>
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    {row.actor?.name || 'System'} ({row.actor?.role || 'N/A'}) • {new Date(row.createdAt).toLocaleString()}
+                  </p>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest mt-1">
+                    {row.entityType} {row.entityId ? `• ${row.entityId}` : ''}
+                  </p>
+                </div>
+              ))}
+              {auditRows.length === 0 && (
+                <div className="border border-dashed border-gray-800 rounded-xl px-3 py-8 text-center text-sm text-gray-500">
+                  No audit entries found.
+                </div>
+              )}
+            </div>
+          )}
+        </article>
       </section>
 
       {/* --- MEMBER DIRECTORY --- */}

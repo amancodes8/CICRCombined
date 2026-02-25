@@ -4,6 +4,8 @@ const Event = require('../models/Event');
 const InviteCode = require('../models/InviteCode');
 const User = require('../models/User');
 const sendEmail = require('../utils/sendEmail');
+const { createNotifications } = require('../utils/notificationService');
+const { logAudit } = require('../utils/auditLogger');
 
 const STATUS_OPTIONS = ['New', 'InReview', 'Interview', 'Accepted', 'Selected', 'Rejected'];
 
@@ -88,6 +90,36 @@ const createApplication = async (req, res) => {
       userAgent: sanitize(req.get('user-agent')),
     });
 
+    const reviewers = await User.find({
+      role: { $in: ['Admin', 'Head'] },
+      $or: [{ isVerified: true }, { approvalStatus: 'Approved' }],
+    }).select('_id');
+    await createNotifications({
+      userIds: reviewers.map((u) => u._id),
+      title: 'New Recruitment Application',
+      message: `${fullName} submitted an application.`,
+      type: 'action',
+      link: '/admin',
+      meta: {
+        applicationId: application._id,
+        eventId: linkedEvent ? String(linkedEvent) : null,
+      },
+      createdBy: req.user?.id || null,
+    });
+
+    await logAudit({
+      actor: req.user?.id || null,
+      action: 'APPLICATION_CREATED',
+      entityType: 'Application',
+      entityId: application._id,
+      after: {
+        fullName: application.fullName,
+        email: application.email,
+        status: application.status,
+      },
+      req,
+    });
+
     res.status(201).json({ success: true, id: application._id });
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -126,6 +158,12 @@ const updateApplication = async (req, res) => {
     if (!application) {
       return res.status(404).json({ message: 'Application not found' });
     }
+
+    const before = {
+      status: application.status,
+      stage: application.stage,
+      assignedTo: application.assignedTo ? String(application.assignedTo) : null,
+    };
 
     if (Object.prototype.hasOwnProperty.call(req.body, 'status')) {
       const status = normalizeStatus(req.body.status);
@@ -180,6 +218,35 @@ const updateApplication = async (req, res) => {
       { path: 'history.changedBy', select: 'name role' },
       { path: 'inviteSentBy', select: 'name role' },
     ]);
+
+    if (application.assignedTo) {
+      await createNotifications({
+        userIds: [application.assignedTo],
+        title: 'Application Assignment Updated',
+        message: `You are assigned to review ${application.fullName}.`,
+        type: 'info',
+        link: '/admin',
+        meta: { applicationId: application._id, status: application.status },
+        createdBy: req.user.id,
+      });
+    }
+
+    await logAudit({
+      actor: req.user.id,
+      action: 'APPLICATION_UPDATED',
+      entityType: 'Application',
+      entityId: application._id,
+      before,
+      after: {
+        status: application.status,
+        stage: application.stage,
+        assignedTo: application.assignedTo ? String(application.assignedTo) : null,
+      },
+      meta: {
+        note: sanitize(req.body.note) || null,
+      },
+      req,
+    });
 
     res.json(populated);
   } catch (err) {
@@ -250,6 +317,30 @@ const sendApplicationInvite = async (req, res) => {
       email: application.email,
       subject: 'CICR Connect Invitation',
       message: emailMessage,
+    });
+
+    if (application.inviteSentBy) {
+      await createNotifications({
+        userIds: [application.inviteSentBy],
+        title: 'Recruitment Invite Sent',
+        message: `Invite sent to ${application.fullName} (${application.email}).`,
+        type: 'success',
+        link: '/admin',
+        meta: { applicationId: application._id, inviteCode: newCode.code },
+        createdBy: req.user.id,
+      });
+    }
+
+    await logAudit({
+      actor: req.user.id,
+      action: 'APPLICATION_INVITE_SENT',
+      entityType: 'Application',
+      entityId: application._id,
+      after: {
+        status: application.status,
+        inviteCode: newCode.code,
+      },
+      req,
     });
 
     res.json({ success: true, inviteCode: newCode.code });

@@ -1,23 +1,39 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Users, FolderKanban, 
   Calendar, LogOut, ShieldCheck, FileText, UserSquare2,
-  Package, Menu, X, Radio, Sparkles
+  Package, Menu, X, Radio, Sparkles, Bell, CheckCheck, GitBranchPlus
 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
-import { fetchCommunicationMessages, getMe } from '../api';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  fetchCommunicationMessages,
+  fetchNotifications,
+  getMe,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from '../api';
 import logo from './logo.png';
 
 export default function Layout({ children }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
-  const [logoUnavailable, setLogoUnavailable] = useState(false);
+  const [logoMode, setLogoMode] = useState('bundle');
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationBusy, setNotificationBusy] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
+  const navigate = useNavigate();
   
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const [user, setUser] = useState(profile.result || profile);
   const isStrictAdmin = user.role?.toLowerCase() === 'admin';
+  const logoSrc = useMemo(() => {
+    if (logoMode === 'bundle') return logo;
+    if (logoMode === 'public') return '/cicr-logo.png';
+    return '';
+  }, [logoMode]);
 
   useEffect(() => {
     const syncProfile = async () => {
@@ -84,6 +100,82 @@ export default function Layout({ children }) {
     };
   }, [isStrictAdmin, location.pathname, user._id]);
 
+  const loadNotifications = async (silent = true) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
+    if (!silent) setNotificationBusy(true);
+    try {
+      const { data } = await fetchNotifications({ limit: 20 });
+      const items = Array.isArray(data?.items) ? data.items : [];
+      setNotifications(items);
+      setUnreadCount(Number(data?.unreadCount || 0));
+    } catch {
+      // keep previous state on errors
+    } finally {
+      if (!silent) setNotificationBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications(false);
+    const poll = setInterval(() => loadNotifications(true), 30000);
+    return () => clearInterval(poll);
+  }, []);
+
+  useEffect(() => {
+    setNotificationsOpen(false);
+  }, [location.pathname]);
+
+  const openNotifications = () => {
+    setNotificationsOpen((prev) => !prev);
+    if (!notificationsOpen) {
+      loadNotifications(false);
+    }
+  };
+
+  const handleReadNotification = async (item) => {
+    try {
+      if (!item.isRead) {
+        await markNotificationRead(item._id);
+        setNotifications((prev) =>
+          prev.map((row) => (row._id === item._id ? { ...row, isRead: true } : row))
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+    } catch {
+      // ignore read failures
+    }
+
+    if (item.link) {
+      setIsMobileOpen(false);
+      setNotificationsOpen(false);
+      navigate(item.link);
+    }
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    try {
+      await markAllNotificationsRead();
+      setNotifications((prev) => prev.map((row) => ({ ...row, isRead: true })));
+      setUnreadCount(0);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleLogoError = () => {
+    if (logoMode === 'bundle') {
+      setLogoMode('public');
+      return;
+    }
+    setLogoMode('fallback');
+  };
+
   const handleLogout = () => {
     localStorage.clear();
     window.location.href = '/login';
@@ -94,6 +186,7 @@ export default function Layout({ children }) {
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: FolderKanban, label: "Projects", path: "/projects" },
     { icon: Calendar, label: "Meetings", path: "/meetings" },
+    { icon: GitBranchPlus, label: "Hierarchy", path: "/hierarchy" },
     { icon: Sparkles, label: "Events", path: "/events" },
     { icon: Package, label: "Inventory", path: "/inventory" },
     ...(isStrictAdmin ? [{ icon: Radio, label: "Collab Stream", path: "/communication" }] : []),
@@ -116,12 +209,12 @@ export default function Layout({ children }) {
           onClick={() => setIsMobileOpen(false)}
           className="group inline-flex items-center gap-3"
         >
-          {!logoUnavailable ? (
+          {logoMode !== 'fallback' ? (
             <img
               className="h-9 w-auto max-w-[124px] object-contain drop-shadow-[0_0_14px_rgba(96,165,250,0.35)]"
-              src={logo}
+              src={logoSrc}
               alt="CICR logo"
-              onError={() => setLogoUnavailable(true)}
+              onError={handleLogoError}
             />
           ) : (
             <div className="h-9 min-w-[54px] px-3 rounded-lg border border-blue-500/35 inline-flex items-center justify-center text-[10px] uppercase tracking-[0.24em] text-blue-300 font-black">
@@ -138,6 +231,70 @@ export default function Layout({ children }) {
           </motion.h1>
         </Link>
       </motion.div>
+
+      <div className="relative mb-4 px-2">
+        <button
+          type="button"
+          onClick={openNotifications}
+          className="w-full inline-flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-800 text-gray-300 hover:border-blue-500/40 hover:text-white transition-colors"
+        >
+          <span className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.14em] font-black">
+            <Bell size={14} className="text-blue-400" />
+            Notifications
+          </span>
+          {unreadCount > 0 ? (
+            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-blue-500/20 text-[10px] text-blue-200 font-black">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          ) : (
+            <span className="text-[10px] text-gray-500 uppercase tracking-widest">Clear</span>
+          )}
+        </button>
+
+        <AnimatePresence>
+          {notificationsOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="absolute left-2 right-2 top-[calc(100%+8px)] z-40 border border-gray-800 rounded-2xl bg-[#0a0a0c] shadow-2xl overflow-hidden"
+            >
+              <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-800">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 font-black">Recent Alerts</p>
+                <button
+                  type="button"
+                  onClick={handleMarkAllNotificationsRead}
+                  className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-blue-300 hover:text-blue-200"
+                >
+                  <CheckCheck size={12} />
+                  Read all
+                </button>
+              </div>
+              {notificationBusy ? (
+                <div className="px-3 py-6 text-center text-xs text-gray-500">Loading...</div>
+              ) : notifications.length === 0 ? (
+                <div className="px-3 py-6 text-center text-xs text-gray-500">No notifications</div>
+              ) : (
+                <div className="max-h-72 overflow-y-auto">
+                  {notifications.map((item) => (
+                    <button
+                      key={item._id}
+                      type="button"
+                      onClick={() => handleReadNotification(item)}
+                      className={`w-full text-left px-3 py-2.5 border-b border-gray-800/70 last:border-b-0 hover:bg-white/[0.03] ${
+                        item.isRead ? 'text-gray-400' : 'text-gray-200'
+                      }`}
+                    >
+                      <p className="text-xs font-semibold truncate">{item.title}</p>
+                      <p className="text-[11px] mt-1 line-clamp-2">{item.message}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
       
       {/* Main Navigation */}
       <nav className="flex-1 space-y-2">
@@ -211,12 +368,12 @@ export default function Layout({ children }) {
       {/* Mobile Top Nav */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#0a0a0c]/80 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-6 z-30">
         <div className="flex items-center gap-2.5">
-          {!logoUnavailable ? (
+          {logoMode !== 'fallback' ? (
             <img
               className="h-7 w-auto max-w-[88px] object-contain drop-shadow-[0_0_12px_rgba(96,165,250,0.35)]"
-              src={logo}
+              src={logoSrc}
               alt="CICR logo"
-              onError={() => setLogoUnavailable(true)}
+              onError={handleLogoError}
             />
           ) : (
             <div className="h-7 min-w-[44px] px-2 rounded-md border border-blue-500/35 inline-flex items-center justify-center text-[9px] uppercase tracking-[0.2em] text-blue-300 font-black">

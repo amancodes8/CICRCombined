@@ -1,4 +1,7 @@
 const IssueTicket = require('../models/IssueTicket');
+const User = require('../models/User');
+const { createNotifications } = require('../utils/notificationService');
+const { logAudit } = require('../utils/auditLogger');
 
 const CATEGORY_OPTIONS = ['General', 'Technical', 'Infrastructure', 'Event', 'Academic', 'Safety'];
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical'];
@@ -41,6 +44,35 @@ const createIssue = async (req, res) => {
     });
 
     const populated = await issue.populate('createdBy', 'name email collegeId role');
+
+    const admins = await User.find({
+      role: { $in: ['Admin', 'Head'] },
+      $or: [{ isVerified: true }, { approvalStatus: 'Approved' }],
+    }).select('_id');
+    await createNotifications({
+      userIds: admins.map((u) => u._id),
+      title: 'New Issue Ticket',
+      message: `${req.user.name || 'A member'} submitted: ${title}`,
+      type: 'action',
+      link: '/community',
+      meta: { issueId: issue._id, category, priority },
+      createdBy: req.user.id,
+    });
+
+    await logAudit({
+      actor: req.user.id,
+      action: 'ISSUE_CREATED',
+      entityType: 'IssueTicket',
+      entityId: issue._id,
+      after: {
+        title,
+        category,
+        priority,
+        status: issue.status,
+      },
+      req,
+    });
+
     res.status(201).json(populated);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -90,6 +122,14 @@ const updateIssue = async (req, res) => {
       return res.status(404).json({ message: 'Issue not found' });
     }
 
+    const before = {
+      status: issue.status,
+      priority: issue.priority,
+      adminNote: issue.adminNote,
+      resolvedBy: issue.resolvedBy ? String(issue.resolvedBy) : null,
+      resolvedAt: issue.resolvedAt || null,
+    };
+
     if (Object.prototype.hasOwnProperty.call(req.body, 'status')) {
       const status = normalizeEnum(req.body.status, STATUS_OPTIONS, '');
       if (!status) {
@@ -129,6 +169,32 @@ const updateIssue = async (req, res) => {
       { path: 'createdBy', select: 'name email collegeId role branch year' },
       { path: 'resolvedBy', select: 'name role' },
     ]);
+
+    await createNotifications({
+      userIds: [issue.createdBy],
+      title: 'Issue Ticket Updated',
+      message: `Your ticket "${issue.title}" is now ${issue.status}.`,
+      type: issue.status === 'Resolved' ? 'success' : issue.status === 'Rejected' ? 'warning' : 'info',
+      link: '/community',
+      meta: { issueId: issue._id, status: issue.status },
+      createdBy: req.user.id,
+    });
+
+    await logAudit({
+      actor: req.user.id,
+      action: 'ISSUE_UPDATED',
+      entityType: 'IssueTicket',
+      entityId: issue._id,
+      before,
+      after: {
+        status: issue.status,
+        priority: issue.priority,
+        adminNote: issue.adminNote,
+        resolvedBy: issue.resolvedBy ? String(issue.resolvedBy) : null,
+        resolvedAt: issue.resolvedAt || null,
+      },
+      req,
+    });
 
     res.json(populated);
   } catch (err) {

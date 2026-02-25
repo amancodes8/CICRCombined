@@ -9,6 +9,7 @@ const Projects = lazy(() => import('./pages/Projects'));
 const ProjectDetails = lazy(() => import('./pages/ProjectDetails'));
 const Meetings = lazy(() => import('./pages/Meetings'));
 const ScheduleMeeting = lazy(() => import('./pages/ScheduleMeeting'));
+const Hierarchy = lazy(() => import('./pages/Hierarchy'));
 const AdminPanel = lazy(() => import('./pages/AdminPanel'));
 const CreateProject = lazy(() => import('./pages/CreateProject'));
 const Community = lazy(() => import('./pages/Community'));
@@ -82,6 +83,7 @@ function App() {
                     {/* Meetings & Collaboration */}
                     <Route path="/meetings" element={<Meetings />} />
                     <Route path="/schedule" element={<ScheduleMeeting />} />
+                    <Route path="/hierarchy" element={<Hierarchy />} />
                     <Route path="/events" element={<Events />} />
                     
                     {/* Community & AI Tools */}

@@ -1,7 +1,10 @@
 const User = require('../models/User');
 const InviteCode = require('../models/InviteCode');
 const AdminAction = require('../models/AdminAction');
+const AuditLog = require('../models/AuditLog');
 const sendEmail = require('../utils/sendEmail');
+const { createNotifications } = require('../utils/notificationService');
+const { logAudit } = require('../utils/auditLogger');
 const crypto = require('crypto');
 
 const REQUIRED_ADMIN_APPROVALS = 3;
@@ -42,6 +45,15 @@ exports.generateInviteCode = async (req, res) => {
     });
 
     await newCode.save();
+
+    await logAudit({
+      actor: req.user.id,
+      action: 'ADMIN_INVITE_CODE_GENERATED',
+      entityType: 'InviteCode',
+      entityId: newCode._id,
+      after: { code: newCode.code, isUsed: newCode.isUsed },
+      req,
+    });
 
     res.status(201).json({
       success: true,
@@ -111,6 +123,15 @@ exports.sendInviteEmail = async (req, res) => {
         email,
         subject: 'CICR Connect Invitation',
         message: emailMessage,
+      });
+
+      await logAudit({
+        actor: req.user.id,
+        action: 'ADMIN_INVITE_EMAIL_SENT',
+        entityType: 'InviteCode',
+        entityId: codeRecord._id,
+        after: { email, code: inviteCode, emailSent: true },
+        req,
       });
 
       return res.status(200).json({
@@ -193,6 +214,17 @@ exports.deleteUser = async (req, res) => {
 
       if (!canExecuteAdminAction(action)) {
         await action.save();
+        await logAudit({
+          actor: req.user.id,
+          action: 'ADMIN_DELETE_PENDING_APPROVAL',
+          entityType: 'AdminAction',
+          entityId: action._id,
+          after: {
+            targetUser: String(targetUser._id),
+            approvals: action.approvals.length,
+          },
+          req,
+        });
         return res.status(202).json({
           success: true,
           requiresApproval: true,
@@ -204,11 +236,39 @@ exports.deleteUser = async (req, res) => {
       action.status = 'Executed';
       action.executedAt = new Date();
       await action.save();
+      const before = {
+        _id: targetUser._id,
+        name: targetUser.name,
+        email: targetUser.email,
+        role: targetUser.role,
+      };
       await targetUser.deleteOne();
+      await logAudit({
+        actor: req.user.id,
+        action: 'ADMIN_ACCOUNT_DELETED',
+        entityType: 'User',
+        entityId: before._id,
+        before,
+        req,
+      });
       return res.json({ success: true, message: 'Admin account deleted after required approvals' });
     }
 
+    const before = {
+      _id: targetUser._id,
+      name: targetUser.name,
+      email: targetUser.email,
+      role: targetUser.role,
+    };
     await targetUser.deleteOne();
+    await logAudit({
+      actor: req.user.id,
+      action: 'USER_DELETED_BY_ADMIN',
+      entityType: 'User',
+      entityId: before._id,
+      before,
+      req,
+    });
     res.json({ success: true, message: 'User removed' });
   } catch (err) {
     console.error("❌ deleteUser error:", err.message);
@@ -250,6 +310,12 @@ exports.updateUserByAdmin = async (req, res) => {
     if (!targetUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    const before = {
+      _id: targetUser._id,
+      role: targetUser.role,
+      approvalStatus: targetUser.approvalStatus,
+      isVerified: targetUser.isVerified,
+    };
 
     const isAdminDemotion = targetUser.role === 'Admin' && payload.role && payload.role !== 'Admin';
     if (isAdminDemotion) {
@@ -277,6 +343,18 @@ exports.updateUserByAdmin = async (req, res) => {
 
       if (!canExecuteAdminAction(action)) {
         await action.save();
+        await logAudit({
+          actor: req.user.id,
+          action: 'ADMIN_ROLE_CHANGE_PENDING_APPROVAL',
+          entityType: 'AdminAction',
+          entityId: action._id,
+          after: {
+            targetUser: String(targetUser._id),
+            newRole: payload.role,
+            approvals: action.approvals.length,
+          },
+          req,
+        });
         return res.status(202).json({
           success: true,
           requiresApproval: true,
@@ -294,6 +372,15 @@ exports.updateUserByAdmin = async (req, res) => {
         { role: payload.role },
         { new: true }
       );
+      await logAudit({
+        actor: req.user.id,
+        action: 'ADMIN_ROLE_CHANGED',
+        entityType: 'User',
+        entityId: demoted?._id || req.params.id,
+        before,
+        after: { role: demoted?.role },
+        req,
+      });
       return res.json({
         success: true,
         user: demoted,
@@ -302,6 +389,31 @@ exports.updateUserByAdmin = async (req, res) => {
     }
 
     const updatedUser = await User.findByIdAndUpdate(req.params.id, payload, { new: true });
+    await logAudit({
+      actor: req.user.id,
+      action: 'USER_UPDATED_BY_ADMIN',
+      entityType: 'User',
+      entityId: updatedUser?._id || req.params.id,
+      before,
+      after: {
+        role: updatedUser?.role,
+        approvalStatus: updatedUser?.approvalStatus,
+        isVerified: updatedUser?.isVerified,
+      },
+      meta: { changedFields: Object.keys(payload) },
+      req,
+    });
+    if (updatedUser && String(updatedUser._id) !== String(req.user.id)) {
+      await createNotifications({
+        userIds: [updatedUser._id],
+        title: 'Account Status Updated',
+        message: 'Your role/profile approval status was updated by admin.',
+        type: 'info',
+        link: '/profile',
+        meta: { role: updatedUser.role, approvalStatus: updatedUser.approvalStatus },
+        createdBy: req.user.id,
+      });
+    }
     res.json({ success: true, user: updatedUser });
   } catch (err) {
     console.error("❌ updateUserByAdmin error:", err.message);
@@ -341,6 +453,14 @@ exports.approveAdminAction = async (req, res) => {
 
     if (!canExecuteAdminAction(action)) {
       await action.save();
+      await logAudit({
+        actor: req.user.id,
+        action: 'ADMIN_ACTION_APPROVAL_RECORDED',
+        entityType: 'AdminAction',
+        entityId: action._id,
+        after: { approvals: action.approvals.length, type: action.type },
+        req,
+      });
       return res.json({
         success: true,
         requiresApproval: true,
@@ -359,6 +479,15 @@ exports.approveAdminAction = async (req, res) => {
     action.status = 'Executed';
     action.executedAt = new Date();
     await action.save();
+
+    await logAudit({
+      actor: req.user.id,
+      action: 'ADMIN_ACTION_EXECUTED',
+      entityType: 'AdminAction',
+      entityId: action._id,
+      after: { type: action.type, targetUser: String(action.targetUser) },
+      req,
+    });
 
     return res.json({
       success: true,
@@ -385,6 +514,25 @@ exports.generatePasswordResetCode = async (req, res) => {
     targetUser.passwordResetOtpExpires = Date.now() + 15 * 60 * 1000;
     await targetUser.save({ validateBeforeSave: false });
 
+    await createNotifications({
+      userIds: [targetUser._id],
+      title: 'Password Reset Code Generated',
+      message: 'Admin generated a temporary reset code for your account.',
+      type: 'warning',
+      link: '/login',
+      meta: { validForMinutes: 15 },
+      createdBy: req.user.id,
+    });
+
+    await logAudit({
+      actor: req.user.id,
+      action: 'PASSWORD_RESET_CODE_GENERATED',
+      entityType: 'User',
+      entityId: targetUser._id,
+      after: { validForMinutes: 15 },
+      req,
+    });
+
     return res.json({
       success: true,
       resetCode,
@@ -397,6 +545,28 @@ exports.generatePasswordResetCode = async (req, res) => {
     });
   } catch (err) {
     console.error('❌ generatePasswordResetCode error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getAuditLogs = async (req, res) => {
+  try {
+    const limitRaw = Number(req.query.limit || 120);
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 10), 300) : 120;
+    const action = String(req.query.action || '').trim();
+
+    const query = {};
+    if (action) {
+      query.action = action;
+    }
+
+    const logs = await AuditLog.find(query)
+      .populate('actor', 'name role collegeId')
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    return res.json(logs);
+  } catch (err) {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };

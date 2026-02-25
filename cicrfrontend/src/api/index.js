@@ -48,6 +48,11 @@ export const updateUserByAdmin = (id, data) => API.put(`/admin/users/${id}`, dat
 export const deleteUser = (id) => API.delete(`/admin/users/${id}`);
 export const fetchPendingAdminActions = () => API.get('/admin/actions/pending');
 export const approveAdminAction = (actionId) => API.post(`/admin/actions/${actionId}/approve`);
+export const fetchAuditLogs = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/admin/audit/logs${suffix}`);
+};
 
 // Invitation System
 export const generateInvite = () => API.post('/admin/invite');
@@ -205,6 +210,26 @@ export const fetchMyIssues = () => API.get('/issues/mine');
 export const fetchAdminIssues = (status = '') =>
   API.get(`/issues${status ? `?status=${encodeURIComponent(status)}` : ''}`);
 export const updateIssueTicket = (id, payload) => API.patch(`/issues/${id}`, payload);
+
+// Notifications
+export const fetchNotifications = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/notifications${suffix}`);
+};
+export const markNotificationRead = (id) => API.post(`/notifications/${id}/read`);
+export const markAllNotificationsRead = () => API.post('/notifications/read-all');
+export const broadcastNotification = (payload) => API.post('/notifications/broadcast', payload);
+
+// Hierarchy tasks
+export const fetchHierarchyTasks = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/hierarchy/tasks${suffix}`);
+};
+export const createHierarchyTask = (payload) => API.post('/hierarchy/tasks', payload);
+export const updateHierarchyTask = (id, payload) => API.patch(`/hierarchy/tasks/${id}`, payload);
+export const deleteHierarchyTask = (id) => API.delete(`/hierarchy/tasks/${id}`);
 
 // Events
 export const fetchEvents = (params = {}) => {

@@ -1,4 +1,7 @@
 const Event = require('../models/Event');
+const User = require('../models/User');
+const { createNotifications } = require('../utils/notificationService');
+const { logAudit } = require('../utils/auditLogger');
 
 const sanitize = (value) => String(value || '').trim();
 const parseDate = (value) => {
@@ -56,6 +59,35 @@ const createEvent = async (req, res) => {
     });
 
     const populated = await event.populate('createdBy', 'name role');
+
+    const recipients = await User.find({
+      $or: [{ isVerified: true }, { approvalStatus: 'Approved' }],
+    }).select('_id');
+    await createNotifications({
+      userIds: recipients.map((u) => u._id),
+      title: 'New CICR Event',
+      message: `${title} is now scheduled at ${location}.`,
+      type: allowApplications ? 'action' : 'info',
+      link: '/events',
+      meta: { eventId: event._id, allowApplications },
+      createdBy: req.user.id,
+    });
+
+    await logAudit({
+      actor: req.user.id,
+      action: 'EVENT_CREATED',
+      entityType: 'Event',
+      entityId: event._id,
+      after: {
+        title,
+        type,
+        status,
+        startTime,
+        endTime,
+      },
+      req,
+    });
+
     res.status(201).json(populated);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -170,6 +202,23 @@ const updateEvent = async (req, res) => {
 
     const updated = await event.save();
     const populated = await updated.populate('createdBy', 'name role');
+
+    await logAudit({
+      actor: req.user.id,
+      action: 'EVENT_UPDATED',
+      entityType: 'Event',
+      entityId: event._id,
+      before,
+      after: {
+        title: event.title,
+        status: event.status,
+        allowApplications: event.allowApplications,
+        startTime: event.startTime,
+        endTime: event.endTime,
+      },
+      req,
+    });
+
     res.json(populated);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -182,7 +231,23 @@ const deleteEvent = async (req, res) => {
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
+    const before = {
+      title: event.title,
+      status: event.status,
+      startTime: event.startTime,
+      endTime: event.endTime,
+    };
     await event.deleteOne();
+
+    await logAudit({
+      actor: req.user.id,
+      action: 'EVENT_DELETED',
+      entityType: 'Event',
+      entityId: req.params.id,
+      before,
+      req,
+    });
+
     res.json({ success: true, message: 'Event deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -196,3 +261,10 @@ module.exports = {
   updateEvent,
   deleteEvent,
 };
+    const before = {
+      title: event.title,
+      status: event.status,
+      allowApplications: event.allowApplications,
+      startTime: event.startTime,
+      endTime: event.endTime,
+    };

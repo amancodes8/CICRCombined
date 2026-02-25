@@ -65,6 +65,8 @@ app.use('/api/communication', require('./routes/communicationRoutes'));
 app.use('/api/issues', require('./routes/issueRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
 app.use('/api/applications', require('./routes/applicationRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/hierarchy', require('./routes/hierarchyRoutes'));
 
 app.use((err, req, res, next) => {
     const statusCode = res.statusCode === 200 ? 500 : res.statusCode;

@@ -1,6 +1,8 @@
 const Project = require('../models/Project');
 const User = require('../models/User');
 const { isAdminOrHead, validateHierarchyTeam, parseYear, canManageJunior } = require('../utils/hierarchy');
+const { createNotifications } = require('../utils/notificationService');
+const { logAudit } = require('../utils/auditLogger');
 
 /**
  * @desc    Create a new project
@@ -53,6 +55,31 @@ const createProject = async (req, res) => {
         });
 
         const createdProject = await project.save();
+
+        await createNotifications({
+            userIds: teamIds.filter((id) => String(id) !== String(req.user.id)),
+            title: 'New Project Assignment',
+            message: `${req.user.name || 'A senior'} added you to project "${title}".`,
+            type: 'action',
+            link: '/projects',
+            meta: { projectId: createdProject._id, domain },
+            createdBy: req.user.id,
+        });
+
+        await logAudit({
+            actor: req.user.id,
+            action: 'PROJECT_CREATED',
+            entityType: 'Project',
+            entityId: createdProject._id,
+            after: {
+                title,
+                domain,
+                lead: leadId,
+                teamCount: teamIds.length,
+            },
+            req,
+        });
+
         res.status(201).json(createdProject);
     } catch (err) {
         console.error(err.message);

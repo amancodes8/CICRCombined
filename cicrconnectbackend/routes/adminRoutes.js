@@ -9,6 +9,7 @@ const {
     getPendingAdminActions,
     approveAdminAction,
     generatePasswordResetCode,
+    getAuditLogs,
 } = require('../controllers/adminController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -32,5 +33,6 @@ router.post('/users/:id/password-reset-code', generatePasswordResetCode);
 
 router.get('/actions/pending', getPendingAdminActions);
 router.post('/actions/:actionId/approve', approveAdminAction);
+router.get('/audit/logs', getAuditLogs);
 
 module.exports = router;

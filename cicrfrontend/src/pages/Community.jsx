@@ -355,7 +355,7 @@ export default function Community() {
               <Globe size={14} />
               Community Workspace
             </div>
-            <h1 className="mt-2 text-3xl md:text-4xl font-black tracking-tight heading-flow">CICR Network</h1>
+            <h1 className="mt-2 text-3xl md:text-4xl font-black tracking-tight heading-flow">CICR Community</h1>
             <p className="mt-2 text-sm text-gray-400 max-w-2xl">
               Professional collaboration board, verified member directory, and issue reporting line to admin.
             </p>

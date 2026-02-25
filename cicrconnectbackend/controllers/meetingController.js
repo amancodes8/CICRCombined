@@ -1,6 +1,8 @@
 const Meeting = require('../models/Meeting');
 const User = require('../models/User');
 const { isAdminOrHead, validateHierarchyTeam, parseYear } = require('../utils/hierarchy');
+const { createNotifications } = require('../utils/notificationService');
+const { logAudit } = require('../utils/auditLogger');
 
 /**
  * @desc    Schedule a new meeting
@@ -58,6 +60,31 @@ exports.scheduleMeeting = async (req, res) => {
         const populatedMeeting = await Meeting.findById(savedMeeting._id)
             .populate('organizedBy', 'name role')
             .populate('participants', 'name branch');
+
+        await createNotifications({
+            userIds: participantIds.filter((id) => String(id) !== String(req.user.id)),
+            title: 'New Meeting Scheduled',
+            message: `${req.user.name || 'A senior'} scheduled "${title}".`,
+            type: 'action',
+            link: '/meetings',
+            meta: { meetingId: savedMeeting._id, meetingType },
+            createdBy: req.user.id,
+        });
+
+        await logAudit({
+            actor: req.user.id,
+            action: 'MEETING_SCHEDULED',
+            entityType: 'Meeting',
+            entityId: savedMeeting._id,
+            after: {
+                title,
+                meetingType,
+                participantCount: participantIds.length,
+                startTime,
+                endTime,
+            },
+            req,
+        });
 
         res.status(201).json(populatedMeeting);
     } catch (err) {
