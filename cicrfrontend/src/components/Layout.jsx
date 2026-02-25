@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Users, FolderKanban, 
-  Calendar, MessageSquare, LogOut, ShieldCheck, FileText, UserSquare2,
-  Package, Menu, X 
+  Calendar, LogOut, ShieldCheck, FileText, UserSquare2,
+  Package, Menu, X, Radio
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getMe } from '../api';
+import { fetchCommunicationMessages, getMe } from '../api';
 
 export default function Layout({ children }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -31,6 +32,51 @@ export default function Layout({ children }) {
     syncProfile();
   }, []);
 
+  useEffect(() => {
+    const isChatOpen = location.pathname.startsWith('/communication');
+    if (isChatOpen) {
+      localStorage.setItem('communication_last_seen_at', String(Date.now()));
+      setHasUnreadChat(false);
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setHasUnreadChat(false);
+      return;
+    }
+
+    const checkUnread = async () => {
+      try {
+        const { data } = await fetchCommunicationMessages(1);
+        const latest = Array.isArray(data) ? data[data.length - 1] : null;
+        if (!latest?.createdAt) {
+          setHasUnreadChat(false);
+          return;
+        }
+        const lastSeen = Number(localStorage.getItem('communication_last_seen_at') || 0);
+        const latestTime = new Date(latest.createdAt).getTime();
+        const isOwnMessage = String(latest.sender?._id || '') === String(user._id || '');
+        setHasUnreadChat(!isOwnMessage && latestTime > lastSeen);
+      } catch {
+        // keep current unread state on fetch failures
+      }
+    };
+
+    checkUnread();
+    const poll = setInterval(checkUnread, 20000);
+    const onReadUpdated = () => {
+      if (!location.pathname.startsWith('/communication')) {
+        checkUnread();
+      }
+    };
+    window.addEventListener('communication-read-updated', onReadUpdated);
+    return () => {
+      clearInterval(poll);
+      window.removeEventListener('communication-read-updated', onReadUpdated);
+    };
+  }, [location.pathname, user._id]);
+
   const handleLogout = () => {
     localStorage.clear();
     window.location.href = '/login';
@@ -42,7 +88,7 @@ export default function Layout({ children }) {
     { icon: FolderKanban, label: "Projects", path: "/projects" },
     { icon: Calendar, label: "Meetings", path: "/meetings" },
     { icon: Package, label: "Inventory", path: "/inventory" },
-    { icon: MessageSquare, label: "AI Assistant", path: "/ai" },
+    { icon: Radio, label: "Collab Stream", path: "/communication" },
     { icon: Users, label: "Community", path: "/community" },
     { icon: UserSquare2, label: "Profile", path: "/profile" },
     { icon: FileText, label: "Guidelines", path: "/guidelines" },
@@ -63,12 +109,17 @@ export default function Layout({ children }) {
           <Link key={link.path} to={link.path} onClick={() => setIsMobileOpen(false)}>
             <motion.div
               whileHover={{ x: 5 }}
-              className={`flex items-center space-x-3 p-3 rounded-xl transition-colors ${
+              className={`flex items-center justify-between p-3 rounded-xl transition-colors ${
                 location.pathname === link.path ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800'
               }`}
             >
-              <link.icon size={20} />
-              <span className="font-medium">{link.label}</span>
+              <div className="flex items-center space-x-3">
+                <link.icon size={20} />
+                <span className="font-medium">{link.label}</span>
+              </div>
+              {link.path === '/communication' && hasUnreadChat && (
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" title="Unread messages" />
+              )}
             </motion.div>
           </Link>
         ))}

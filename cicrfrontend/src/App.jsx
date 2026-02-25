@@ -5,15 +5,17 @@ import Layout from './components/Layout';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
+import ProjectDetails from './pages/ProjectDetails';
 import Meetings from './pages/Meetings';
 import ScheduleMeeting from './pages/ScheduleMeeting';
 import AdminPanel from './pages/AdminPanel';
-import AISummarizer from './pages/AISummarizer';
 import CreateProject from './pages/CreateProject';
 import Community from './pages/Community';
 import Profile from './pages/Profile'; // Import the new Profile page
+import PublicProfile from './pages/PublicProfile';
 import VerifyEmail from './pages/VerifyEmail';
 import Guidelines from './pages/Guidelines';
+import Communication from './pages/Communication';
 
 // Inventory Pages
 import Inventory from './pages/Inventory'; 
@@ -45,6 +47,7 @@ function App() {
         {/* Public Route */}
         <Route path="/login" element={<Auth />} />
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
+        <Route path="/profile/:collegeId" element={<PublicProfile />} />
 
         {/* Protected Application Routes */}
         <Route 
@@ -59,6 +62,7 @@ function App() {
                   
                   {/* Project Management */}
                   <Route path="/projects" element={<Projects />} />
+                  <Route path="/projects/:id" element={<ProjectDetails />} />
                   <Route path="/create-project" element={<CreateProject />} />
                   
                   {/* Meetings & Collaboration */}
@@ -67,7 +71,8 @@ function App() {
                   
                   {/* Community & AI Tools */}
                   <Route path="/community" element={<Community />} />
-                  <Route path="/ai" element={<AISummarizer />} />
+                  <Route path="/communication" element={<Communication />} />
+                  <Route path="/ai" element={<Navigate to="/communication" replace />} />
                   <Route path="/guidelines" element={<Guidelines />} />
                   
                   {/* Inventory Management System */}

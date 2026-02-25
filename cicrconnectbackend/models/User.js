@@ -34,6 +34,8 @@ const UserSchema = new mongoose.Schema({
         linkedin: { type: String, default: '' },
         github: { type: String, default: '' },
         portfolio: { type: String, default: '' },
+        instagram: { type: String, default: '' },
+        facebook: { type: String, default: '' },
     },
     warnings: [{
         reason: { type: String, required: true },

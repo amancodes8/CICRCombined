@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import {
   Activity,
   CalendarDays,
@@ -154,10 +155,10 @@ export default function Dashboard() {
           <h3 className="text-xl font-black text-white flex items-center gap-2 mb-5"><FolderKanban size={18} className="text-indigo-400" />Projects</h3>
           <div className="space-y-3">
             {projects.slice(0, 6).map((p) => (
-              <div key={p._id} className="bg-[#0a0a0c] border border-gray-800 rounded-2xl p-4">
+              <Link key={p._id} to={`/projects/${p._id}`} className="block bg-[#0a0a0c] border border-gray-800 rounded-2xl p-4 hover:border-blue-500/40 transition-colors">
                 <p className="text-white font-bold">{p.title}</p>
                 <p className="text-xs text-gray-400 uppercase tracking-widest mt-1">{p.domain} • {p.status}</p>
-              </div>
+              </Link>
             ))}
           </div>
         </section>

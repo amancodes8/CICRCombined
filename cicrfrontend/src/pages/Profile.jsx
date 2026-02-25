@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, Phone, BookOpen, Calendar, Save, 
-  Edit2, X, Hash, Mail, Loader2, Award, Briefcase, Link as LinkIcon 
+  Edit2, X, Hash, Mail, Loader2, Award, Briefcase, Link as LinkIcon, Instagram, Facebook
 } from 'lucide-react';
 import { acknowledgeWarnings, getMe, updateProfile } from '../api';
 
@@ -37,6 +37,8 @@ export default function Profile() {
       linkedin: userData.social?.linkedin || '',
       github: userData.social?.github || '',
       portfolio: userData.social?.portfolio || '',
+      instagram: userData.social?.instagram || '',
+      facebook: userData.social?.facebook || '',
     },
   });
 
@@ -75,6 +77,8 @@ export default function Profile() {
           linkedin: data.social?.linkedin || '',
           github: data.social?.github || '',
           portfolio: data.social?.portfolio || '',
+          instagram: data.social?.instagram || '',
+          facebook: data.social?.facebook || '',
         },
       }));
       
@@ -107,6 +111,8 @@ export default function Profile() {
             linkedin: data.social?.linkedin || '',
             github: data.social?.github || '',
             portfolio: data.social?.portfolio || '',
+            instagram: data.social?.instagram || '',
+            facebook: data.social?.facebook || '',
           },
         }));
         setWarnings(data.warnings || []);
@@ -149,6 +155,11 @@ export default function Profile() {
                     {userData.role}
                 </span>
               </div>
+              {userData.collegeId && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Public Profile URL: {window.location.origin}/profile/{userData.collegeId}
+                </p>
+              )}
             </div>
             <button 
               onClick={() => setIsEditing(!isEditing)}
@@ -247,6 +258,34 @@ export default function Profile() {
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
                   className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
                   placeholder="+91 00000 00000"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Instagram Handle</label>
+              <div className="relative">
+                <Instagram className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isEditing ? 'text-blue-500' : 'text-gray-600'}`} size={18} />
+                <input
+                  disabled={!isEditing}
+                  value={formData.social.instagram}
+                  onChange={(e) => setFormData({ ...formData, social: { ...formData.social, instagram: e.target.value } })}
+                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
+                  placeholder="@username or instagram.com/username"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Facebook Handle</label>
+              <div className="relative">
+                <Facebook className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${isEditing ? 'text-blue-500' : 'text-gray-600'}`} size={18} />
+                <input
+                  disabled={!isEditing}
+                  value={formData.social.facebook}
+                  onChange={(e) => setFormData({ ...formData, social: { ...formData.social, facebook: e.target.value } })}
+                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-blue-500 disabled:opacity-50 transition-all text-white"
+                  placeholder="@username or facebook.com/username"
                 />
               </div>
             </div>

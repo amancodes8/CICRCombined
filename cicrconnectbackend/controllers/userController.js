@@ -2,6 +2,24 @@ const User = require('../models/User');
 const mongoose = require('mongoose');
 const { buildUserInsights } = require('../utils/userInsights');
 
+const normalizeHandle = (value) => {
+    if (!value) return '';
+    const raw = String(value).trim();
+    if (!raw) return '';
+
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+        try {
+            const u = new URL(raw);
+            const path = u.pathname.replace(/^\/+|\/+$/g, '');
+            return path.split('/')[0] || '';
+        } catch {
+            return raw.replace(/^@+/, '');
+        }
+    }
+
+    return raw.replace(/^@+/, '');
+};
+
 /**
  * @desc    Get logged in user's profile
  * @route   GET /api/users/profile
@@ -42,6 +60,8 @@ const updateUserProfile = async (req, res) => {
             linkedin: req.body.social?.linkedin ?? user.social?.linkedin ?? '',
             github: req.body.social?.github ?? user.social?.github ?? '',
             portfolio: req.body.social?.portfolio ?? user.social?.portfolio ?? '',
+            instagram: normalizeHandle(req.body.social?.instagram ?? user.social?.instagram ?? ''),
+            facebook: normalizeHandle(req.body.social?.facebook ?? user.social?.facebook ?? ''),
         };
 
         const updatedUser = await user.save();
@@ -85,6 +105,47 @@ const getMemberInsights = async (req, res) => {
     res.json(insights);
 };
 
+const getPublicProfileByCollegeId = async (req, res) => {
+    const collegeId = String(req.params.collegeId || '').trim();
+    if (!collegeId) {
+        return res.status(400).json({ message: 'College ID is required' });
+    }
+
+    const user = await User.findOne({ collegeId }).select(
+        'name collegeId role branch year batch joinedAt bio achievements skills social createdAt'
+    );
+
+    if (!user) {
+        return res.status(404).json({ message: 'Profile not found' });
+    }
+
+    const insights = await buildUserInsights(user);
+    const member = insights.member || {};
+    const metrics = insights.metrics || {};
+
+    res.json({
+        profile: {
+            name: member.name || user.name,
+            collegeId: member.collegeId || user.collegeId,
+            role: member.role || user.role,
+            branch: member.branch || user.branch || '',
+            year: member.year || user.year || null,
+            batch: member.batch || user.batch || '',
+            joinedAt: member.joinedAt || user.joinedAt || user.createdAt,
+            yearsInCICR: member.yearsInCICR || 0,
+            bio: member.bio || '',
+            achievements: member.achievements || [],
+            skills: member.skills || [],
+            social: member.social || {},
+        },
+        metrics: {
+            totalProjectContributions: metrics.totalProjectContributions || 0,
+            totalEvents: metrics.totalEvents || 0,
+            postsCreated: metrics.postsCreated || 0,
+        },
+    });
+};
+
 const acknowledgeWarnings = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -100,5 +161,6 @@ module.exports = {
     updateUserProfile,
     getMyInsights,
     getMemberInsights,
+    getPublicProfileByCollegeId,
     acknowledgeWarnings,
 };

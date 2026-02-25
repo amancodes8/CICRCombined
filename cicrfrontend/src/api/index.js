@@ -2,7 +2,7 @@ import axios from 'axios';
 
 
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://cicrcombined.onrender.com/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api',
 
   headers: {
     'Content-Type': 'application/json',
@@ -34,6 +34,7 @@ export const getMe = () => API.get('/auth/me');
 export const updateProfile = (data) => API.put('/auth/profile', data);
 export const fetchMyInsights = () => API.get('/users/insights/me');
 export const fetchMemberInsights = (identifier) => API.get(`/users/insights/member/${encodeURIComponent(identifier)}`);
+export const fetchPublicProfile = (collegeId) => API.get(`/users/public/${encodeURIComponent(collegeId)}`);
 export const acknowledgeWarnings = () => API.post('/users/warnings/ack');
 
 
@@ -98,15 +99,97 @@ export const deleteInventoryItem = (id) => API.delete(`/inventory/${id}`);
   //  AI TOOLS
 export const summarize = (data) => API.post('/chatbot/summarize', data);
 export const askCicrAssistant = async (payload) => {
+  const question = String(payload?.question || '').trim();
   try {
     return await API.post('/chatbot/query', payload);
   } catch (err) {
     try {
       return await API.post('/chatbot/ask', payload);
     } catch (err2) {
-      return await API.post('/chatbot/assistant/query', payload);
+      try {
+        return await API.post('/chatbot/assistant/query', payload);
+      } catch (err3) {
+        // Compatibility fallback: if chatbot routes are missing, proxy via communication AI mention.
+        const all404 = [err, err2, err3].every((e) => e?.response?.status === 404);
+        if (!all404 || !question) {
+          throw err3;
+        }
+
+        const startTime = Date.now();
+        await API.post('/communication/messages', { text: `@cicrai ${question}` });
+
+        const timeoutMs = 15000;
+        const intervalMs = 1200;
+        while (Date.now() - startTime < timeoutMs) {
+          await new Promise((resolve) => setTimeout(resolve, intervalMs));
+          const { data } = await API.get('/communication/messages?limit=60');
+          const rows = Array.isArray(data) ? data : [];
+          const aiMessage = [...rows]
+            .reverse()
+            .find((m) => {
+              const isAI =
+                String(m?.sender?.collegeId || '').toLowerCase() === 'cicrai' ||
+                m?.sender?.isAI === true ||
+                String(m?.sender?.name || '').toLowerCase().includes('cicr ai');
+              return isAI && new Date(m.createdAt).getTime() >= startTime - 1500;
+            });
+
+          if (aiMessage?.text) {
+            const cleaned = String(aiMessage.text).replace(/^@cicrai\s*/i, '').trim();
+            return { data: { answer: cleaned || aiMessage.text } };
+          }
+        }
+
+        return {
+          data: {
+            answer:
+              'Assistant request timed out. Chatbot routes are unavailable on backend and communication AI did not respond in time.',
+          },
+        };
+      }
     }
   }
+};
+
+// Communication stream
+export const fetchCommunicationMessages = (limit = 100) => API.get(`/communication/messages?limit=${limit}`);
+export const createCommunicationMessage = (payload) => API.post('/communication/messages', payload);
+export const deleteCommunicationMessage = async (id) => {
+  const attempts = [
+    () => API.post('/communication/messages', { action: 'delete', id }),
+    () => API.delete(`/communication/messages/${id}`),
+    () => API.post(`/communication/messages/${id}/delete`),
+    () => API.post(`/communication/delete/${id}`),
+    () => API.delete(`/communication/${id}`),
+    () => API.post(`/communication/${id}/remove`),
+  ];
+
+  let lastErr;
+  for (const attempt of attempts) {
+    try {
+      return await attempt();
+    } catch (err) {
+      lastErr = err;
+      const status = err?.response?.status;
+      const message = String(err?.response?.data?.message || '').toLowerCase();
+      const isCompat400 = status === 400 && message.includes('message text is required');
+      if (status !== 404 && !isCompat400) {
+        throw err;
+      }
+    }
+  }
+
+  // idempotent client fallback: treat pure-404 chain as already removed
+  if (lastErr?.response?.status === 404) {
+    return { data: { success: true, _id: id, alreadyDeleted: true } };
+  }
+
+  throw lastErr;
+};
+export const fetchMentionCandidates = (q = '') => API.get(`/communication/mentions?q=${encodeURIComponent(q)}`);
+export const createCommunicationStream = () => {
+  const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/+$/, '');
+  return new EventSource(`${base}/communication/stream`);
 };
 
 export default API;

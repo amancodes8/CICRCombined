@@ -8,24 +8,35 @@ connectDB();
 
 const app = express();
 
+const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
+
 const allowedOrigins = new Set([
-    'https://cicrconnect.vercel.app'
+    'http://localhost:5173',
+    // 'https://cicrconnect.vercel.app',
 ]);
 
 if (process.env.FRONTEND_URL) {
-    allowedOrigins.add(process.env.FRONTEND_URL);
+    process.env.FRONTEND_URL
+        .split(',')
+        .map((v) => normalizeOrigin(v))
+        .filter(Boolean)
+        .forEach((v) => allowedOrigins.add(v));
 }
 
-app.use(cors({
+const corsOptions = {
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.has(origin)) {
+        if (!origin) return callback(null, true);
+        const normalized = normalizeOrigin(origin);
+        if (allowedOrigins.has(normalized)) {
             return callback(null, true);
         }
-        return callback(new Error('CORS policy: origin not allowed'));
+        return callback(new Error(`CORS policy: origin not allowed (${normalized})`));
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+    allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -46,6 +57,7 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/chatbot', require('./routes/chatbotRoutes'));
 app.use('/api/inventory', require('./routes/inventoryRoutes')); 
 app.use('/api/community', require('./routes/postRoutes'));
+app.use('/api/communication', require('./routes/communicationRoutes'));
 
 app.use((err, req, res, next) => {
     const statusCode = res.statusCode === 200 ? 500 : res.statusCode;

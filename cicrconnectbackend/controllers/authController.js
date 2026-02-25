@@ -4,6 +4,24 @@ const generateToken = require('../utils/generateToken');
 const sendEmail = require('../utils/sendEmail');
 const crypto = require('crypto');
 
+const normalizeHandle = (value) => {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    try {
+      const u = new URL(raw);
+      const path = u.pathname.replace(/^\/+|\/+$/g, '');
+      return path.split('/')[0] || '';
+    } catch {
+      return raw.replace(/^@+/, '');
+    }
+  }
+
+  return raw.replace(/^@+/, '');
+};
+
 const registerUser = async (req, res) => {
   const { name, email, password, collegeId, inviteCode, joinedAt } = req.body;
 
@@ -174,6 +192,8 @@ const updateProfile = async (req, res) => {
     linkedin: req.body.social?.linkedin ?? user.social?.linkedin ?? '',
     github: req.body.social?.github ?? user.social?.github ?? '',
     portfolio: req.body.social?.portfolio ?? user.social?.portfolio ?? '',
+    instagram: normalizeHandle(req.body.social?.instagram ?? user.social?.instagram ?? ''),
+    facebook: normalizeHandle(req.body.social?.facebook ?? user.social?.facebook ?? ''),
   };
 
   const updatedUser = await user.save();

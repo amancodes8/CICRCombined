@@ -4,6 +4,19 @@ const User = require('../models/User');
 const Post = require('../models/Post');
 const mongoose = require('mongoose');
 const { buildUserInsights } = require('../utils/userInsights');
+const { geminiGenerate } = require('../utils/geminiClient');
+
+const SCOPE_KEYWORDS = [
+    'cicr', 'robot', 'robotics', 'tech', 'technology', 'it', 'software', 'hardware', 'coding', 'code',
+    'program', 'project', 'ai', 'ml', 'machine learning', 'iot', 'embedded', 'electronics', 'network',
+    'cyber', 'security', 'meeting', 'event', 'member', 'contribution'
+];
+
+const isInScopeQuestion = (text) => {
+    const q = String(text || '').toLowerCase();
+    if (!q) return false;
+    return SCOPE_KEYWORDS.some((k) => q.includes(k));
+};
 
 /**
  * @desc    Summarize a page (project or meeting)
@@ -32,30 +45,12 @@ const summarizePage = async (req, res) => {
         }
 
         const prompt = `Provide a concise, one-paragraph summary of the following: ${contextText}`;
-        
-        // --- Gemini API Call ---
-        // Using fetch to call the Gemini API
-        const apiKey = process.env.GEMINI_API_KEY;
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
-
-        const payload = {
-            contents: [{ parts: [{ text: prompt }] }],
-        };
-
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Gemini API Error:', errorData);
-            return res.status(response.status).json({ message: 'Failed to get summary from Gemini API.', details: errorData });
+        const result = await geminiGenerate(prompt);
+        if (!result.ok) {
+            return res.status(502).json({ message: `Failed to get summary from Gemini API: ${result.error}` });
         }
 
-        const result = await response.json();
-        const summary = result.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't generate a summary for this.";
+        const summary = result.text || "Sorry, I couldn't generate a summary for this.";
 
         res.status(200).json({ summary });
 
@@ -109,6 +104,12 @@ const askCicrAssistant = async (req, res) => {
         if (!trimmed) {
             return res.status(400).json({ message: 'Question is required' });
         }
+        if (!isInScopeQuestion(trimmed)) {
+            return res.json({
+                answer:
+                    'I can only answer CICR, robotics, and technology-related questions. Please ask about projects, members, events, coding, AI/ML, hardware, or IT topics.',
+            });
+        }
 
         const lower = trimmed.toLowerCase();
         const requestedIdentifier = identifier || resolveUserIdentifierFromQuestion(trimmed);
@@ -136,7 +137,14 @@ const askCicrAssistant = async (req, res) => {
             memberInsights = await buildUserInsights(member);
         }
 
-        const society = await getSocietySnapshot();
+        const [society, projectHighlights] = await Promise.all([
+            getSocietySnapshot(),
+            Project.find({})
+                .sort({ updatedAt: -1 })
+                .limit(10)
+                .select('title domain status description')
+                .lean(),
+        ]);
 
         // deterministic answer for speed/stability without LLM dependency
         if (!process.env.GEMINI_API_KEY) {
@@ -155,33 +163,35 @@ const askCicrAssistant = async (req, res) => {
             });
         }
 
+        const projectContext = projectHighlights
+            .map((p) => `- ${p.title} [${p.domain}] (${p.status}): ${String(p.description || '').slice(0, 220)}`)
+            .join('\n');
+
         const context = [
             `Society snapshot: members=${society.memberCount}, projects=${society.projectCount}, meetings=${society.meetingCount}, posts=${society.postCount}.`,
             `Role breakdown: ${JSON.stringify(society.roleBreakdown)}.`,
+            `Recent projects:\n${projectContext || 'No project data available.'}`,
             memberInsights ? `Member details: ${JSON.stringify(memberInsights)}` : '',
         ].join('\n');
 
-        const prompt = `You are CICR internal assistant. Answer accurately and concisely based only on provided context.\nContext:\n${context}\nQuestion:\n${trimmed}`;
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`;
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-        });
-
-        if (!response.ok) {
+        const prompt = `You are CICR internal assistant.
+You must only answer questions about CICR, robotics, technology, IT, and project workflows.
+If the question is outside this scope, politely refuse and request a CICR/tech question.
+Answer accurately and concisely based only on provided context.
+Context:\n${context}\nQuestion:\n${trimmed}`;
+        const ai = await geminiGenerate(prompt);
+        if (!ai.ok) {
             const fallbackAnswer = memberInsights
                 ? `${memberInsights.member.name} (${memberInsights.member.collegeId}) has ${memberInsights.metrics.totalProjectContributions} project contributions and ${memberInsights.metrics.totalEvents} events.`
                 : `CICR currently has ${society.memberCount} members, ${society.projectCount} projects, ${society.meetingCount} meetings, and ${society.postCount} community posts.`;
             return res.json({
-                answer: `${fallbackAnswer} (LLM unavailable, showing live database summary.)`,
+                answer: `${fallbackAnswer} (LLM unavailable: ${ai.error}. Showing live database summary.)`,
                 member: memberInsights,
                 society,
             });
         }
 
-        const result = await response.json();
-        const answer = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated.';
+        const answer = ai.text || 'No response generated.';
         return res.json({ answer, member: memberInsights, society });
     } catch (err) {
         console.error('askCicrAssistant error:', err);
