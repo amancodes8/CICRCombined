@@ -14,6 +14,7 @@ import {
   Instagram,
   Link as LinkIcon,
   Loader2,
+  LogOut,
   Lock,
   Mail,
   Phone,
@@ -287,6 +288,11 @@ export default function Profile() {
     } finally {
       setPasswordBusy(false);
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.clear();
+    window.location.href = '/login';
   };
 
   useEffect(() => {
@@ -716,6 +722,14 @@ export default function Profile() {
           >
             <Copy size={14} />
             Copy Public URL
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-red-500/20 px-4 py-2.5 text-sm text-red-100 hover:bg-red-500/30"
+          >
+            <LogOut size={14} />
+            Logout
           </button>
         </div>
       </section>
