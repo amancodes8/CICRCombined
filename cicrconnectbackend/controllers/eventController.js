@@ -132,6 +132,14 @@ const updateEvent = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
+    const before = {
+      title: event.title,
+      status: event.status,
+      allowApplications: event.allowApplications,
+      startTime: event.startTime,
+      endTime: event.endTime,
+    };
+
     if (Object.prototype.hasOwnProperty.call(req.body, 'title')) {
       event.title = sanitize(req.body.title);
     }
@@ -261,10 +269,3 @@ module.exports = {
   updateEvent,
   deleteEvent,
 };
-    const before = {
-      title: event.title,
-      status: event.status,
-      allowApplications: event.allowApplications,
-      startTime: event.startTime,
-      endTime: event.endTime,
-    };
