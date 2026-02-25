@@ -11,8 +11,8 @@ const app = express();
 const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
 
 const allowedOrigins = new Set([
-    'http://localhost:5173',
-    // 'https://cicrconnect.vercel.app',
+    // 'http://localhost:5173',
+    'https://cicrconnect.vercel.app',
 ]);
 
 if (process.env.FRONTEND_URL) {
