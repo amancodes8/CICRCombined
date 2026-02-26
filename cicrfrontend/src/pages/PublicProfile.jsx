@@ -45,6 +45,7 @@ export default function PublicProfile() {
   const { collegeId } = useParams();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -60,6 +61,10 @@ export default function PublicProfile() {
     };
     load();
   }, [collegeId]);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [data?.profile?.avatarUrl]);
 
   if (loading) {
     return (
@@ -161,9 +166,18 @@ export default function PublicProfile() {
                   initial={{ rotate: -8, scale: 0.9 }}
                   animate={{ rotate: [0, -4, 0], scale: [1, 1.04, 1] }}
                   transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-                  className="h-16 w-16 rounded-2xl border border-cyan-400/45 bg-cyan-400/10 text-cyan-100 flex items-center justify-center text-2xl font-black shrink-0"
+                  className="h-16 w-16 rounded-2xl border border-cyan-400/45 bg-cyan-400/10 text-cyan-100 flex items-center justify-center text-2xl font-black shrink-0 overflow-hidden"
                 >
-                  {profile.name?.[0] || 'C'}
+                  {profile.avatarUrl && !avatarFailed ? (
+                    <img
+                      src={profile.avatarUrl}
+                      alt={profile.name || 'Profile'}
+                      className="h-full w-full object-cover"
+                      onError={() => setAvatarFailed(true)}
+                    />
+                  ) : (
+                    <span>{profile.name?.[0] || 'C'}</span>
+                  )}
                 </motion.div>
                 <div className="min-w-0">
                   <h1 className="text-3xl md:text-5xl font-black tracking-tight break-words leading-[1.05] bg-gradient-to-r from-white via-cyan-100 to-slate-300 text-transparent bg-clip-text">

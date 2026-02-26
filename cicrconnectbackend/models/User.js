@@ -56,6 +56,7 @@ const UserSchema = new mongoose.Schema({
     projects: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Project' }], 
     projectIdeas: [{ type: String }],
     bio: { type: String, default: '' },
+    avatarUrl: { type: String, default: '', trim: true, maxlength: 600 },
     achievements: [{ type: String }],
     skills: [{ type: String }],
     social: {

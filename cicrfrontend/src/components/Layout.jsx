@@ -54,6 +54,7 @@ export default function Layout() {
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
+  const [sidebarAvatarFailed, setSidebarAvatarFailed] = useState(false);
   const [openNavGroups, setOpenNavGroups] = useState({
     core: true,
     growth: true,
@@ -135,6 +136,10 @@ export default function Layout() {
     };
     syncProfile();
   }, []);
+
+  useEffect(() => {
+    setSidebarAvatarFailed(false);
+  }, [user.avatarUrl]);
 
   useEffect(() => {
     if (!isStrictAdmin) {
@@ -625,8 +630,17 @@ export default function Layout() {
       <div className="mt-auto pt-6 border-t border-gray-800 space-y-4">
         <div className="group px-2 py-2 rounded-xl border border-gray-800/70">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-600/10 border border-blue-500/20 rounded-lg flex items-center justify-center text-blue-500 font-black">
-              {user.name?.[0] || 'M'}
+            <div className="w-9 h-9 bg-blue-600/10 border border-blue-500/20 rounded-lg flex items-center justify-center text-blue-500 font-black overflow-hidden">
+              {user.avatarUrl && !sidebarAvatarFailed ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.name || 'Member'}
+                  className="h-full w-full object-cover"
+                  onError={() => setSidebarAvatarFailed(true)}
+                />
+              ) : (
+                <span>{user.name?.[0] || 'M'}</span>
+              )}
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-bold truncate text-gray-100 flex items-center gap-2">

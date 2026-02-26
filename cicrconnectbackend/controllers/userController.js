@@ -26,6 +26,21 @@ const normalizeHandle = (value) => {
     return raw.replace(/^@+/, '');
 };
 
+const normalizeAvatarUrl = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            return null;
+        }
+        return parsed.toString().slice(0, 600);
+    } catch {
+        return null;
+    }
+};
+
 /**
  * @desc    Get logged in user's profile
  * @route   GET /api/users/profile
@@ -60,6 +75,13 @@ const updateUserProfile = async (req, res) => {
         user.joinedAt = req.body.joinedAt ? new Date(req.body.joinedAt) : user.joinedAt;
         user.projectIdeas = req.body.projectIdeas || user.projectIdeas;
         user.bio = req.body.bio ?? user.bio;
+        if (Object.prototype.hasOwnProperty.call(req.body, 'avatarUrl')) {
+            const avatarUrl = normalizeAvatarUrl(req.body.avatarUrl);
+            if (avatarUrl === null) {
+                return res.status(400).json({ message: 'Profile picture URL must be a valid http/https URL.' });
+            }
+            user.avatarUrl = avatarUrl;
+        }
         user.achievements = Array.isArray(req.body.achievements) ? req.body.achievements : user.achievements;
         user.skills = Array.isArray(req.body.skills) ? req.body.skills : user.skills;
         user.social = {
@@ -158,7 +180,7 @@ const getPublicProfileByCollegeId = async (req, res) => {
     }
 
     const user = await User.findOne({ collegeId }).select(
-        'name collegeId role branch year batch joinedAt bio achievements skills social alumniProfile createdAt'
+        'name collegeId role branch year batch joinedAt bio avatarUrl achievements skills social alumniProfile createdAt'
     );
 
     if (!user) {
@@ -180,6 +202,7 @@ const getPublicProfileByCollegeId = async (req, res) => {
             joinedAt: member.joinedAt || user.joinedAt || user.createdAt,
             yearsInCICR: member.yearsInCICR || 0,
             bio: member.bio || '',
+            avatarUrl: member.avatarUrl || user.avatarUrl || '',
             achievements: member.achievements || [],
             skills: member.skills || [],
             social: member.social || {},

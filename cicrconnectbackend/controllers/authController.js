@@ -31,6 +31,21 @@ const normalizeHandle = (value) => {
   return raw.replace(/^@+/, '');
 };
 
+const normalizeAvatarUrl = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+    return parsed.toString().slice(0, 600);
+  } catch {
+    return null;
+  }
+};
+
 const registerUser = async (req, res) => {
   const { name, email, password, collegeId, inviteCode, joinedAt } = req.body;
   const normalizedName = String(name || '').trim();
@@ -315,6 +330,14 @@ const updateProfile = async (req, res) => {
 
     if (Object.prototype.hasOwnProperty.call(req.body, 'bio')) {
       user.bio = String(req.body.bio || '').trim();
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'avatarUrl')) {
+      const avatarUrl = normalizeAvatarUrl(req.body.avatarUrl);
+      if (avatarUrl === null) {
+        return res.status(400).json({ message: 'Profile picture URL must be a valid http/https URL.' });
+      }
+      user.avatarUrl = avatarUrl;
     }
 
     if (Array.isArray(req.body.achievements)) {

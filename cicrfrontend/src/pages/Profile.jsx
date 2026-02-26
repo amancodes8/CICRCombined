@@ -73,6 +73,7 @@ const buildFormData = (user = {}) => ({
   batch: user.batch || '',
   joinedAt: dateToInput(user.joinedAt),
   bio: user.bio || '',
+  avatarUrl: user.avatarUrl || '',
   skillsText: (user.skills || []).join(', '),
   achievementsText: (user.achievements || []).join('\n'),
   social: {
@@ -175,6 +176,7 @@ export default function Profile() {
   const [warnings, setWarnings] = useState(initialUser.warnings || []);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
@@ -290,6 +292,10 @@ export default function Profile() {
     ].map((s) => ({ ...s, href: resolveSocialUrl(s.key, s.raw) })),
     [user.social]
   );
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [user.avatarUrl]);
 
   const persistProfile = (incoming) => {
     const existing = JSON.parse(localStorage.getItem('profile') || '{}');
@@ -477,6 +483,7 @@ export default function Profile() {
         batch: formData.batch.trim(),
         joinedAt: formData.joinedAt || null,
         bio: formData.bio.trim(),
+        avatarUrl: String(formData.avatarUrl || '').trim(),
         skills: formData.skillsText
           .split(',')
           .map((v) => v.trim())
@@ -597,8 +604,17 @@ export default function Profile() {
       <motion.section id="about" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="pt-2 section-motion section-motion-delay-1">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
           <div className="flex items-start gap-3 sm:gap-4 min-w-0">
-            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-500 flex items-center justify-center text-2xl md:text-3xl font-black text-white shrink-0 shadow-lg shadow-cyan-500/20">
-              {user.name ? user.name[0].toUpperCase() : 'U'}
+            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-500 flex items-center justify-center text-2xl md:text-3xl font-black text-white shrink-0 shadow-lg shadow-cyan-500/20 overflow-hidden">
+              {user.avatarUrl && !avatarFailed ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.name || 'Profile'}
+                  className="h-full w-full object-cover"
+                  onError={() => setAvatarFailed(true)}
+                />
+              ) : (
+                <span>{user.name ? user.name[0].toUpperCase() : 'U'}</span>
+              )}
             </div>
             <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-[0.24em] text-cyan-300/90 font-black">My Profile</p>
@@ -911,6 +927,15 @@ export default function Profile() {
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="+91 00000 00000"
+                disabled={loading}
+              />
+
+              <InputField
+                icon={LinkIcon}
+                label="Profile Picture URL"
+                value={formData.avatarUrl}
+                onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
+                placeholder="https://.../your-photo.jpg"
                 disabled={loading}
               />
 

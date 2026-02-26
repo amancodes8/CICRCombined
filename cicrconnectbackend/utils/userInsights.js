@@ -82,6 +82,7 @@ const buildUserInsights = async (user) => {
       joinedAt: effectiveJoinedAt,
       yearsInCICR,
       bio: user.bio || '',
+      avatarUrl: user.avatarUrl || '',
       achievements: Array.isArray(user.achievements) ? user.achievements : [],
       skills: Array.isArray(user.skills) ? user.skills : [],
       social: user.social || {},
