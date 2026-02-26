@@ -5,7 +5,7 @@ import {
   Calendar, ShieldCheck, FileText, UserSquare2,
   Package, Menu, X, Radio, Sparkles, Bell, GitBranchPlus, Search, PlusCircle, Bug, CalendarPlus
 } from 'lucide-react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchCommunicationMessages,
   fetchNotifications,
@@ -608,7 +608,7 @@ export default function Layout({ children }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          {children}
+          {children || <Outlet />}
         </motion.div>
       </main>
 

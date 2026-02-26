@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import GlobalToastHost from './components/GlobalToastHost';
 
@@ -25,24 +25,21 @@ const AddComponent = lazy(() => import('./pages/AddComponent'));
 const InventoryDetail = lazy(() => import('./pages/InventoryDetail'));
 const MyInventory = lazy(() => import('./pages/MyInventory'));
 
-// Middleware: Prevent access if not logged in
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   if (!token) return <Navigate to="/login" replace />;
   return children;
 };
 
-// Middleware: Prevent access if not Admin/Head
 const AdminRoute = ({ children }) => {
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
-  const user = profile.result || profile; 
+  const user = profile.result || profile;
   const isAdmin = user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'head';
-  
+
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
   return children;
 };
 
-// Middleware: Prevent access if not Admin
 const StrictAdminRoute = ({ children }) => {
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const user = profile.result || profile;
@@ -58,70 +55,59 @@ function App() {
       <GlobalToastHost />
       <Suspense fallback={<RouteLoader />}>
         <Routes>
-          {/* Public Route */}
           <Route path="/login" element={<Auth />} />
           <Route path="/verify-email/:token" element={<VerifyEmail />} />
           <Route path="/profile/:collegeId" element={<PublicProfile />} />
           <Route path="/apply" element={<Apply />} />
 
-          {/* Protected Application Routes */}
-          <Route 
-            path="/*" 
+          <Route
             element={
               <ProtectedRoute>
-                <Layout>
-                  <Routes>
-                    {/* Main Dashboard & Profile */}
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/profile" element={<Profile />} />
-                    
-                    {/* Project Management */}
-                    <Route path="/projects" element={<Projects />} />
-                    <Route path="/projects/:id" element={<ProjectDetails />} />
-                    <Route path="/create-project" element={<CreateProject />} />
-                    
-                    {/* Meetings & Collaboration */}
-                    <Route path="/meetings" element={<Meetings />} />
-                    <Route path="/schedule" element={<ScheduleMeeting />} />
-                    <Route path="/hierarchy" element={<Hierarchy />} />
-                    <Route path="/events" element={<Events />} />
-                    
-                    {/* Community & AI Tools */}
-                    <Route path="/community" element={<Community />} />
-                    <Route path="/ai" element={<Navigate to="/communication" replace />} />
-                    <Route
-                      path="/communication"
-                      element={
-                        <StrictAdminRoute>
-                          <Communication />
-                        </StrictAdminRoute>
-                      }
-                    />
-                    <Route path="/guidelines" element={<Guidelines />} />
-                    
-                    {/* Inventory Management System */}
-                    <Route path="/inventory" element={<Inventory />} />
-                    <Route path="/inventory/add" element={<AddComponent />} />
-                    <Route path="/inventory/my-items" element={<MyInventory />} />
-                    <Route path="/inventory/:id" element={<InventoryDetail />} />
-                    
-                    {/* Admin Specific Control Panel */}
-                    <Route 
-                      path="/admin" 
-                      element={
-                        <AdminRoute>
-                          <AdminPanel />
-                        </AdminRoute>
-                      } 
-                    />
-
-                    {/* Fallback to Dashboard */}
-                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                  </Routes>
-                </Layout>
+                <Layout />
               </ProtectedRoute>
-            } 
-          />
+            }
+          >
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/profile" element={<Profile />} />
+
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/projects/:id" element={<ProjectDetails />} />
+            <Route path="/create-project" element={<CreateProject />} />
+
+            <Route path="/meetings" element={<Meetings />} />
+            <Route path="/schedule" element={<ScheduleMeeting />} />
+            <Route path="/hierarchy" element={<Hierarchy />} />
+            <Route path="/events" element={<Events />} />
+
+            <Route path="/community" element={<Community />} />
+            <Route path="/ai" element={<Navigate to="/communication" replace />} />
+            <Route
+              path="/communication"
+              element={
+                <StrictAdminRoute>
+                  <Communication />
+                </StrictAdminRoute>
+              }
+            />
+            <Route path="/guidelines" element={<Guidelines />} />
+
+            <Route path="/inventory" element={<Inventory />} />
+            <Route path="/inventory/add" element={<AddComponent />} />
+            <Route path="/inventory/my-items" element={<MyInventory />} />
+            <Route path="/inventory/:id" element={<InventoryDetail />} />
+
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminPanel />
+                </AdminRoute>
+              }
+            />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Suspense>
     </Router>

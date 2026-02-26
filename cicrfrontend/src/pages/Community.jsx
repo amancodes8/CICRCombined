@@ -672,76 +672,92 @@ export default function Community() {
               </div>
             </section>
 
-            <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-              {filteredMembers.map((member) => {
-                const roleLower = String(member.role || '').toLowerCase();
-                const isAlumni = roleLower === 'alumni';
-                const yearLabel = isAlumni
-                  ? 'Alumni'
-                  : member.year
-                  ? `${member.year}${getOrdinal(member.year)} Year`
-                  : 'Year N/A';
-                const hasProfile = Boolean(member.collegeId);
+            <section className="ui-table-shell overflow-hidden">
+              <div className="overflow-x-auto max-h-[68vh]">
+                <table className="w-full min-w-[980px] border-collapse">
+                  <thead className="ui-table-head sticky top-0 z-10">
+                    <tr>
+                      <th className="px-4 py-3 text-left">Member</th>
+                      <th className="px-4 py-3 text-left">Academic</th>
+                      <th className="px-4 py-3 text-left">Contact</th>
+                      <th className="px-4 py-3 text-left">Role</th>
+                      <th className="px-4 py-3 text-right">Profile</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800/60">
+                    {filteredMembers.map((member) => {
+                      const roleLower = String(member.role || '').toLowerCase();
+                      const isAlumni = roleLower === 'alumni';
+                      const yearLabel = isAlumni
+                        ? 'Alumni'
+                        : member.year
+                        ? `${member.year}${getOrdinal(member.year)} Year`
+                        : 'Year N/A';
+                      const hasProfile = Boolean(member.collegeId);
 
-                return (
-                  <article
-                    key={member._id}
-                    className="border border-gray-800 p-5 rounded-[1.6rem] hover:border-blue-500/35 transition-colors pro-hover-lift"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="w-12 h-12 rounded-xl border border-blue-500/35 flex items-center justify-center font-black text-cyan-200 text-xl">
-                        {member.name?.[0] || 'M'}
-                      </div>
-                      <div className="flex flex-wrap justify-end gap-1.5">
-                        <span
-                          className={`text-[9px] px-2 py-1 rounded-md font-black uppercase tracking-widest ${
-                            isAlumni ? 'bg-emerald-500/15 text-emerald-300' : 'bg-blue-500/15 text-blue-300'
-                          }`}
-                        >
-                          {member.role || 'User'}
-                        </span>
-                        {member.role === 'Admin' && <ShieldCheck size={14} className="text-red-400 mt-1" />}
-                      </div>
-                    </div>
-
-                    <h4 className="text-white font-black text-lg mt-4 truncate">{member.name || 'Member'}</h4>
-
-                    <div className="mt-3 space-y-1.5">
-                      <p className="text-gray-400 text-[11px] font-bold uppercase tracking-widest inline-flex items-center gap-1.5">
-                        <Fingerprint size={12} className="text-blue-400" />
-                        {member.collegeId || 'NO-ID'}
-                      </p>
-                      <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-1.5">
-                        <GraduationCap size={12} className="text-amber-400" />
-                        {yearLabel}
-                      </p>
-                      <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest">
-                        {member.branch || 'GENERAL'} {member.batch ? `• ${member.batch}` : ''}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-gray-800">
-                      <p className="text-gray-400 text-[11px] inline-flex items-center gap-2 w-full">
-                        <Mail size={12} className="text-blue-400 shrink-0" />
-                        <span className="truncate">{member.email || 'No email'}</span>
-                      </p>
-                    </div>
-
-                    {hasProfile ? (
-                      <Link
-                        to={`/profile/${encodeURIComponent(member.collegeId)}`}
-                        className="w-full mt-4 py-2.5 rounded-xl border border-blue-500/40 text-blue-200 text-[10px] font-black uppercase tracking-widest inline-flex items-center justify-center gap-2 hover:bg-blue-500/10"
-                      >
-                        Open Profile <ExternalLink size={12} />
-                      </Link>
-                    ) : (
-                      <button disabled className="w-full mt-4 py-2.5 rounded-xl border border-gray-700 text-gray-500 text-[10px] font-black uppercase tracking-widest">
-                        Profile Unavailable
-                      </button>
-                    )}
-                  </article>
-                );
-              })}
+                      return (
+                        <tr key={member._id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="px-4 py-3.5 align-top">
+                            <div className="flex items-start gap-3">
+                              <div className="w-9 h-9 rounded-lg border border-blue-500/35 flex items-center justify-center font-black text-cyan-200 text-sm shrink-0">
+                                {member.name?.[0] || 'M'}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-black text-white truncate">{member.name || 'Member'}</p>
+                                <p className="mt-1 text-[11px] text-gray-500 inline-flex items-center gap-1.5 uppercase tracking-wider">
+                                  <Fingerprint size={11} className="text-blue-400" />
+                                  {member.collegeId || 'NO-ID'}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 align-top">
+                            <p className="text-xs text-gray-300 inline-flex items-center gap-1.5">
+                              <GraduationCap size={12} className="text-amber-400" />
+                              {yearLabel}
+                            </p>
+                            <p className="mt-1 text-[11px] uppercase tracking-wider text-gray-500">
+                              {member.branch || 'GENERAL'} {member.batch ? `• ${member.batch}` : ''}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3.5 align-top">
+                            <p className="text-xs text-gray-300 inline-flex items-center gap-1.5">
+                              <Mail size={12} className="text-blue-400 shrink-0" />
+                              <span className="truncate max-w-[240px] inline-block">{member.email || 'No email'}</span>
+                            </p>
+                          </td>
+                          <td className="px-4 py-3.5 align-top">
+                            <div className="inline-flex items-center gap-2">
+                              <span
+                                className={`text-[10px] px-2 py-1 rounded-md font-black uppercase tracking-widest ${
+                                  isAlumni ? 'bg-emerald-500/15 text-emerald-300' : 'bg-blue-500/15 text-blue-300'
+                                }`}
+                              >
+                                {member.role || 'User'}
+                              </span>
+                              {member.role === 'Admin' && <ShieldCheck size={14} className="text-red-400" />}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 text-right align-top">
+                            {hasProfile ? (
+                              <Link
+                                to={`/profile/${encodeURIComponent(member.collegeId)}`}
+                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-500/40 text-blue-200 text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/10"
+                              >
+                                Open <ExternalLink size={11} />
+                              </Link>
+                            ) : (
+                              <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-gray-700 text-gray-500 text-[10px] font-black uppercase tracking-widest">
+                                Unavailable
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </section>
 
             {filteredMembers.length === 0 && (
