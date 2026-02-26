@@ -232,13 +232,41 @@ export default function Profile() {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
+
+    const name = String(formData.name || '').trim();
+    const phone = String(formData.phone || '').trim();
+    const yearRaw = String(formData.year || '').trim();
+    const joinedAtRaw = String(formData.joinedAt || '').trim();
+
+    if (!name) {
+      dispatchToast('Name is required.', 'error');
+      return;
+    }
+
+    if (yearRaw) {
+      const yearNum = Number(yearRaw);
+      if (!Number.isFinite(yearNum) || yearNum < 1 || yearNum > 6) {
+        dispatchToast('Year must be a number between 1 and 6.', 'error');
+        return;
+      }
+    }
+
+    if (joinedAtRaw) {
+      const joinedDate = new Date(joinedAtRaw);
+      if (Number.isNaN(joinedDate.getTime())) {
+        dispatchToast('Joined date is invalid.', 'error');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
+      const parsedYear = yearRaw ? Number(yearRaw) : null;
       const payload = {
-        name: formData.name.trim(),
-        phone: formData.phone.trim(),
-        year: formData.year.trim(),
-        branch: formData.branch.trim().toLowerCase(),
+        name,
+        phone,
+        year: parsedYear,
+        branch: formData.branch.trim().toUpperCase(),
         batch: formData.batch.trim(),
         joinedAt: formData.joinedAt || null,
         bio: formData.bio.trim(),

@@ -248,35 +248,93 @@ const getMe = async (req, res) => {
 };
 
 const updateProfile = async (req, res) => {
-  const user = await User.findById(req.user.id);
+  try {
+    const user = await User.findById(req.user.id);
 
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'name')) {
+      const name = String(req.body.name || '').trim();
+      if (!name) {
+        return res.status(400).json({ message: 'Name is required.' });
+      }
+      user.name = name;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'phone')) {
+      user.phone = String(req.body.phone || '').trim();
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'year')) {
+      const rawYear = String(req.body.year ?? '').trim();
+      if (!rawYear) {
+        user.year = undefined;
+      } else {
+        const parsedYear = Number(rawYear);
+        if (!Number.isFinite(parsedYear) || parsedYear < 1 || parsedYear > 6) {
+          return res.status(400).json({ message: 'Year must be a number between 1 and 6.' });
+        }
+        user.year = parsedYear;
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'branch')) {
+      user.branch = String(req.body.branch || '').trim().toUpperCase();
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'batch')) {
+      user.batch = String(req.body.batch || '').trim();
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'joinedAt')) {
+      const rawJoinedAt = req.body.joinedAt;
+      if (!rawJoinedAt) {
+        user.joinedAt = user.joinedAt || Date.now();
+      } else {
+        const parsedDate = new Date(rawJoinedAt);
+        if (Number.isNaN(parsedDate.getTime())) {
+          return res.status(400).json({ message: 'Invalid joined date.' });
+        }
+        user.joinedAt = parsedDate;
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'projectIdeas')) {
+      user.projectIdeas = Array.isArray(req.body.projectIdeas)
+        ? req.body.projectIdeas.map((v) => String(v || '').trim()).filter(Boolean)
+        : user.projectIdeas;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'bio')) {
+      user.bio = String(req.body.bio || '').trim();
+    }
+
+    if (Array.isArray(req.body.achievements)) {
+      user.achievements = req.body.achievements.map((v) => String(v || '').trim()).filter(Boolean);
+    }
+
+    if (Array.isArray(req.body.skills)) {
+      user.skills = req.body.skills.map((v) => String(v || '').trim()).filter(Boolean);
+    }
+
+    user.social = {
+      linkedin: String(req.body.social?.linkedin ?? user.social?.linkedin ?? '').trim(),
+      github: String(req.body.social?.github ?? user.social?.github ?? '').trim(),
+      portfolio: String(req.body.social?.portfolio ?? user.social?.portfolio ?? '').trim(),
+      instagram: normalizeHandle(req.body.social?.instagram ?? user.social?.instagram ?? ''),
+      facebook: normalizeHandle(req.body.social?.facebook ?? user.social?.facebook ?? ''),
+    };
+
+    const updatedUser = await user.save();
+    const userResponse = updatedUser.toObject();
+    delete userResponse.password;
+
+    return res.json(userResponse);
+  } catch (err) {
+    return res.status(400).json({ message: err.message || 'Unable to update profile.' });
   }
-
-  user.name = req.body.name || user.name;
-  user.phone = req.body.phone || user.phone;
-  user.year = req.body.year || user.year;
-  user.branch = req.body.branch || user.branch;
-  user.batch = req.body.batch || user.batch;
-  user.joinedAt = req.body.joinedAt ? new Date(req.body.joinedAt) : user.joinedAt;
-  user.projectIdeas = req.body.projectIdeas || user.projectIdeas;
-  user.bio = req.body.bio ?? user.bio;
-  user.achievements = Array.isArray(req.body.achievements) ? req.body.achievements : user.achievements;
-  user.skills = Array.isArray(req.body.skills) ? req.body.skills : user.skills;
-  user.social = {
-    linkedin: req.body.social?.linkedin ?? user.social?.linkedin ?? '',
-    github: req.body.social?.github ?? user.social?.github ?? '',
-    portfolio: req.body.social?.portfolio ?? user.social?.portfolio ?? '',
-    instagram: normalizeHandle(req.body.social?.instagram ?? user.social?.instagram ?? ''),
-    facebook: normalizeHandle(req.body.social?.facebook ?? user.social?.facebook ?? ''),
-  };
-
-  const updatedUser = await user.save();
-  const userResponse = updatedUser.toObject();
-  delete userResponse.password;
-
-  res.json(userResponse);
 };
 
 module.exports = {

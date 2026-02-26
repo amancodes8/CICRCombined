@@ -12,6 +12,14 @@ app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
 const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
+const isVercelOrigin = (origin) => {
+    try {
+        const parsed = new URL(origin);
+        return parsed.protocol === 'https:' && parsed.hostname.endsWith('.vercel.app');
+    } catch {
+        return false;
+    }
+};
 
 const allowedOrigins = new Set([
     // 'http://localhost:5173',
@@ -30,7 +38,7 @@ const corsOptions = {
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
         const normalized = normalizeOrigin(origin);
-        if (allowedOrigins.has(normalized)) {
+        if (allowedOrigins.has(normalized) || isVercelOrigin(normalized)) {
             return callback(null, true);
         }
         return callback(new Error(`CORS policy: origin not allowed (${normalized})`));

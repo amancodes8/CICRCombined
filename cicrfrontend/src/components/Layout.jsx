@@ -5,7 +5,7 @@ import {
   Calendar, ShieldCheck, FileText, UserSquare2,
   Package, Menu, X, Radio, Sparkles, Bell, GitBranchPlus, Search, PlusCircle, Bug, CalendarPlus
 } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchCommunicationMessages,
   fetchNotifications,
@@ -210,6 +210,17 @@ export default function Layout({ children }) {
     setIsCommandOpen(true);
   }, [closeNotifications]);
 
+  const closeNavigationPanels = useCallback(() => {
+    setIsMobileOpen(false);
+    closeNotifications();
+    setIsCommandOpen(false);
+  }, [closeNotifications]);
+
+  const isRouteActive = useCallback(
+    (path) => location.pathname === path || location.pathname.startsWith(`${path}/`),
+    [location.pathname]
+  );
+
   useEffect(() => {
     const onKeyDown = (event) => {
       const key = String(event.key || '').toLowerCase();
@@ -360,7 +371,7 @@ export default function Layout({ children }) {
       >
         <Link
           to="/dashboard"
-          onClick={() => setIsMobileOpen(false)}
+          onClick={closeNavigationPanels}
           className="group inline-flex items-center gap-3"
         >
           {logoMode !== 'fallback' ? (
@@ -423,11 +434,11 @@ export default function Layout({ children }) {
       {/* Main Navigation */}
       <nav className="flex-1 space-y-2">
         {navLinks.map((link) => (
-          <Link key={link.path} to={link.path} onClick={() => setIsMobileOpen(false)}>
+          <NavLink key={link.path} to={link.path} onClick={closeNavigationPanels}>
             <motion.div
               whileHover={{ x: 5 }}
               className={`flex items-center justify-between p-3 rounded-xl transition-colors ${
-                location.pathname === link.path ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800'
+                isRouteActive(link.path) ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800'
               }`}
             >
               <div className="flex items-center space-x-3">
@@ -438,20 +449,20 @@ export default function Layout({ children }) {
                 <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" title="Unread messages" />
               )}
             </motion.div>
-          </Link>
+          </NavLink>
         ))}
 
         {/* Admin Link (Conditional) */}
         {(user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'head') && (
           <div className="pt-4 mt-4 border-t border-gray-800/50">
-            <Link to="/admin" onClick={() => setIsMobileOpen(false)}>
+            <NavLink to="/admin" onClick={closeNavigationPanels}>
               <div className={`flex items-center space-x-3 p-3 rounded-xl transition-colors ${
-                location.pathname === '/admin' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-800'
+                isRouteActive('/admin') ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-800'
               }`}>
                 <ShieldCheck size={20} />
                 <span className="font-medium">Admin Panel</span>
               </div>
-            </Link>
+            </NavLink>
           </div>
         )}
       </nav>

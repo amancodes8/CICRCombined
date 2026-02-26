@@ -23,7 +23,8 @@ export const prewarmBackend = () => {
     fetch(healthUrl, {
       method: 'GET',
       cache: 'no-store',
-      mode: 'no-cors',
+      mode: 'cors',
+      credentials: 'omit',
       keepalive: true,
     }).catch(() => {
       // Intentionally swallow prewarm failures; this should never block UI.
