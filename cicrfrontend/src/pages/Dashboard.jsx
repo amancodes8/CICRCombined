@@ -9,6 +9,7 @@ import {
   FolderKanban,
   GraduationCap,
   Handshake,
+  BookOpenCheck,
   Loader2,
   MessageSquareText,
   Mail,
@@ -25,6 +26,7 @@ import {
   fetchProjects,
   fetchApplications,
   fetchDirectoryMembers,
+  fetchLearningOverview,
 } from '../api';
 import PageHeader from '../components/PageHeader';
 
@@ -42,8 +44,10 @@ export default function Dashboard() {
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const userData = profile.result || profile;
   const role = String(userData.role || '').toLowerCase();
+  const year = Number(userData.year);
   const isAdminOrHead = role === 'admin' || role === 'head';
   const isAlumni = role === 'alumni';
+  const isJuniorMember = role === 'user' && (year === 1 || year === 2);
 
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState([]);
@@ -52,6 +56,7 @@ export default function Dashboard() {
   const [insights, setInsights] = useState(null);
   const [applications, setApplications] = useState([]);
   const [directoryMembers, setDirectoryMembers] = useState([]);
+  const [learningOverview, setLearningOverview] = useState(null);
 
   const recentRef = useRef(null);
   const meetingsRef = useRef(null);
@@ -61,13 +66,14 @@ export default function Dashboard() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [postRes, projectRes, meetingRes, insightRes, appRes, directoryRes] = await Promise.all([
+        const [postRes, projectRes, meetingRes, insightRes, appRes, directoryRes, learningRes] = await Promise.all([
           fetchPosts().catch(() => ({ data: [] })),
           fetchProjects().catch(() => ({ data: [] })),
           fetchMeetings().catch(() => ({ data: [] })),
           fetchMyInsights().catch(() => ({ data: null })),
           isAdminOrHead ? fetchApplications().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
           isAlumni ? fetchDirectoryMembers().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+          isJuniorMember ? fetchLearningOverview().catch(() => ({ data: null })) : Promise.resolve({ data: null }),
         ]);
         setPosts(Array.isArray(postRes.data) ? postRes.data : []);
         setProjects(Array.isArray(projectRes.data) ? projectRes.data : []);
@@ -75,12 +81,13 @@ export default function Dashboard() {
         setInsights(insightRes.data);
         setApplications(Array.isArray(appRes.data) ? appRes.data : []);
         setDirectoryMembers(Array.isArray(directoryRes.data) ? directoryRes.data : []);
+        setLearningOverview(learningRes.data);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [isAdminOrHead, isAlumni]);
+  }, [isAdminOrHead, isAlumni, isJuniorMember]);
 
   const recentPosts = useMemo(() => posts.slice(0, 4), [posts]);
   const metrics = insights?.metrics;
@@ -95,6 +102,10 @@ export default function Dashboard() {
     });
     return base;
   }, [applications]);
+  const juniorRecommendations = useMemo(
+    () => (Array.isArray(learningOverview?.recommendedTasks) ? learningOverview.recommendedTasks.slice(0, 4) : []),
+    [learningOverview?.recommendedTasks]
+  );
   const alumniProfile = member?.alumniProfile || userData.alumniProfile || {};
   const alumniTenures = useMemo(
     () =>
@@ -278,6 +289,45 @@ export default function Dashboard() {
         <Stat label="Discussions" value={posts.length} />
         <Stat label="Years In CICR" value={insights?.member?.yearsInCICR ?? 0} />
       </section>
+
+      {isJuniorMember && (
+        <section className="border border-gray-800 rounded-[2rem] p-6 md:p-8 section-motion section-motion-delay-2">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h3 className="text-xl font-black text-white inline-flex items-center gap-2">
+                <BookOpenCheck size={18} className="text-cyan-300" />
+                Junior Growth Launchpad
+              </h3>
+              <p className="text-sm text-gray-400 mt-1">
+                Curated skill tracks and weekly tasks designed for {year === 1 ? 'first-year' : 'second-year'} members.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/learning" className="btn btn-primary !w-auto">Open Learning Hub</Link>
+              <Link to="/hierarchy" className="btn btn-secondary !w-auto">Mentorship Tasks</Link>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5">
+            <Stat label="Active Tracks" value={learningOverview?.stats?.activeTracks || 0} />
+            <Stat label="Tasks Approved" value={learningOverview?.stats?.myApprovedTasks || 0} />
+            <Stat label="Learning Points" value={learningOverview?.stats?.myPoints || 0} />
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+            {juniorRecommendations.length === 0 && (
+              <p className="text-sm text-gray-500">No pending recommendations right now. Check the Learning Hub for more tracks.</p>
+            )}
+            {juniorRecommendations.map((item) => (
+              <article key={`${item.trackId}-${item.moduleIndex}-${item.taskIndex}`} className="rounded-xl border border-gray-700/70 p-3 bg-[#0a0f16]/55">
+                <p className="text-sm font-bold text-white">{item.taskTitle}</p>
+                <p className="text-xs text-gray-400 mt-1">{item.trackTitle} • {item.moduleTitle}</p>
+                <p className="text-xs text-cyan-200 mt-2">{item.points || 0} points • {item.status}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       {member && (
         <section className="border-b-white border-b-1  p-6 md:p-6 section-motion section-motion-delay-2">

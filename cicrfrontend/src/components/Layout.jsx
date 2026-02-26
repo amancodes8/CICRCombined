@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Users, FolderKanban, 
   Calendar, ShieldCheck, FileText, UserSquare2,
-  Package, Menu, X, Radio, Sparkles, Bell, GitBranchPlus, Search, PlusCircle, Bug, CalendarPlus
+  Package, Menu, X, Radio, Sparkles, Bell, GitBranchPlus, Search, PlusCircle, Bug, CalendarPlus, BookOpenCheck
 } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -25,6 +25,7 @@ const ROUTE_LABELS = {
   meetings: 'Meetings',
   schedule: 'Schedule Meeting',
   hierarchy: 'Mentorship Ops',
+  learning: 'Learning Hub',
   events: 'Events',
   inventory: 'Inventory',
   community: 'Community',
@@ -303,6 +304,7 @@ export default function Layout() {
       { icon: FolderKanban, label: "Projects", path: "/projects" },
       { icon: Calendar, label: "Meetings", path: "/meetings" },
       { icon: GitBranchPlus, label: "Mentorship Ops", path: "/hierarchy" },
+      { icon: BookOpenCheck, label: "Learning Hub", path: "/learning" },
       { icon: Sparkles, label: "Events", path: "/events" },
       { icon: Package, label: "Inventory", path: "/inventory" },
       ...(isStrictAdmin ? [{ icon: Radio, label: "Collab Stream", path: "/communication" }] : []),
@@ -363,6 +365,14 @@ export default function Layout() {
         icon: Bug,
         keywords: 'quick create issue ticket support',
         onSelect: () => navigate('/community?tab=issues&quick=create-issue'),
+      },
+      {
+        id: 'cmd-learning',
+        label: 'Open Learning Hub',
+        subtitle: 'Tracks, skill tasks, and progress',
+        icon: BookOpenCheck,
+        keywords: 'learning hub upskill juniors track',
+        onSelect: () => navigate('/learning'),
       },
       {
         id: 'cmd-profile',

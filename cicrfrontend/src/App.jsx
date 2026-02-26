@@ -15,6 +15,7 @@ const CreateProject = lazy(() => import('./pages/CreateProject'));
 const Community = lazy(() => import('./pages/Community'));
 const Profile = lazy(() => import('./pages/Profile'));
 const PublicProfile = lazy(() => import('./pages/PublicProfile'));
+const LearningHub = lazy(() => import('./pages/LearningHub'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 const Guidelines = lazy(() => import('./pages/Guidelines'));
 const Communication = lazy(() => import('./pages/Communication'));
@@ -81,6 +82,7 @@ function App() {
             <Route path="/events" element={<Events />} />
 
             <Route path="/community" element={<Community />} />
+            <Route path="/learning" element={<LearningHub />} />
             <Route path="/ai" element={<Navigate to="/communication" replace />} />
             <Route
               path="/communication"

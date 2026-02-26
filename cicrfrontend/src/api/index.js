@@ -283,4 +283,29 @@ export const fetchApplications = (params = {}) => {
 export const updateApplication = (id, payload) => API.patch(`/applications/${id}`, payload);
 export const sendApplicationInvite = (id) => API.post(`/applications/${id}/send-invite`);
 
+// Learning Hub
+export const fetchLearningOverview = () => API.get('/learning/overview');
+export const fetchLearningConfig = () => API.get('/learning/config');
+export const updateLearningConfig = (payload) => API.put('/learning/config', payload);
+export const fetchLearningTracks = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/learning/tracks${suffix}`);
+};
+export const fetchLearningTrackById = (id) => API.get(`/learning/tracks/${id}`);
+export const createLearningTrack = (payload) => API.post('/learning/tracks', payload);
+export const updateLearningTrack = (id, payload) => API.put(`/learning/tracks/${id}`, payload);
+export const setLearningTrackPublish = (id, payload) => API.patch(`/learning/tracks/${id}/publish`, payload);
+export const setLearningTrackArchive = (id, payload) => API.patch(`/learning/tracks/${id}/archive`, payload);
+export const submitLearningTask = (trackId, payload) =>
+  API.post(`/learning/tracks/${trackId}/submissions`, payload);
+export const fetchMyLearningSubmissions = () => API.get('/learning/submissions/mine');
+export const fetchLearningSubmissions = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/learning/submissions${suffix}`);
+};
+export const reviewLearningSubmission = (id, payload) =>
+  API.patch(`/learning/submissions/${id}/review`, payload);
+
 export default API;
