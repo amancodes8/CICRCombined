@@ -1,0 +1,20 @@
+name: Keep Render Service Warm
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping-health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend health endpoint
+        env:
+          CONFIGURED_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
+          FALLBACK_HEALTH_URL: https://cicrcombined.onrender.com/api/health
+        run: |
+          set -euo pipefail
+          TARGET_URL="${CONFIGURED_HEALTH_URL:-$FALLBACK_HEALTH_URL}"
+          echo "Pinging: ${TARGET_URL}"
+          curl --fail --silent --show-error --max-time 25 --retry 2 --retry-delay 3 "${TARGET_URL}" >/dev/null
