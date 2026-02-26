@@ -3,6 +3,12 @@ const InviteCode = require('../models/InviteCode');
 const generateToken = require('../utils/generateToken');
 const sendEmail = require('../utils/sendEmail');
 const crypto = require('crypto');
+const {
+  YEAR_MIN,
+  YEAR_MAX,
+  normalizeAlumniProfile,
+  validateTenures,
+} = require('../utils/alumniProfile');
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 const normalizeCollegeId = (value) => String(value || '').trim().toUpperCase();
@@ -326,6 +332,23 @@ const updateProfile = async (req, res) => {
       instagram: normalizeHandle(req.body.social?.instagram ?? user.social?.instagram ?? ''),
       facebook: normalizeHandle(req.body.social?.facebook ?? user.social?.facebook ?? ''),
     };
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'alumniProfile')) {
+      const normalizedAlumniProfile = normalizeAlumniProfile(req.body.alumniProfile, user.alumniProfile || {});
+      const tenureValidation = validateTenures(normalizedAlumniProfile.tenures);
+      if (!tenureValidation.ok) {
+        return res.status(400).json({ message: tenureValidation.message });
+      }
+      if (
+        Number.isFinite(normalizedAlumniProfile.graduationYear) &&
+        (normalizedAlumniProfile.graduationYear < YEAR_MIN || normalizedAlumniProfile.graduationYear > YEAR_MAX)
+      ) {
+        return res
+          .status(400)
+          .json({ message: `Graduation year must be between ${YEAR_MIN} and ${YEAR_MAX}.` });
+      }
+      user.alumniProfile = normalizedAlumniProfile;
+    }
 
     const updatedUser = await user.save();
     const userResponse = updatedUser.toObject();

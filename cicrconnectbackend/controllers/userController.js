@@ -1,6 +1,12 @@
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const { buildUserInsights } = require('../utils/userInsights');
+const {
+    YEAR_MIN,
+    YEAR_MAX,
+    normalizeAlumniProfile,
+    validateTenures,
+} = require('../utils/alumniProfile');
 
 const normalizeHandle = (value) => {
     if (!value) return '';
@@ -63,6 +69,23 @@ const updateUserProfile = async (req, res) => {
             instagram: normalizeHandle(req.body.social?.instagram ?? user.social?.instagram ?? ''),
             facebook: normalizeHandle(req.body.social?.facebook ?? user.social?.facebook ?? ''),
         };
+
+        if (Object.prototype.hasOwnProperty.call(req.body, 'alumniProfile')) {
+            const normalizedAlumniProfile = normalizeAlumniProfile(req.body.alumniProfile, user.alumniProfile || {});
+            const tenureValidation = validateTenures(normalizedAlumniProfile.tenures);
+            if (!tenureValidation.ok) {
+                return res.status(400).json({ message: tenureValidation.message });
+            }
+            if (
+                Number.isFinite(normalizedAlumniProfile.graduationYear) &&
+                (normalizedAlumniProfile.graduationYear < YEAR_MIN || normalizedAlumniProfile.graduationYear > YEAR_MAX)
+            ) {
+                return res
+                    .status(400)
+                    .json({ message: `Graduation year must be between ${YEAR_MIN} and ${YEAR_MAX}.` });
+            }
+            user.alumniProfile = normalizedAlumniProfile;
+        }
 
         const updatedUser = await user.save();
         
@@ -135,7 +158,7 @@ const getPublicProfileByCollegeId = async (req, res) => {
     }
 
     const user = await User.findOne({ collegeId }).select(
-        'name collegeId role branch year batch joinedAt bio achievements skills social createdAt'
+        'name collegeId role branch year batch joinedAt bio achievements skills social alumniProfile createdAt'
     );
 
     if (!user) {
@@ -160,11 +183,13 @@ const getPublicProfileByCollegeId = async (req, res) => {
             achievements: member.achievements || [],
             skills: member.skills || [],
             social: member.social || {},
+            alumniProfile: member.alumniProfile || user.alumniProfile || {},
         },
         metrics: {
             totalProjectContributions: metrics.totalProjectContributions || 0,
             totalEvents: metrics.totalEvents || 0,
             postsCreated: metrics.postsCreated || 0,
+            alumniTenureYears: metrics.alumniTenureYears || 0,
         },
     });
 };

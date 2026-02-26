@@ -407,7 +407,7 @@ export default function Community() {
           subtitle="Professional collaboration board, verified member directory, and private issue reporting line to admin."
           icon={Globe}
         />
-        <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-800 p-1 self-start md:self-auto">
+        <div className="inline-flex items-center gap-2 rounded-2xl border border-cyan-500/25 bg-cyan-500/[0.04] p-1 self-start md:self-auto overflow-x-auto max-w-full">
           {[
             { id: 'feed', icon: MessageSquare, label: 'Feed' },
             { id: 'directory', icon: Users, label: 'Directory' },
@@ -416,10 +416,10 @@ export default function Community() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 md:px-5 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-[0.18em] inline-flex items-center gap-2 transition-colors ${
+              className={`px-4 md:px-5 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-[0.18em] inline-flex items-center gap-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
-                  ? 'text-white border border-blue-500/45 bg-blue-500/10'
-                  : 'text-gray-500 hover:text-gray-200'
+                  ? 'text-cyan-100 border border-cyan-500/45 bg-cyan-500/10'
+                  : 'text-gray-500 hover:text-gray-200 hover:border hover:border-gray-700/70'
               }`}
             >
               <tab.icon size={14} />
@@ -433,22 +433,26 @@ export default function Community() {
         {activeTab === 'feed' ? (
           <motion.div
             key="feed"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
+            initial={{ opacity: 0, y: 12, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.99 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
             className="grid grid-cols-1 lg:grid-cols-12 gap-8 section-motion section-motion-delay-2"
           >
             <div className="lg:col-span-8 space-y-6 md:space-y-7">
-              <form onSubmit={handlePostSubmit} className="border border-gray-800 p-5 md:p-7 rounded-[1.5rem] space-y-4 pro-hover-lift">
+              <form
+                onSubmit={handlePostSubmit}
+                className="border border-cyan-500/25 bg-gradient-to-b from-cyan-500/[0.06] to-transparent p-5 md:p-7 rounded-[1.5rem] space-y-4 pro-hover-lift"
+              >
                 <div className="flex gap-4">
-                  <div className="hidden sm:flex w-12 h-12 rounded-2xl border border-blue-500/30 flex-shrink-0 items-center justify-center font-black text-blue-400 text-xl">
+                  <div className="hidden sm:flex w-12 h-12 rounded-2xl border border-cyan-500/40 bg-cyan-500/10 flex-shrink-0 items-center justify-center font-black text-cyan-300 text-xl">
                     {userData.name?.[0] || 'M'}
                   </div>
                   <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     placeholder="Share an update, idea, requirement, or event note..."
-                    className="w-full border border-gray-800 rounded-2xl bg-[#0b0e13]/60 text-white placeholder:text-gray-600 text-sm md:text-base p-4 resize-none outline-none focus:border-blue-500"
+                    className="w-full border border-gray-700/80 rounded-2xl bg-[#0b0f16]/78 text-white placeholder:text-gray-600 text-sm md:text-base p-4 resize-none outline-none focus:border-cyan-500"
                     rows={4}
                   />
                 </div>
@@ -462,8 +466,8 @@ export default function Community() {
                         onClick={() => setPostType(type)}
                         className={`whitespace-nowrap px-3 py-2 rounded-xl text-[9px] md:text-[10px] font-black uppercase border transition-colors ${
                           postType === type
-                            ? 'text-blue-300 border-blue-500/45 bg-blue-500/10'
-                            : 'border-gray-800 text-gray-500'
+                            ? 'text-cyan-200 border-cyan-500/45 bg-cyan-500/10'
+                            : 'border-gray-800 text-gray-500 hover:text-gray-300'
                         }`}
                       >
                         {type}
@@ -475,10 +479,10 @@ export default function Community() {
                     value={postTopic}
                     onChange={(e) => setPostTopic(e.target.value)}
                     placeholder="Topic (AI, Robotics, Placement...)"
-                    className="w-full sm:w-64 border border-gray-800 rounded-xl px-3 py-2 text-xs bg-[#0b0e13]/60 text-white outline-none focus:border-blue-500"
+                    className="w-full sm:w-64 border border-gray-700/80 rounded-xl px-3 py-2 text-xs bg-[#0b0f16]/78 text-white outline-none focus:border-cyan-500"
                   />
 
-                  <button className="w-full sm:w-auto border border-blue-500/45 bg-blue-500/10 text-blue-100 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-[0.16em] inline-flex items-center justify-center gap-2">
+                  <button className="w-full sm:w-auto border border-cyan-500/45 bg-cyan-500/10 text-cyan-100 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-[0.16em] inline-flex items-center justify-center gap-2 hover:bg-cyan-500/20">
                     <Send size={14} />
                     Post
                   </button>
@@ -492,11 +496,11 @@ export default function Community() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.04 }}
-                    className="border border-gray-800 p-5 md:p-6 rounded-[1.4rem] pro-hover-lift"
+                    className="border border-slate-700/70 bg-[#0b0f16]/72 p-5 md:p-6 rounded-[1.4rem] pro-hover-lift"
                   >
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex gap-4 min-w-0">
-                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl border border-blue-500/35 flex items-center justify-center font-black text-blue-300 shrink-0">
+                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl border border-cyan-500/35 bg-cyan-500/10 flex items-center justify-center font-black text-cyan-200 shrink-0">
                           {post.user?.name?.[0] || 'M'}
                         </div>
                         <div className="min-w-0">
@@ -508,7 +512,7 @@ export default function Community() {
                           </div>
                           <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 flex flex-wrap items-center gap-2">
                             <span className="inline-flex items-center gap-1">
-                              <Hash size={10} className="text-blue-400" />
+                              <Hash size={10} className="text-cyan-300" />
                               {post.topic || post.type}
                             </span>
                             <span className="inline-flex items-center gap-1">
@@ -542,7 +546,7 @@ export default function Community() {
                     <div className="mt-4">
                       <button
                         onClick={() => handleLike(post._id)}
-                        className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl border border-gray-800 text-gray-300 hover:text-pink-300"
+                        className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl border border-gray-700 text-gray-300 hover:text-pink-300 hover:border-pink-400/35"
                       >
                         <Heart size={14} />
                         {post.likes?.length || 0} Reactions
@@ -561,9 +565,9 @@ export default function Community() {
               </div>
             </div>
 
-            <aside className="lg:col-span-4 border border-gray-800 rounded-[2rem] p-6 md:p-7 h-fit pro-hover-lift">
+            <aside className="lg:col-span-4 border border-indigo-500/20 bg-gradient-to-b from-indigo-500/[0.08] to-transparent rounded-[2rem] p-6 md:p-7 h-fit pro-hover-lift">
               <h3 className="font-black mb-6 flex items-center gap-3 text-white uppercase tracking-[0.18em] text-xs">
-                <Sparkles size={16} className="text-cyan-300" />
+                <Sparkles size={16} className="text-indigo-300" />
                 Community Standards
               </h3>
               <div className="space-y-3">
@@ -574,7 +578,7 @@ export default function Community() {
                 ].map((item, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between rounded-xl border border-gray-800 px-3 py-3 text-[11px] text-gray-300"
+                    className="flex items-center justify-between rounded-xl border border-indigo-500/20 bg-indigo-500/[0.05] px-3 py-3 text-[11px] text-gray-300"
                   >
                     {item}
                     <ChevronRight size={14} className="text-gray-500" />
@@ -584,32 +588,39 @@ export default function Community() {
             </aside>
           </motion.div>
         ) : activeTab === 'directory' ? (
-          <motion.div key="directory" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-7 section-motion section-motion-delay-2">
+          <motion.div
+            key="directory"
+            initial={{ opacity: 0, y: 12, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.99 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+            className="space-y-7 section-motion section-motion-delay-2"
+          >
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
               <div>
-                <p className="text-[10px] uppercase tracking-[0.22em] text-blue-400 font-black">CICR Directory</p>
+                <p className="text-[10px] uppercase tracking-[0.22em] text-cyan-300 font-black">CICR Directory</p>
                 <h3 className="text-2xl md:text-3xl font-black text-white mt-1">Member Index</h3>
                 <p className="text-gray-500 text-sm mt-2">All verified members are visible here, including alumni.</p>
               </div>
               <div className="grid grid-cols-3 gap-2 md:gap-3">
-                <div className="border border-gray-800 rounded-xl px-3 py-2">
+                <div className="border border-slate-700/70 bg-[#0b0f16]/72 rounded-xl px-3 py-2">
                   <p className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Total</p>
                   <p className="text-lg font-black text-white">{directoryStats.total}</p>
                 </div>
-                <div className="border border-gray-800 rounded-xl px-3 py-2">
+                <div className="border border-emerald-500/20 bg-emerald-500/[0.06] rounded-xl px-3 py-2">
                   <p className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Alumni</p>
                   <p className="text-lg font-black text-emerald-300">{directoryStats.alumni}</p>
                 </div>
-                <div className="border border-gray-800 rounded-xl px-3 py-2">
+                <div className="border border-cyan-500/20 bg-cyan-500/[0.06] rounded-xl px-3 py-2">
                   <p className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Visible</p>
                   <p className="text-lg font-black text-cyan-300">{directoryStats.visible}</p>
                 </div>
               </div>
             </div>
 
-            <section className="border border-gray-800 p-5 rounded-[1.8rem] pro-hover-lift">
+            <section className="border border-cyan-500/20 bg-gradient-to-b from-cyan-500/[0.05] to-transparent p-5 rounded-[1.8rem] pro-hover-lift">
               <div className="flex items-center gap-2 text-gray-400 text-xs font-black uppercase tracking-widest mb-3">
-                <Filter size={14} />
+                <Filter size={14} className="text-cyan-300" />
                 Directory Filters
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
@@ -620,14 +631,14 @@ export default function Community() {
                     placeholder="Search by name, ID, email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full border border-gray-800 p-3.5 pl-12 rounded-xl bg-[#0b0e13]/60 text-white text-sm outline-none focus:border-blue-500"
+                    className="w-full border border-gray-700/80 p-3.5 pl-12 rounded-xl bg-[#0b0f16]/80 text-white text-sm outline-none focus:border-cyan-500"
                   />
                 </div>
 
                 <select
                   value={filterBranch}
                   onChange={(e) => setFilterBranch(e.target.value)}
-                  className="border border-gray-800 p-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-300 bg-[#0b0e13]/60"
+                  className="border border-gray-700/80 p-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-300 bg-[#0b0f16]/80"
                 >
                   {branchOptions.map((b) => (
                     <option key={b} value={b}>
@@ -639,7 +650,7 @@ export default function Community() {
                 <select
                   value={filterYear}
                   onChange={(e) => setFilterYear(e.target.value)}
-                  className="border border-gray-800 p-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-300 bg-[#0b0e13]/60"
+                  className="border border-gray-700/80 p-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-300 bg-[#0b0f16]/80"
                 >
                   {yearOptions.map((y) => (
                     <option key={y} value={y}>
@@ -652,7 +663,7 @@ export default function Community() {
                   <select
                     value={filterRole}
                     onChange={(e) => setFilterRole(e.target.value)}
-                    className="flex-1 border border-gray-800 p-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-300 bg-[#0b0e13]/60"
+                    className="flex-1 border border-gray-700/80 p-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-300 bg-[#0b0f16]/80"
                   >
                     {roleOptions.map((role) => (
                       <option key={role} value={role}>
@@ -663,7 +674,7 @@ export default function Community() {
                   <button
                     type="button"
                     onClick={resetDirectoryFilters}
-                    className="inline-flex items-center justify-center border border-gray-800 rounded-xl px-3 text-gray-400 hover:text-white hover:border-blue-500/40"
+                    className="inline-flex items-center justify-center border border-gray-700/80 rounded-xl px-3 text-gray-400 hover:text-white hover:border-cyan-500/45"
                     title="Reset filters"
                   >
                     <RotateCcw size={16} />
@@ -672,9 +683,9 @@ export default function Community() {
               </div>
             </section>
 
-            <section className="ui-table-shell overflow-hidden">
+            <section className="ui-table-shell overflow-hidden hidden lg:block">
               <div className="overflow-x-auto max-h-[68vh]">
-                <table className="w-full min-w-[980px] border-collapse">
+                <table className="w-full min-w-[920px] border-collapse">
                   <thead className="ui-table-head sticky top-0 z-10">
                     <tr>
                       <th className="px-4 py-3 text-left">Member</th>
@@ -760,6 +771,71 @@ export default function Community() {
               </div>
             </section>
 
+            <section className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:hidden">
+              {filteredMembers.map((member) => {
+                const roleLower = String(member.role || '').toLowerCase();
+                const isAlumni = roleLower === 'alumni';
+                const yearLabel = isAlumni
+                  ? 'Alumni'
+                  : member.year
+                  ? `${member.year}${getOrdinal(member.year)} Year`
+                  : 'Year N/A';
+                const hasProfile = Boolean(member.collegeId);
+
+                return (
+                  <article
+                    key={`mobile-${member._id}`}
+                    className="rounded-2xl border border-slate-700/70 bg-[#0b0f16]/80 p-4 space-y-2.5"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl border border-cyan-500/35 bg-cyan-500/10 flex items-center justify-center font-black text-cyan-200 shrink-0">
+                        {member.name?.[0] || 'M'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-white truncate">{member.name || 'Member'}</p>
+                        <p className="mt-1 text-[11px] text-gray-500 inline-flex items-center gap-1.5 uppercase tracking-wider">
+                          <Fingerprint size={11} className="text-cyan-300" />
+                          {member.collegeId || 'NO-ID'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-gray-300 inline-flex items-center gap-1.5">
+                      <GraduationCap size={12} className="text-amber-400" />
+                      {yearLabel} • {member.branch || 'GENERAL'} {member.batch ? `• ${member.batch}` : ''}
+                    </p>
+
+                    <p className="text-xs text-gray-300 inline-flex items-center gap-1.5 break-all">
+                      <Mail size={12} className="text-cyan-300 shrink-0" />
+                      {member.email || 'No email'}
+                    </p>
+
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <span
+                        className={`text-[10px] px-2 py-1 rounded-md font-black uppercase tracking-widest ${
+                          isAlumni ? 'bg-emerald-500/15 text-emerald-300' : 'bg-cyan-500/15 text-cyan-300'
+                        }`}
+                      >
+                        {member.role || 'User'}
+                      </span>
+                      {hasProfile ? (
+                        <Link
+                          to={`/profile/${encodeURIComponent(member.collegeId)}`}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-500/40 text-cyan-200 text-[10px] font-black uppercase tracking-widest hover:bg-cyan-500/10"
+                        >
+                          Open <ExternalLink size={11} />
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-gray-700 text-gray-500 text-[10px] font-black uppercase tracking-widest">
+                          Unavailable
+                        </span>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </section>
+
             {filteredMembers.length === 0 && (
               <div className="text-center py-16 border border-dashed border-gray-800 rounded-[2rem]">
                 <Users className="mx-auto text-gray-700 mb-3" size={44} />
@@ -772,7 +848,14 @@ export default function Community() {
             )}
           </motion.div>
         ) : (
-          <motion.div key="issues" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-7 section-motion section-motion-delay-2">
+          <motion.div
+            key="issues"
+            initial={{ opacity: 0, y: 12, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.99 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+            className="space-y-7 section-motion section-motion-delay-2"
+          >
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.22em] text-rose-300 font-black">Issue Escalation</p>
@@ -788,7 +871,10 @@ export default function Community() {
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-              <section ref={issueSectionRef} className="xl:col-span-5 border border-gray-800 rounded-[1.8rem] p-5 md:p-6 pro-hover-lift">
+              <section
+                ref={issueSectionRef}
+                className="xl:col-span-5 border border-rose-500/20 bg-gradient-to-b from-rose-500/[0.06] to-transparent rounded-[1.8rem] p-5 md:p-6 pro-hover-lift"
+              >
                 <h4 className="text-sm font-black uppercase tracking-[0.18em] text-gray-200 inline-flex items-center gap-2">
                   <Bug size={14} className="text-rose-300" />
                   New Issue
@@ -800,7 +886,7 @@ export default function Community() {
                     value={issueForm.title}
                     onChange={(e) => setIssueForm((prev) => ({ ...prev, title: e.target.value }))}
                     placeholder="Issue title"
-                    className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0b0e13]/60 text-sm text-white outline-none focus:border-rose-500/60"
+                    className="w-full border border-gray-700/80 rounded-xl px-3 py-2.5 bg-[#0b0f16]/80 text-sm text-white outline-none focus:border-rose-500/60"
                     required
                     minLength={4}
                     maxLength={160}
@@ -810,7 +896,7 @@ export default function Community() {
                     <select
                       value={issueForm.category}
                       onChange={(e) => setIssueForm((prev) => ({ ...prev, category: e.target.value }))}
-                      className="border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0b0e13]/60 text-sm text-white outline-none focus:border-rose-500/60"
+                      className="border border-gray-700/80 rounded-xl px-3 py-2.5 bg-[#0b0f16]/80 text-sm text-white outline-none focus:border-rose-500/60"
                     >
                       {ISSUE_CATEGORIES.map((category) => (
                         <option key={category} value={category}>
@@ -822,7 +908,7 @@ export default function Community() {
                     <select
                       value={issueForm.priority}
                       onChange={(e) => setIssueForm((prev) => ({ ...prev, priority: e.target.value }))}
-                      className="border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0b0e13]/60 text-sm text-white outline-none focus:border-rose-500/60"
+                      className="border border-gray-700/80 rounded-xl px-3 py-2.5 bg-[#0b0f16]/80 text-sm text-white outline-none focus:border-rose-500/60"
                     >
                       {ISSUE_PRIORITIES.map((priority) => (
                         <option key={priority} value={priority}>
@@ -836,7 +922,7 @@ export default function Community() {
                     value={issueForm.description}
                     onChange={(e) => setIssueForm((prev) => ({ ...prev, description: e.target.value }))}
                     placeholder="Describe the issue in detail with impact and urgency."
-                    className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0b0e13]/60 text-sm text-white outline-none focus:border-rose-500/60 resize-none"
+                    className="w-full border border-gray-700/80 rounded-xl px-3 py-2.5 bg-[#0b0f16]/80 text-sm text-white outline-none focus:border-rose-500/60 resize-none"
                     rows={5}
                     required
                     minLength={10}
@@ -853,11 +939,11 @@ export default function Community() {
                   </button>
                 </form>
 
-                <div className="mt-5 border-t border-gray-800 pt-4">
+                  <div className="mt-5 border-t border-rose-500/20 pt-4">
                   <h5 className="text-xs uppercase tracking-widest text-gray-400 font-black">My Ticket History</h5>
                   <div className="mt-3 space-y-3 max-h-[360px] overflow-auto pr-1">
                     {myIssues.map((issue) => (
-                      <article key={issue._id} className="border border-gray-800 rounded-xl p-3">
+                      <article key={issue._id} className="border border-gray-700/70 bg-[#0b0f16]/72 rounded-xl p-3">
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-semibold text-white leading-snug">{issue.title}</p>
                           <span
@@ -892,7 +978,7 @@ export default function Community() {
                             Admin note: {issue.adminNote}
                           </p>
                         ) : null}
-                        <div className="mt-3 border border-gray-800/75 rounded-lg px-2.5 py-2">
+                        <div className="mt-3 border border-gray-700/75 rounded-lg px-2.5 py-2">
                           <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Timeline</p>
                           <div className="mt-2 space-y-1.5">
                             {buildIssueTimeline(issue).map((step) => (
@@ -920,7 +1006,7 @@ export default function Community() {
               </section>
 
               {isStrictAdmin && (
-                <section className="xl:col-span-7 border border-gray-800 rounded-[1.8rem] p-5 md:p-6 pro-hover-lift">
+                <section className="xl:col-span-7 border border-cyan-500/20 bg-gradient-to-b from-cyan-500/[0.05] to-transparent rounded-[1.8rem] p-5 md:p-6 pro-hover-lift">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <h4 className="text-sm font-black uppercase tracking-[0.18em] text-gray-200 inline-flex items-center gap-2">
                       <ShieldCheck size={14} className="text-cyan-300" />
@@ -929,7 +1015,7 @@ export default function Community() {
                     <select
                       value={adminIssueFilter}
                       onChange={(e) => setAdminIssueFilter(e.target.value)}
-                      className="border border-gray-800 rounded-xl px-3 py-2 bg-[#0b0e13]/60 text-xs text-gray-300"
+                      className="border border-gray-700/80 rounded-xl px-3 py-2 bg-[#0b0f16]/80 text-xs text-gray-300"
                     >
                       <option value="All">All Statuses</option>
                       {ISSUE_STATUSES.map((status) => (
@@ -942,7 +1028,7 @@ export default function Community() {
 
                   <div className="mt-4 space-y-3 max-h-[720px] overflow-auto pr-1">
                     {adminVisibleIssues.map((issue) => (
-                      <article key={issue._id} className="border border-gray-800 rounded-xl p-4">
+                      <article key={issue._id} className="border border-gray-700/70 bg-[#0b0f16]/72 rounded-xl p-4">
                         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-sm md:text-base font-bold text-white break-words">{issue.title}</p>
@@ -993,7 +1079,7 @@ export default function Community() {
                           </p>
                         ) : null}
 
-                        <div className="mt-3 border border-gray-800/75 rounded-lg px-2.5 py-2">
+                        <div className="mt-3 border border-gray-700/75 rounded-lg px-2.5 py-2">
                           <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Timeline</p>
                           <div className="mt-2 space-y-1.5">
                             {buildIssueTimeline(issue).map((step) => (
@@ -1047,7 +1133,7 @@ export default function Community() {
             </div>
 
             {!isStrictAdmin && (
-              <div className="border border-gray-800 rounded-xl p-4 text-sm text-gray-400 inline-flex items-start gap-2 section-motion section-motion-delay-3">
+              <div className="border border-cyan-500/25 bg-cyan-500/[0.05] rounded-xl p-4 text-sm text-gray-300 inline-flex items-start gap-2 section-motion section-motion-delay-3">
                 <ShieldCheck size={15} className="text-cyan-300 mt-0.5" />
                 Only admin can access full issue inbox and update statuses.
               </div>

@@ -2,6 +2,34 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto'); // Built-in Node module for token generation
 
+const AlumniTenureSchema = new mongoose.Schema(
+    {
+        position: { type: String, default: '', trim: true, maxlength: 80 },
+        fromYear: { type: Number, min: 2000, max: 2100 },
+        toYear: { type: Number, min: 2000, max: 2100 },
+    },
+    { _id: false }
+);
+
+const AlumniProfileSchema = new mongoose.Schema(
+    {
+        tenures: { type: [AlumniTenureSchema], default: [] },
+        graduationYear: { type: Number, min: 2000, max: 2100, default: null },
+        currentOrganization: { type: String, default: '', trim: true, maxlength: 140 },
+        currentDesignation: { type: String, default: '', trim: true, maxlength: 100 },
+        location: { type: String, default: '', trim: true, maxlength: 120 },
+        willingToMentor: { type: Boolean, default: true },
+        mentorshipAreas: { type: [String], default: [] },
+        availabilityMode: {
+            type: String,
+            enum: ['Flexible', 'Weekends', 'Evenings', 'Limited', 'Unavailable'],
+            default: 'Flexible',
+        },
+        notableProjects: { type: String, default: '', maxlength: 600 },
+    },
+    { _id: false }
+);
+
 const UserSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
@@ -36,6 +64,10 @@ const UserSchema = new mongoose.Schema({
         portfolio: { type: String, default: '' },
         instagram: { type: String, default: '' },
         facebook: { type: String, default: '' },
+    },
+    alumniProfile: {
+        type: AlumniProfileSchema,
+        default: () => ({}),
     },
     warnings: [{
         reason: { type: String, required: true },

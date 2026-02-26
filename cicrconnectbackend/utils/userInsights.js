@@ -12,6 +12,22 @@ const yearsSince = (dateValue) => {
   return Math.max(0, years - (hasNotCompletedYear ? 1 : 0));
 };
 
+const getAlumniTenureYears = (alumniProfile = {}) => {
+  const tenures = Array.isArray(alumniProfile?.tenures) ? alumniProfile.tenures : [];
+  if (tenures.length === 0) return 0;
+  const normalized = tenures
+    .map((row) => ({
+      fromYear: Number(row?.fromYear),
+      toYear: Number(row?.toYear),
+    }))
+    .filter((row) => Number.isFinite(row.fromYear) && Number.isFinite(row.toYear) && row.toYear >= row.fromYear);
+  if (normalized.length === 0) return 0;
+  const minFrom = Math.min(...normalized.map((row) => row.fromYear));
+  const maxTo = Math.max(...normalized.map((row) => row.toYear));
+  const total = maxTo - minFrom + 1;
+  return Number.isFinite(total) ? Math.max(0, total) : 0;
+};
+
 const buildUserInsights = async (user) => {
   const userId = user._id;
 
@@ -48,6 +64,8 @@ const buildUserInsights = async (user) => {
 
   const effectiveJoinedAt = user.joinedAt || user.createdAt;
   const yearsInCICR = yearsSince(effectiveJoinedAt);
+  const alumniProfile = user.alumniProfile || {};
+  const alumniTenureYears = getAlumniTenureYears(alumniProfile);
 
   return {
     member: {
@@ -67,6 +85,7 @@ const buildUserInsights = async (user) => {
       achievements: Array.isArray(user.achievements) ? user.achievements : [],
       skills: Array.isArray(user.skills) ? user.skills : [],
       social: user.social || {},
+      alumniProfile: alumniProfile || {},
     },
     metrics: {
       projectsLed,
@@ -78,6 +97,7 @@ const buildUserInsights = async (user) => {
       totalEvents: meetingsOrganized + meetingsJoined,
       postsCreated,
       totalAchievements: Array.isArray(user.achievements) ? user.achievements.length : 0,
+      alumniTenureYears,
     },
     contributedProjects,
     events,

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Award,
+  Building2,
   BookOpen,
   Briefcase,
   Calendar,
@@ -19,10 +20,13 @@ import {
   LogOut,
   Lock,
   Mail,
+  MapPin,
   Phone,
+  Plus,
   Save,
   ShieldAlert,
   SquareUser,
+  Trash2,
   User,
   X,
 } from 'lucide-react';
@@ -53,6 +57,14 @@ const yearsInCicr = (joinedAt) => {
   return Math.max(0, years);
 };
 
+const ALUMNI_AVAILABILITY_OPTIONS = ['Flexible', 'Weekends', 'Evenings', 'Limited', 'Unavailable'];
+
+const createEmptyTenure = () => ({
+  position: '',
+  fromYear: '',
+  toYear: '',
+});
+
 const buildFormData = (user = {}) => ({
   name: user.name || '',
   phone: user.phone || '',
@@ -69,6 +81,29 @@ const buildFormData = (user = {}) => ({
     portfolio: user.social?.portfolio || '',
     instagram: user.social?.instagram || '',
     facebook: user.social?.facebook || '',
+  },
+  alumniProfile: {
+    graduationYear: user.alumniProfile?.graduationYear || '',
+    currentOrganization: user.alumniProfile?.currentOrganization || '',
+    currentDesignation: user.alumniProfile?.currentDesignation || '',
+    location: user.alumniProfile?.location || '',
+    willingToMentor:
+      typeof user.alumniProfile?.willingToMentor === 'boolean'
+        ? user.alumniProfile.willingToMentor
+        : true,
+    mentorshipAreasText: Array.isArray(user.alumniProfile?.mentorshipAreas)
+      ? user.alumniProfile.mentorshipAreas.join(', ')
+      : '',
+    availabilityMode: user.alumniProfile?.availabilityMode || 'Flexible',
+    notableProjects: user.alumniProfile?.notableProjects || '',
+    tenures:
+      Array.isArray(user.alumniProfile?.tenures) && user.alumniProfile.tenures.length > 0
+        ? user.alumniProfile.tenures.map((row) => ({
+            position: row?.position || '',
+            fromYear: row?.fromYear || '',
+            toYear: row?.toYear || '',
+          }))
+        : [createEmptyTenure()],
   },
 });
 
@@ -152,34 +187,97 @@ export default function Profile() {
   const publicProfileUrl = user.collegeId ? `${origin}/profile/${user.collegeId}` : '';
   const skills = Array.isArray(user.skills) ? user.skills : [];
   const achievements = Array.isArray(user.achievements) ? user.achievements : [];
+  const isAlumni = String(user.role || '').toLowerCase() === 'alumni';
+  const alumniTenures = Array.isArray(user.alumniProfile?.tenures) ? user.alumniProfile.tenures : [];
+  const alumniMentorshipAreas = Array.isArray(user.alumniProfile?.mentorshipAreas)
+    ? user.alumniProfile.mentorshipAreas
+    : [];
 
   const completionScore = useMemo(() => {
-    const checks = [
-      !!user.name,
-      !!user.phone,
-      !!user.year,
-      !!user.branch,
-      !!user.batch,
-      !!user.joinedAt,
-      !!user.bio,
-      skills.length > 0,
-      achievements.length > 0,
-      Object.values(user.social || {}).some((v) => String(v || '').trim()),
-    ];
+    const checks = isAlumni
+      ? [
+          !!user.name,
+          !!user.phone,
+          !!user.joinedAt,
+          !!user.bio,
+          skills.length > 0,
+          achievements.length > 0,
+          !!user.alumniProfile?.graduationYear,
+          alumniTenures.length > 0,
+          !!user.alumniProfile?.currentOrganization,
+          Object.values(user.social || {}).some((v) => String(v || '').trim()),
+        ]
+      : [
+          !!user.name,
+          !!user.phone,
+          !!user.year,
+          !!user.branch,
+          !!user.batch,
+          !!user.joinedAt,
+          !!user.bio,
+          skills.length > 0,
+          achievements.length > 0,
+          Object.values(user.social || {}).some((v) => String(v || '').trim()),
+        ];
     const done = checks.filter(Boolean).length;
     return Math.round((done / checks.length) * 100);
-  }, [achievements.length, skills.length, user.batch, user.bio, user.branch, user.joinedAt, user.name, user.phone, user.social, user.year]);
+  }, [
+    achievements.length,
+    alumniTenures.length,
+    isAlumni,
+    skills.length,
+    user.alumniProfile?.currentOrganization,
+    user.alumniProfile?.graduationYear,
+    user.batch,
+    user.bio,
+    user.branch,
+    user.joinedAt,
+    user.name,
+    user.phone,
+    user.social,
+    user.year,
+  ]);
 
   const profileChecklist = useMemo(
-    () => [
-      { id: 'identity', label: 'Identity details', done: Boolean(user.name && user.phone && user.collegeId) },
-      { id: 'academic', label: 'Academic context', done: Boolean(user.year && user.branch && user.batch) },
-      { id: 'about', label: 'Professional bio', done: Boolean(user.bio) },
-      { id: 'skills', label: 'Skills listed', done: skills.length > 0 },
-      { id: 'achievements', label: 'Achievements listed', done: achievements.length > 0 },
-      { id: 'social', label: 'Social links', done: Object.values(user.social || {}).some((v) => String(v || '').trim()) },
-    ],
-    [achievements.length, skills.length, user.batch, user.bio, user.branch, user.collegeId, user.name, user.phone, user.social, user.year]
+    () =>
+      isAlumni
+        ? [
+            { id: 'identity', label: 'Identity details', done: Boolean(user.name && user.phone && user.collegeId) },
+            { id: 'timeline', label: 'CICR tenure timeline', done: alumniTenures.length > 0 },
+            {
+              id: 'alumni-role',
+              label: 'Current professional role',
+              done: Boolean(user.alumniProfile?.currentOrganization && user.alumniProfile?.currentDesignation),
+            },
+            { id: 'about', label: 'Professional bio', done: Boolean(user.bio) },
+            { id: 'skills', label: 'Skills listed', done: skills.length > 0 },
+            { id: 'achievements', label: 'Achievements listed', done: achievements.length > 0 },
+            { id: 'social', label: 'Social links', done: Object.values(user.social || {}).some((v) => String(v || '').trim()) },
+          ]
+        : [
+            { id: 'identity', label: 'Identity details', done: Boolean(user.name && user.phone && user.collegeId) },
+            { id: 'academic', label: 'Academic context', done: Boolean(user.year && user.branch && user.batch) },
+            { id: 'about', label: 'Professional bio', done: Boolean(user.bio) },
+            { id: 'skills', label: 'Skills listed', done: skills.length > 0 },
+            { id: 'achievements', label: 'Achievements listed', done: achievements.length > 0 },
+            { id: 'social', label: 'Social links', done: Object.values(user.social || {}).some((v) => String(v || '').trim()) },
+          ],
+    [
+      achievements.length,
+      alumniTenures.length,
+      isAlumni,
+      skills.length,
+      user.alumniProfile?.currentDesignation,
+      user.alumniProfile?.currentOrganization,
+      user.batch,
+      user.bio,
+      user.branch,
+      user.collegeId,
+      user.name,
+      user.phone,
+      user.social,
+      user.year,
+    ]
   );
 
   const socialItems = useMemo(
@@ -230,6 +328,51 @@ export default function Profile() {
     }
   };
 
+  const updateAlumniFormField = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      alumniProfile: {
+        ...prev.alumniProfile,
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateAlumniTenure = (index, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      alumniProfile: {
+        ...prev.alumniProfile,
+        tenures: prev.alumniProfile.tenures.map((row, rowIdx) =>
+          rowIdx === index ? { ...row, [field]: value } : row
+        ),
+      },
+    }));
+  };
+
+  const addAlumniTenure = () => {
+    setFormData((prev) => ({
+      ...prev,
+      alumniProfile: {
+        ...prev.alumniProfile,
+        tenures: [...(prev.alumniProfile.tenures || []), createEmptyTenure()],
+      },
+    }));
+  };
+
+  const removeAlumniTenure = (index) => {
+    setFormData((prev) => {
+      const rows = (prev.alumniProfile.tenures || []).filter((_, rowIdx) => rowIdx !== index);
+      return {
+        ...prev,
+        alumniProfile: {
+          ...prev.alumniProfile,
+          tenures: rows.length ? rows : [createEmptyTenure()],
+        },
+      };
+    });
+  };
+
   const handleUpdate = async (e) => {
     e.preventDefault();
 
@@ -243,7 +386,7 @@ export default function Profile() {
       return;
     }
 
-    if (yearRaw) {
+    if (!isAlumni && yearRaw) {
       const yearNum = Number(yearRaw);
       if (!Number.isFinite(yearNum) || yearNum < 1 || yearNum > 6) {
         dispatchToast('Year must be a number between 1 and 6.', 'error');
@@ -259,9 +402,73 @@ export default function Profile() {
       }
     }
 
+    const alumniTenureRows = (formData.alumniProfile?.tenures || [])
+      .map((row) => ({
+        position: String(row.position || '').trim(),
+        fromYear: String(row.fromYear || '').trim(),
+        toYear: String(row.toYear || '').trim(),
+      }))
+      .filter((row) => row.position || row.fromYear || row.toYear);
+
+    const parsedAlumniTenures = [];
+    if (isAlumni) {
+      for (let i = 0; i < alumniTenureRows.length; i += 1) {
+        const row = alumniTenureRows[i];
+        const rowLabel = `Tenure #${i + 1}`;
+        if (!row.position) {
+          dispatchToast(`${rowLabel}: position is required.`, 'error');
+          return;
+        }
+        if (!row.fromYear || !row.toYear) {
+          dispatchToast(`${rowLabel}: both start year and end year are required.`, 'error');
+          return;
+        }
+        const fromYear = Number(row.fromYear);
+        const toYear = Number(row.toYear);
+        if (!Number.isFinite(fromYear) || !Number.isFinite(toYear)) {
+          dispatchToast(`${rowLabel}: years must be valid numbers.`, 'error');
+          return;
+        }
+        if (fromYear < 2000 || toYear > 2100) {
+          dispatchToast(`${rowLabel}: year must be between 2000 and 2100.`, 'error');
+          return;
+        }
+        if (toYear < fromYear) {
+          dispatchToast(`${rowLabel}: end year cannot be earlier than start year.`, 'error');
+          return;
+        }
+        if (toYear - fromYear > 3) {
+          dispatchToast(`${rowLabel}: CICR tenure cannot exceed 4 years.`, 'error');
+          return;
+        }
+        parsedAlumniTenures.push({
+          position: row.position,
+          fromYear,
+          toYear,
+        });
+      }
+
+      if (parsedAlumniTenures.length > 0) {
+        const minFrom = Math.min(...parsedAlumniTenures.map((row) => row.fromYear));
+        const maxTo = Math.max(...parsedAlumniTenures.map((row) => row.toYear));
+        if (maxTo - minFrom > 3) {
+          dispatchToast('Combined CICR timeline cannot exceed 4 years for one member.', 'error');
+          return;
+        }
+      }
+    }
+
     setLoading(true);
     try {
-      const parsedYear = yearRaw ? Number(yearRaw) : null;
+      const parsedYear = !isAlumni && yearRaw ? Number(yearRaw) : null;
+      const graduationYearRaw = String(formData.alumniProfile?.graduationYear || '').trim();
+      const graduationYear = graduationYearRaw ? Number(graduationYearRaw) : null;
+      if (isAlumni && graduationYearRaw && (!Number.isFinite(graduationYear) || graduationYear < 2000 || graduationYear > 2100)) {
+        dispatchToast('Graduation year must be between 2000 and 2100.', 'error');
+        setLoading(false);
+        return;
+      }
+
       const payload = {
         name,
         phone,
@@ -286,6 +493,24 @@ export default function Profile() {
           facebook: formData.social.facebook.trim(),
         },
       };
+      if (isAlumni) {
+        payload.alumniProfile = {
+          graduationYear,
+          currentOrganization: String(formData.alumniProfile?.currentOrganization || '').trim(),
+          currentDesignation: String(formData.alumniProfile?.currentDesignation || '').trim(),
+          location: String(formData.alumniProfile?.location || '').trim(),
+          willingToMentor: Boolean(formData.alumniProfile?.willingToMentor),
+          mentorshipAreas: String(formData.alumniProfile?.mentorshipAreasText || '')
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean),
+          availabilityMode: ALUMNI_AVAILABILITY_OPTIONS.includes(String(formData.alumniProfile?.availabilityMode || ''))
+            ? formData.alumniProfile.availabilityMode
+            : 'Flexible',
+          notableProjects: String(formData.alumniProfile?.notableProjects || '').trim(),
+          tenures: parsedAlumniTenures,
+        };
+      }
 
       const { data } = await updateProfile(payload);
       const merged = persistProfile(data);
@@ -422,6 +647,7 @@ export default function Profile() {
             {[
               { id: 'about', label: 'About' },
               { id: 'snapshot', label: 'Snapshot' },
+              ...(isAlumni ? [{ id: 'alumni', label: 'Alumni Portal' }] : []),
               { id: 'skills', label: 'Skills' },
               { id: 'achievements', label: 'Achievements' },
               { id: 'security', label: 'Security' },
@@ -463,9 +689,17 @@ export default function Profile() {
           </h2>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <ProfileRow icon={Phone} label="Phone" value={user.phone} />
-            <ProfileRow icon={Calendar} label="Year" value={user.year} />
+            <ProfileRow icon={Calendar} label={isAlumni ? 'Graduation Year' : 'Year'} value={isAlumni ? user.alumniProfile?.graduationYear : user.year} />
             <ProfileRow icon={BookOpen} label="Branch" value={(user.branch || '').toUpperCase()} />
             <ProfileRow icon={Hash} label="Batch" value={user.batch} />
+            {isAlumni && (
+              <>
+                <ProfileRow icon={Building2} label="Organization" value={user.alumniProfile?.currentOrganization} />
+                <ProfileRow icon={Briefcase} label="Designation" value={user.alumniProfile?.currentDesignation} />
+                <ProfileRow icon={MapPin} label="Location" value={user.alumniProfile?.location} />
+                <ProfileRow icon={User} label="Mentorship" value={user.alumniProfile?.willingToMentor ? 'Available for mentorship' : 'Mentorship unavailable'} />
+              </>
+            )}
           </div>
         </article>
 
@@ -492,6 +726,51 @@ export default function Profile() {
           </div>
         </article>
       </section>
+
+      {isAlumni && (
+        <section id="alumni" className="grid grid-cols-1 xl:grid-cols-12 gap-8 section-motion section-motion-delay-3">
+          <article className="xl:col-span-7">
+            <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
+              <Briefcase size={17} className="text-cyan-300" />
+              CICR Role Timeline
+            </h2>
+            <div className="mt-3 space-y-2.5">
+              {alumniTenures.length === 0 && <p className="text-sm text-gray-500">No tenure history added yet.</p>}
+              {alumniTenures.map((tenure, idx) => (
+                <article key={`${tenure.position}-${idx}`} className="rounded-xl border border-gray-700/75 bg-[#0a0f16]/65 p-3">
+                  <p className="text-sm font-bold text-cyan-100">{tenure.position}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {tenure.fromYear || 'N/A'} - {tenure.toYear || 'N/A'}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </article>
+
+          <article className="xl:col-span-5">
+            <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
+              <BookOpen size={17} className="text-cyan-300" />
+              Alumni Contribution Focus
+            </h2>
+            <div className="mt-3 space-y-2.5">
+              <p className="text-sm text-gray-300">
+                {user.alumniProfile?.notableProjects || 'Add notable alumni support areas, talks, projects, or contributions.'}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {alumniMentorshipAreas.length === 0 && <span className="text-xs text-gray-500">No mentorship areas listed.</span>}
+                {alumniMentorshipAreas.map((area) => (
+                  <span key={area} className="text-xs px-2.5 py-1 rounded-full border border-cyan-500/35 text-cyan-200">
+                    {area}
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500">
+                Availability mode: <span className="text-gray-300">{user.alumniProfile?.availabilityMode || 'Flexible'}</span>
+              </p>
+            </div>
+          </article>
+        </section>
+      )}
 
       <section className="grid grid-cols-1 xl:grid-cols-2 gap-8 section-motion section-motion-delay-3">
         <article id="skills">
@@ -635,14 +914,16 @@ export default function Profile() {
                 disabled={loading}
               />
 
-              <InputField
-                icon={Calendar}
-                label="Year"
-                value={formData.year}
-                onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                placeholder="e.g. 3"
-                disabled={loading}
-              />
+              {!isAlumni && (
+                <InputField
+                  icon={Calendar}
+                  label="Year"
+                  value={formData.year}
+                  onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                  placeholder="e.g. 3"
+                  disabled={loading}
+                />
+              )}
 
               <InputField
                 icon={BookOpen}
@@ -670,6 +951,152 @@ export default function Profile() {
                 onChange={(e) => setFormData({ ...formData, joinedAt: e.target.value })}
                 disabled={loading}
               />
+
+              {isAlumni && (
+                <>
+                  <InputField
+                    icon={Calendar}
+                    label="Graduation Year"
+                    value={formData.alumniProfile.graduationYear}
+                    onChange={(e) => updateAlumniFormField('graduationYear', e.target.value)}
+                    placeholder="e.g. 2022"
+                    disabled={loading}
+                  />
+
+                  <InputField
+                    icon={Building2}
+                    label="Current Organization"
+                    value={formData.alumniProfile.currentOrganization}
+                    onChange={(e) => updateAlumniFormField('currentOrganization', e.target.value)}
+                    placeholder="Company / Institution"
+                    disabled={loading}
+                  />
+
+                  <InputField
+                    icon={Briefcase}
+                    label="Current Designation"
+                    value={formData.alumniProfile.currentDesignation}
+                    onChange={(e) => updateAlumniFormField('currentDesignation', e.target.value)}
+                    placeholder="Role / Title"
+                    disabled={loading}
+                  />
+
+                  <InputField
+                    icon={MapPin}
+                    label="Location"
+                    value={formData.alumniProfile.location}
+                    onChange={(e) => updateAlumniFormField('location', e.target.value)}
+                    placeholder="City, Country"
+                    disabled={loading}
+                  />
+
+                  <div className="md:col-span-2 rounded-xl border border-gray-700/70 p-3 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[10px] uppercase tracking-widest text-gray-400 font-black">CICR Role Timeline</p>
+                      <button
+                        type="button"
+                        onClick={addAlumniTenure}
+                        className="inline-flex items-center gap-1 rounded-lg border border-cyan-500/40 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-cyan-200"
+                      >
+                        <Plus size={12} />
+                        Add
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      Add position and years (max total 4 years, for example 2021-2022 for Head).
+                    </p>
+                    <div className="space-y-2">
+                      {(formData.alumniProfile.tenures || []).map((row, idx) => (
+                        <div key={`tenure-${idx}`} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                          <input
+                            value={row.position}
+                            onChange={(e) => updateAlumniTenure(idx, 'position', e.target.value)}
+                            placeholder="Position (Head, Coordinator...)"
+                            className="sm:col-span-6 w-full bg-[#0a0f16]/85 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 text-sm text-white placeholder:text-gray-600"
+                            disabled={loading}
+                          />
+                          <input
+                            value={row.fromYear}
+                            onChange={(e) => updateAlumniTenure(idx, 'fromYear', e.target.value)}
+                            placeholder="From"
+                            className="sm:col-span-2 w-full bg-[#0a0f16]/85 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 text-sm text-white placeholder:text-gray-600"
+                            disabled={loading}
+                          />
+                          <input
+                            value={row.toYear}
+                            onChange={(e) => updateAlumniTenure(idx, 'toYear', e.target.value)}
+                            placeholder="To"
+                            className="sm:col-span-2 w-full bg-[#0a0f16]/85 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 text-sm text-white placeholder:text-gray-600"
+                            disabled={loading}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeAlumniTenure(idx)}
+                            className="sm:col-span-2 inline-flex items-center justify-center rounded-xl border border-gray-700 px-2 py-2 text-gray-400 hover:text-red-300 hover:border-red-500/40"
+                            disabled={loading}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Mentorship Areas</label>
+                      <input
+                        value={formData.alumniProfile.mentorshipAreasText}
+                        onChange={(e) => updateAlumniFormField('mentorshipAreasText', e.target.value)}
+                        disabled={loading}
+                        placeholder="AI, Placements, Product, Startups"
+                        className="w-full bg-[#0a0f16]/85 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 disabled:opacity-60 transition-all text-white placeholder:text-gray-600"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Availability</label>
+                      <select
+                        value={formData.alumniProfile.availabilityMode}
+                        onChange={(e) => updateAlumniFormField('availabilityMode', e.target.value)}
+                        className="w-full bg-[#0a0f16]/85 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 text-white"
+                        disabled={loading}
+                      >
+                        {ALUMNI_AVAILABILITY_OPTIONS.map((mode) => (
+                          <option key={mode} value={mode}>
+                            {mode}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2 flex items-center gap-2 rounded-xl border border-gray-700/70 px-3 py-2.5">
+                    <input
+                      id="willing-to-mentor"
+                      type="checkbox"
+                      checked={Boolean(formData.alumniProfile.willingToMentor)}
+                      onChange={(e) => updateAlumniFormField('willingToMentor', e.target.checked)}
+                      disabled={loading}
+                      className="h-4 w-4 accent-cyan-500"
+                    />
+                    <label htmlFor="willing-to-mentor" className="text-sm text-gray-300">
+                      Open to mentorship sessions with current members
+                    </label>
+                  </div>
+
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Notable Alumni Contributions</label>
+                    <textarea
+                      value={formData.alumniProfile.notableProjects}
+                      onChange={(e) => updateAlumniFormField('notableProjects', e.target.value)}
+                      rows={3}
+                      disabled={loading}
+                      placeholder="Workshops, talks, projects, referrals, industry collaborations..."
+                      className="w-full bg-[#0a0f16]/85 p-3.5 rounded-xl outline-none focus:ring-2 focus:ring-cyan-400/55 disabled:opacity-60 transition-all text-white placeholder:text-gray-600"
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="md:col-span-2 space-y-2">
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Professional Bio</label>
