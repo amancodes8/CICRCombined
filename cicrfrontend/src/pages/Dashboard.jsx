@@ -304,6 +304,7 @@ export default function Dashboard() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Link to="/learning" className="btn btn-primary !w-auto">Open Learning Hub</Link>
+              <Link to="/programs" className="btn btn-secondary !w-auto">Programs Hub</Link>
               <Link to="/hierarchy" className="btn btn-secondary !w-auto">Mentorship Tasks</Link>
             </div>
           </div>

@@ -308,4 +308,60 @@ export const fetchLearningSubmissions = (params = {}) => {
 export const reviewLearningSubmission = (id, payload) =>
   API.patch(`/learning/submissions/${id}/review`, payload);
 
+// Member programs
+export const fetchProgramOverview = () => API.get('/programs/overview');
+export const fetchProgramConfig = () => API.get('/programs/config');
+export const updateProgramConfig = (payload) => API.put('/programs/config', payload);
+
+export const fetchProgramQuests = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/programs/quests${suffix}`);
+};
+export const createProgramQuest = (payload) => API.post('/programs/quests', payload);
+export const updateProgramQuest = (id, payload) => API.patch(`/programs/quests/${id}`, payload);
+export const submitProgramQuest = (id, payload) => API.post(`/programs/quests/${id}/submit`, payload);
+export const fetchMyProgramQuestSubmissions = () => API.get('/programs/quests/submissions/mine');
+export const fetchProgramQuestSubmissions = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/programs/quests/submissions${suffix}`);
+};
+export const reviewProgramQuestSubmission = (id, payload) =>
+  API.patch(`/programs/quests/submissions/${id}/review`, payload);
+
+export const fetchMentorRequests = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/programs/mentor-requests${suffix}`);
+};
+export const createMentorRequest = (payload) => API.post('/programs/mentor-requests', payload);
+export const updateMentorRequest = (id, payload) => API.patch(`/programs/mentor-requests/${id}`, payload);
+
+export const fetchBadgeRules = () => API.get('/programs/badges/rules');
+export const createBadgeRule = (payload) => API.post('/programs/badges/rules', payload);
+export const updateBadgeRule = (id, payload) => API.patch(`/programs/badges/rules/${id}`, payload);
+export const fetchBadgeOverview = () => API.get('/programs/badges/overview');
+
+export const fetchProgramIdeas = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/programs/ideas${suffix}`);
+};
+export const createProgramIdea = (payload) => API.post('/programs/ideas', payload);
+export const updateProgramIdea = (id, payload) => API.patch(`/programs/ideas/${id}`, payload);
+export const toggleProgramIdeaJoin = (id) => API.post(`/programs/ideas/${id}/join`);
+export const convertProgramIdea = (id, payload) => API.post(`/programs/ideas/${id}/convert`, payload);
+
+export const fetchOfficeHourSlots = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/programs/office-hours/slots${suffix}`);
+};
+export const createOfficeHourSlot = (payload) => API.post('/programs/office-hours/slots', payload);
+export const updateOfficeHourSlot = (id, payload) => API.patch(`/programs/office-hours/slots/${id}`, payload);
+export const bookOfficeHourSlot = (id, payload) => API.post(`/programs/office-hours/slots/${id}/book`, payload);
+export const fetchMyOfficeHourBookings = () => API.get('/programs/office-hours/bookings/mine');
+export const updateOfficeHourBooking = (id, payload) => API.patch(`/programs/office-hours/bookings/${id}`, payload);
+
 export default API;

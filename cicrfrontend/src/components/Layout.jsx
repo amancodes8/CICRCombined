@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Users, FolderKanban, 
   Calendar, ShieldCheck, FileText, UserSquare2,
-  Package, Menu, X, Radio, Sparkles, Bell, GitBranchPlus, Search, PlusCircle, Bug, CalendarPlus, BookOpenCheck
+  Package, Menu, X, Radio, Sparkles, Bell, GitBranchPlus, Search, PlusCircle, Bug, CalendarPlus, BookOpenCheck, PanelsTopLeft, ChevronDown
 } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -26,6 +26,7 @@ const ROUTE_LABELS = {
   schedule: 'Schedule Meeting',
   hierarchy: 'Mentorship Ops',
   learning: 'Learning Hub',
+  programs: 'Programs Hub',
   events: 'Events',
   inventory: 'Inventory',
   community: 'Community',
@@ -53,6 +54,12 @@ export default function Layout() {
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
+  const [openNavGroups, setOpenNavGroups] = useState({
+    core: true,
+    growth: true,
+    operations: true,
+    account: true,
+  });
   const location = useLocation();
   const navigate = useNavigate();
   const routerPathRef = useRef('/');
@@ -61,6 +68,7 @@ export default function Layout() {
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const [user, setUser] = useState(profile.result || profile);
   const isStrictAdmin = user.role?.toLowerCase() === 'admin';
+  const isAdminOrHead = user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'head';
   const logoSrc = useMemo(() => {
     if (logoMode === 'bundle') return logo;
     if (logoMode === 'public') return '/cicr-logo.png';
@@ -297,23 +305,66 @@ export default function Layout() {
     setLogoMode('fallback');
   };
 
-  // Profile icon removed from here as requested
-  const navLinks = useMemo(
+  const navGroups = useMemo(
     () => [
-      { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-      { icon: FolderKanban, label: "Projects", path: "/projects" },
-      { icon: Calendar, label: "Meetings", path: "/meetings" },
-      { icon: GitBranchPlus, label: "Mentorship Ops", path: "/hierarchy" },
-      { icon: BookOpenCheck, label: "Learning Hub", path: "/learning" },
-      { icon: Sparkles, label: "Events", path: "/events" },
-      { icon: Package, label: "Inventory", path: "/inventory" },
-      ...(isStrictAdmin ? [{ icon: Radio, label: "Collab Stream", path: "/communication" }] : []),
-      { icon: Users, label: "Community", path: "/community" },
-      { icon: UserSquare2, label: "Profile", path: "/profile" },
-      { icon: FileText, label: "Guidelines", path: "/guidelines" },
+      {
+        id: 'core',
+        label: 'Core Workspace',
+        items: [
+          { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+          { icon: FolderKanban, label: 'Projects', path: '/projects' },
+          { icon: Calendar, label: 'Meetings', path: '/meetings' },
+          { icon: Sparkles, label: 'Events', path: '/events' },
+          { icon: Package, label: 'Inventory', path: '/inventory' },
+        ],
+      },
+      {
+        id: 'growth',
+        label: 'Growth & Community',
+        items: [
+          { icon: GitBranchPlus, label: 'Mentorship Ops', path: '/hierarchy' },
+          { icon: BookOpenCheck, label: 'Learning Hub', path: '/learning' },
+          { icon: PanelsTopLeft, label: 'Programs Hub', path: '/programs' },
+          { icon: Users, label: 'Community', path: '/community' },
+        ],
+      },
+      {
+        id: 'operations',
+        label: 'Operations',
+        items: [
+          ...(isStrictAdmin ? [{ icon: Radio, label: 'Collab Stream', path: '/communication' }] : []),
+          ...(isAdminOrHead ? [{ icon: ShieldCheck, label: 'Admin Panel', path: '/admin' }] : []),
+        ],
+      },
+      {
+        id: 'account',
+        label: 'Account',
+        items: [
+          { icon: UserSquare2, label: 'Profile', path: '/profile' },
+          { icon: FileText, label: 'Guidelines', path: '/guidelines' },
+        ],
+      },
     ],
-    [isStrictAdmin]
+    [isAdminOrHead, isStrictAdmin]
   );
+
+  const navLinks = useMemo(() => navGroups.flatMap((group) => group.items), [navGroups]);
+
+  useEffect(() => {
+    const activeGroup = navGroups.find((group) =>
+      group.items.some((item) => isRouteActive(item.path))
+    );
+    if (!activeGroup) return;
+
+    setOpenNavGroups((prev) =>
+      prev[activeGroup.id]
+        ? prev
+        : {
+            ...prev,
+            [activeGroup.id]: true,
+          }
+    );
+  }, [isRouteActive, navGroups]);
 
   const commandItems = useMemo(() => {
     const primary = navLinks.map((item) => ({
@@ -373,6 +424,14 @@ export default function Layout() {
         icon: BookOpenCheck,
         keywords: 'learning hub upskill juniors track',
         onSelect: () => navigate('/learning'),
+      },
+      {
+        id: 'cmd-programs',
+        label: 'Open Programs Hub',
+        subtitle: 'Quests, mentor desk, badges, ideas, office hours',
+        icon: PanelsTopLeft,
+        keywords: 'programs quests mentor badges ideas office hours',
+        onSelect: () => navigate('/programs'),
       },
       {
         id: 'cmd-profile',
@@ -496,39 +555,70 @@ export default function Layout() {
       </div>
       
       {/* Main Navigation */}
-      <nav className="flex-1 space-y-2">
-        {navLinks.map((link) => (
-          <NavLink key={link.path} to={link.path} onClick={closeNavigationPanels}>
-            <motion.div
-              whileHover={{ x: 5 }}
-              className={`flex items-center justify-between p-3 rounded-xl transition-colors ${
-                isRouteActive(link.path) ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800'
-              }`}
-            >
-              <div className="flex items-center space-x-3">
-                <link.icon size={20} />
-                <span className="font-medium">{link.label}</span>
-              </div>
-              {link.path === '/communication' && hasUnreadChat && (
-                <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" title="Unread messages" />
-              )}
-            </motion.div>
-          </NavLink>
-        ))}
+      <nav className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2.5">
+        {navGroups.map((group) => {
+          if (!group.items.length) return null;
+          const open = !!openNavGroups[group.id];
+          const groupHasActive = group.items.some((item) => isRouteActive(item.path));
 
-        {/* Admin Link (Conditional) */}
-        {(user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'head') && (
-          <div className="pt-4 mt-4 border-t border-gray-800/50">
-            <NavLink to="/admin" onClick={closeNavigationPanels}>
-              <div className={`flex items-center space-x-3 p-3 rounded-xl transition-colors ${
-                isRouteActive('/admin') ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-800'
-              }`}>
-                <ShieldCheck size={20} />
-                <span className="font-medium">Admin Panel</span>
-              </div>
-            </NavLink>
-          </div>
-        )}
+          return (
+            <section key={group.id} className="border border-gray-800/70 rounded-2xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() =>
+                  setOpenNavGroups((prev) => ({
+                    ...prev,
+                    [group.id]: !prev[group.id],
+                  }))
+                }
+                className={`w-full px-3 py-2.5 inline-flex items-center justify-between transition-colors ${
+                  groupHasActive ? 'bg-blue-500/10 text-blue-100' : 'text-gray-300 hover:text-white hover:bg-gray-900/70'
+                }`}
+              >
+                <span className="text-[10px] uppercase tracking-[0.16em] font-black">{group.label}</span>
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform duration-300 ${open ? 'rotate-180 text-blue-300' : 'rotate-0 text-gray-500'}`}
+                />
+              </button>
+
+              <AnimatePresence initial={false}>
+                {open && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                    className="border-t border-gray-800/70"
+                  >
+                    <div className="p-2 space-y-1.5">
+                      {group.items.map((link) => (
+                        <NavLink key={link.path} to={link.path} onClick={closeNavigationPanels}>
+                          <motion.div
+                            whileHover={{ x: 4 }}
+                            className={`flex items-center justify-between p-2.5 rounded-xl transition-colors ${
+                              isRouteActive(link.path)
+                                ? 'bg-blue-600 text-white shadow-lg'
+                                : 'text-gray-400 hover:bg-gray-800/80 hover:text-gray-100'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <link.icon size={18} />
+                              <span className="text-sm font-medium">{link.label}</span>
+                            </div>
+                            {link.path === '/communication' && hasUnreadChat && (
+                              <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" title="Unread messages" />
+                            )}
+                          </motion.div>
+                        </NavLink>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </section>
+          );
+        })}
       </nav>
 
       {/* Footer Profile Section (This acts as the link to /profile) */}
