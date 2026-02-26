@@ -20,7 +20,7 @@ import PageHeader from '../components/PageHeader';
 import { 
   Shield, Trash2, UserPlus, Copy, Check, 
   Search, Mail, Send, Loader2, UserCheck, GraduationCap, Fingerprint,
-  ClipboardCheck, Crown, KeyRound, Megaphone, ScrollText, Download, ArrowUpDown, UserCog, GripVertical
+  ClipboardCheck, Crown, KeyRound, Megaphone, ScrollText, Download, ArrowUpDown, UserCog, GripVertical, ShieldAlert, X
 } from 'lucide-react';
 
 const APPLICATION_STATUSES = ['New', 'InReview', 'Interview', 'Accepted', 'Selected', 'Rejected'];
@@ -59,6 +59,14 @@ const statusBadgeClass = (status) => {
   if (status === 'Interview') return 'text-amber-300 border-amber-500/40 bg-amber-500/10';
   if (status === 'Rejected') return 'text-rose-300 border-rose-500/40 bg-rose-500/10';
   return 'text-gray-300 border-gray-700 bg-gray-800/30';
+};
+
+const dispatchToast = (message, type = 'info') => {
+  try {
+    window.dispatchEvent(new CustomEvent('app:toast', { detail: { message, type } }));
+  } catch {
+    window.alert(message);
+  }
 };
 
 export default function AdminPanel() {
@@ -113,6 +121,13 @@ export default function AdminPanel() {
   const [auditRows, setAuditRows] = useState([]);
   const [auditLoading, setAuditLoading] = useState(true);
   const [broadcastBusy, setBroadcastBusy] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    user: null,
+    typedPhrase: '',
+    submitting: false,
+    error: '',
+  });
   const [broadcastForm, setBroadcastForm] = useState({
     title: '',
     message: '',
@@ -152,9 +167,30 @@ export default function AdminPanel() {
     localStorage.setItem(FILTER_PRESET_KEY, JSON.stringify(savedViews));
   }, [savedViews]);
 
+  useEffect(() => {
+    if (!deleteDialog.open) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeDeleteDialog();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [deleteDialog.open]);
+
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const currentUser = profile.result || profile;
   const currentUserId = String(currentUser?._id || '');
+  const requiredDeletePhrase = useMemo(() => {
+    const targetName = String(deleteDialog.user?.name || '').trim();
+    return targetName ? `remove ${targetName}` : '';
+  }, [deleteDialog.user]);
+  const isDeletePhraseValid = useMemo(
+    () =>
+      String(deleteDialog.typedPhrase || '').trim() === String(requiredDeletePhrase || ''),
+    [deleteDialog.typedPhrase, requiredDeletePhrase]
+  );
 
   const loadUsers = async () => {
     try {
@@ -231,22 +267,64 @@ export default function AdminPanel() {
     }
   };
 
-  const handleDelete = async (userId) => {
-    if (String(userId) === currentUserId) {
-      alert('You cannot delete your own account from admin panel.');
+  const openDeleteDialog = (targetUser) => {
+    if (!targetUser?._id) return;
+    if (String(targetUser._id) === currentUserId) {
+      dispatchToast('You cannot delete your own account from admin panel.', 'error');
       return;
     }
-    if (!window.confirm("Are you sure? This action is permanent.")) return;
+
+    setDeleteDialog({
+      open: true,
+      user: targetUser,
+      typedPhrase: '',
+      submitting: false,
+      error: '',
+    });
+  };
+
+  const closeDeleteDialog = (force = false) => {
+    setDeleteDialog((prev) => {
+      if (prev.submitting && !force) return prev;
+      return {
+        open: false,
+        user: null,
+        typedPhrase: '',
+        submitting: false,
+        error: '',
+      };
+    });
+  };
+
+  const confirmDeleteFromDialog = async () => {
+    const target = deleteDialog.user;
+    if (!target?._id) return;
+
+    if (!isDeletePhraseValid) {
+      setDeleteDialog((prev) => ({
+        ...prev,
+        error: `Type "${requiredDeletePhrase}" exactly to continue.`,
+      }));
+      return;
+    }
+
+    setDeleteDialog((prev) => ({ ...prev, submitting: true, error: '' }));
     try {
-      const { data } = await deleteUser(userId);
+      const { data } = await deleteUser(target._id);
       if (data?.requiresApproval) {
-        alert(data.message);
-        loadPendingActions();
-        return;
+        dispatchToast(data.message || 'Delete request requires approval.', 'info');
+        await loadPendingActions();
+      } else {
+        setUsers((prev) => prev.filter((u) => String(u._id) !== String(target._id)));
+        dispatchToast(`Removed ${target.name || 'user'} successfully.`, 'success');
       }
-      setUsers(users.filter(u => u._id !== userId));
+      closeDeleteDialog(true);
     } catch (err) {
-      alert(err.response?.data?.message || "Error deleting user");
+      setDeleteDialog((prev) => ({
+        ...prev,
+        submitting: false,
+        error: err.response?.data?.message || 'Unable to delete user.',
+      }));
     }
   };
 
@@ -487,14 +565,15 @@ export default function AdminPanel() {
   };
 
   const handleExportUsers = () => {
-    const headers = ['Name', 'CollegeID', 'Email', 'Role', 'Year', 'Approval'];
+    const headers = ['Name', 'College ID', 'Email ID', 'Year', 'Batch', 'Branch', 'Contact Number'];
     const rows = sortedUsers.map((row) => [
       row.name || '',
       row.collegeId || '',
       row.email || '',
-      row.role || '',
       row.year || '',
-      row.approvalStatus || (row.isVerified ? 'Approved' : 'Pending'),
+      row.batch || '',
+      row.branch || '',
+      row.phone || '',
     ]);
     const csv = [headers, ...rows]
       .map((line) => line.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
@@ -1397,7 +1476,7 @@ export default function AdminPanel() {
                             </button>
                             {!['admin', 'head'].includes(String(u.role || '').toLowerCase()) && (
                               <button
-                                onClick={() => handleDelete(u._id)}
+                                onClick={() => openDeleteDialog(u)}
                                 disabled={String(u._id) === currentUserId}
                                 className="p-2.5 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all disabled:opacity-40"
                                 title={String(u._id) === currentUserId ? 'Self-deletion is blocked' : 'Delete user'}
@@ -1428,6 +1507,128 @@ export default function AdminPanel() {
           />
         </>
       )}
+
+      <AnimatePresence>
+        {deleteDialog.open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] bg-[#03040a]/80 backdrop-blur-sm px-4 py-8 overflow-y-auto"
+            onClick={() => closeDeleteDialog()}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 14, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-user-title"
+              className="mx-auto w-full max-w-2xl border border-red-500/25 bg-[#07090f] rounded-[1.75rem] shadow-[0_30px_80px_-30px_rgba(255,0,0,0.45)]"
+            >
+              <div className="flex items-center justify-between gap-3 px-6 md:px-8 py-5 border-b border-red-500/20">
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl border border-red-500/40 bg-red-500/10">
+                    <ShieldAlert size={18} className="text-red-300" />
+                  </span>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-red-300/85">
+                      Destructive action
+                    </p>
+                    <h3 id="delete-user-title" className="text-lg md:text-xl font-black tracking-tight text-white">
+                      Confirm User Removal
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => closeDeleteDialog()}
+                  disabled={deleteDialog.submitting}
+                  className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40"
+                  aria-label="Close delete dialog"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="px-6 md:px-8 py-6 space-y-5">
+                <p className="text-sm leading-relaxed text-gray-300">
+                  This permanently removes the member account and cannot be undone. To continue, type the exact
+                  verification phrase below.
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-3 text-xs">
+                  <div className="rounded-xl border border-gray-800 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Name</p>
+                    <p className="mt-1 font-bold text-gray-100">{deleteDialog.user?.name || 'Unknown User'}</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-800 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">College ID</p>
+                    <p className="mt-1 font-bold text-gray-100">{deleteDialog.user?.collegeId || 'N/A'}</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-800 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Role</p>
+                    <p className="mt-1 font-bold text-gray-100">{deleteDialog.user?.role || 'User'}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-[0.22em] text-gray-400">Required Phrase</p>
+                  <div className="rounded-xl border border-gray-700 bg-[#05070c] px-4 py-3 text-sm font-mono text-red-200 break-all">
+                    {requiredDeletePhrase || 'remove user'}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="delete-phrase-input" className="text-[10px] uppercase tracking-[0.22em] text-gray-400">
+                    Type Phrase To Confirm
+                  </label>
+                  <input
+                    id="delete-phrase-input"
+                    type="text"
+                    value={deleteDialog.typedPhrase}
+                    onChange={(event) =>
+                      setDeleteDialog((prev) => ({
+                        ...prev,
+                        typedPhrase: event.target.value,
+                        error: '',
+                      }))
+                    }
+                    placeholder={requiredDeletePhrase || 'remove username'}
+                    className="w-full rounded-xl border border-gray-700 bg-transparent px-4 py-3 text-sm text-white outline-none transition-colors focus:border-red-400/60"
+                    autoFocus
+                  />
+                  {deleteDialog.error && (
+                    <p className="text-xs font-medium text-red-300">{deleteDialog.error}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 px-6 md:px-8 py-5 border-t border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => closeDeleteDialog()}
+                  disabled={deleteDialog.submitting}
+                  className="px-4 py-2 rounded-xl border border-gray-700 text-xs font-black uppercase tracking-[0.18em] text-gray-300 hover:text-white hover:border-gray-500 transition-colors disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteFromDialog}
+                  disabled={deleteDialog.submitting || !isDeletePhraseValid}
+                  className="px-5 py-2.5 rounded-xl border border-red-500/50 bg-red-500/15 text-xs font-black uppercase tracking-[0.18em] text-red-100 hover:bg-red-500/25 transition-colors disabled:opacity-40 inline-flex items-center gap-2"
+                >
+                  {deleteDialog.submitting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  Remove User
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
