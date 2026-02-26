@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Project = require('../models/Project');
 const mongoose = require('mongoose');
 const { geminiGenerate } = require('../utils/geminiClient');
+const { createNotifications } = require('../utils/notificationService');
 
 const sseClients = new Map();
 const userLastMessageAt = new Map();
@@ -320,7 +321,7 @@ const createMessage = async (req, res) => {
 
   const mentionCollegeIds = parseMentionCollegeIds(text);
   const mentionUsers = mentionCollegeIds.length
-    ? await User.find({ collegeId: { $in: mentionCollegeIds } }).select('_id')
+    ? await User.find({ collegeId: { $in: mentionCollegeIds } }).select('_id role')
     : [];
 
   let replyTo = undefined;
@@ -352,6 +353,29 @@ const createMessage = async (req, res) => {
   const fullMessage = await CommunicationMessage.findById(created._id)
     .populate('sender', 'name collegeId role')
     .populate('mentions', 'name collegeId');
+
+  const mentionRecipientIds = mentionUsers
+    .filter((row) => {
+      const role = String(row.role || '').toLowerCase();
+      return role === 'admin' || role === 'head';
+    })
+    .map((row) => String(row._id))
+    .filter((id) => id && id !== String(req.user._id));
+  if (mentionRecipientIds.length > 0) {
+    await createNotifications({
+      userIds: mentionRecipientIds,
+      title: `Mentioned by ${req.user.name || 'Member'}`,
+      message: String(text).slice(0, 220),
+      type: 'action',
+      link: '/communication',
+      meta: {
+        mention: true,
+        conversationId,
+        messageId: created._id,
+      },
+      createdBy: req.user._id,
+    });
+  }
 
   const payload = serializeMessage(fullMessage);
   broadcast('new-message', payload, conversationId);

@@ -1,16 +1,36 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Calendar as CalendarIcon, MapPin, Video, Users as UsersIcon, 
-  Clock, ArrowLeft, Check, Loader2, Info, Globe
-} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Calendar as CalendarIcon, Check, Loader2, MapPin, Users as UsersIcon, Video } from 'lucide-react';
 import { fetchDirectoryMembers, scheduleMeeting } from '../api';
+import FormField from '../components/FormField';
+import useDraftForm from '../hooks/useDraftForm';
+import useUnsavedChangesWarning from '../hooks/useUnsavedChangesWarning';
+
+const INITIAL_FORM = {
+  title: '',
+  meetingType: 'Online',
+  topic: '',
+  location: '',
+  startTime: '',
+  endTime: '',
+  participants: [],
+};
+
+const dispatchToast = (message, type = 'info') => {
+  try {
+    window.dispatchEvent(new CustomEvent('app:toast', { detail: { message, type } }));
+  } catch {
+    window.alert(message);
+  }
+};
 
 export default function ScheduleMeeting() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const userData = profile.result || profile;
   const role = String(userData.role || '').toLowerCase();
@@ -18,86 +38,116 @@ export default function ScheduleMeeting() {
   const userYear = Number(userData.year);
   const isSenior = Number.isFinite(userYear) && userYear >= 2;
   const canSchedule = isAdminOrHead || isSenior;
-  
-  const [formData, setFormData] = useState({
-    title: '',
-    meetingType: 'Online',
-    topic: '',
-    location: '',
-    startTime: '',
-    endTime: '',
-    participants: []
+
+  const { values: formData, setValues: setFormData, isDirty, lastSavedAt, resetForm } = useDraftForm({
+    storageKey: `draft_schedule_meeting_${String(userData._id || userData.collegeId || 'member')}`,
+    initialValues: INITIAL_FORM,
   });
+  useUnsavedChangesWarning(isDirty);
 
   useEffect(() => {
     const loadUsers = async () => {
       try {
         const { data } = await fetchDirectoryMembers();
-        setUsers(data);
-      } catch (err) {
-        console.error("Could not load users", err);
+        setUsers(Array.isArray(data) ? data : []);
+      } catch {
+        setUsers([]);
       }
     };
     loadUsers();
   }, []);
 
-  const eligibleUsers = isAdminOrHead
-    ? users
-    : users.filter((u) => {
-        const yr = Number(u.year);
-        if (!Number.isFinite(yr)) return false;
-        return Number.isFinite(userYear) && yr <= userYear;
-      });
+  useEffect(() => {
+    if (searchParams.get('quick') === 'create') {
+      document.getElementById('meeting-title')?.focus();
+    }
+  }, [searchParams]);
+
+  const eligibleUsers = useMemo(
+    () =>
+      isAdminOrHead
+        ? users
+        : users.filter((u) => {
+            const yr = Number(u.year);
+            if (!Number.isFinite(yr)) return false;
+            return Number.isFinite(userYear) && yr <= userYear;
+          }),
+    [isAdminOrHead, users, userYear]
+  );
+
+  const updateField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }));
+  };
 
   const toggleParticipant = (userId) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       participants: prev.participants.includes(userId)
-        ? prev.participants.filter(id => id !== userId)
-        : [...prev.participants, userId]
+        ? prev.participants.filter((id) => id !== userId)
+        : [...prev.participants, userId],
     }));
+    if (errors.participants) setErrors((prev) => ({ ...prev, participants: '' }));
+  };
+
+  const validate = () => {
+    const next = {};
+    if (String(formData.title || '').trim().length < 4) next.title = 'Title must be at least 4 characters.';
+    if (String(formData.topic || '').trim().length < 3) next.topic = 'Topic is required.';
+    if (String(formData.location || '').trim().length < 3) next.location = 'Meeting location or link is required.';
+    if (!formData.startTime) next.startTime = 'Start date/time is required.';
+    if (!formData.endTime) next.endTime = 'End date/time is required.';
+    if (formData.startTime && formData.endTime && new Date(formData.endTime) <= new Date(formData.startTime)) {
+      next.endTime = 'End time must be after start time.';
+    }
+    if (!Array.isArray(formData.participants) || formData.participants.length === 0) {
+      next.participants = 'Select at least one participant.';
+    }
+    return next;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!canSchedule) {
-      alert('Only seniors (2nd year+) can schedule meetings.');
+      dispatchToast('Only seniors (2nd year+) can schedule meetings.', 'error');
       return;
     }
+
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
     setLoading(true);
     try {
       const payload = {
         ...formData,
-        details: { topic: formData.topic, location: formData.location }
+        details: { topic: formData.topic, location: formData.location },
       };
       await scheduleMeeting(payload);
+      dispatchToast('Meeting scheduled successfully.', 'success');
+      resetForm(INITIAL_FORM);
       navigate('/meetings');
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to schedule meeting");
+      dispatchToast(err.response?.data?.message || 'Failed to schedule meeting.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="max-w-5xl mx-auto pb-20 px-4 page-motion-d"
-    >
-      {/* Header Section */}
+    <div className="ui-page max-w-5xl mx-auto pb-20 px-4 page-motion-d">
       <div className="flex items-center justify-between mb-10 section-motion section-motion-delay-1">
-        <button 
+        <button
           onClick={() => navigate('/meetings')}
           className="group flex items-center gap-2 text-gray-400 hover:text-white transition-all px-4 py-2 rounded-full border border-gray-800"
         >
-          <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" /> 
+          <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
           <span className="text-sm font-medium">Back</span>
         </button>
-        
+
         <div className="text-right">
-          <h2 className="text-3xl font-black tracking-tight text-white">Create Event</h2>
-          <p className="text-gray-500 text-sm">Fill in the details to sync with the community</p>
+          <h2 className="text-3xl font-black tracking-tight text-white">Schedule Meeting</h2>
+          <p className="text-gray-500 text-sm">Structured planning with autosaved drafts and validation.</p>
         </div>
       </div>
 
@@ -108,177 +158,138 @@ export default function ScheduleMeeting() {
       )}
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8 section-motion section-motion-delay-2">
-        
-        {/* Left Column: Form Inputs */}
         <div className="lg:col-span-2 space-y-6">
-          <section className="backdrop-blur-xl border border-gray-800 p-8 rounded-[2rem] shadow-2xl space-y-8 pro-hover-lift">
-            <div className="flex items-center gap-3 border-b border-gray-800 pb-5">
-              <div className="p-2 bg-blue-600/20 rounded-lg text-blue-500">
-                <Info size={20} />
-              </div>
-              <h3 className="font-bold text-lg">General Information</h3>
+          <section className="border border-gray-800 p-6 md:p-8 rounded-[2rem] space-y-5 pro-hover-lift">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="font-bold text-lg inline-flex items-center gap-2"><CalendarIcon size={18} className="text-blue-400" /> Meeting Details</h3>
+              {lastSavedAt ? (
+                <span className="text-[10px] uppercase tracking-widest text-gray-500">
+                  Draft saved {new Date(lastSavedAt).toLocaleTimeString()}
+                </span>
+              ) : null}
             </div>
 
-            <div className="space-y-6">
-              <div className="group space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Event Title</label>
-                <input 
-                  required
-                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600/50 focus:border-blue-600 transition-all text-white placeholder:text-gray-700"
-                  placeholder="What is this meeting about?"
-                  onChange={e => setFormData({...formData, title: e.target.value})}
+            <FormField id="meeting-title" label="Event Title" required error={errors.title}>
+              <input
+                id="meeting-title"
+                value={formData.title}
+                onChange={(e) => updateField('title', e.target.value)}
+                className="ui-input"
+                placeholder="What is this meeting about?"
+                maxLength={140}
+              />
+            </FormField>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField id="meeting-type" label="Meeting Type" required>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateField('meetingType', 'Online')}
+                    className={`btn ${formData.meetingType === 'Online' ? 'btn-primary' : 'btn-ghost'}`}
+                  >
+                    <Video size={14} /> Online
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateField('meetingType', 'Offline')}
+                    className={`btn ${formData.meetingType === 'Offline' ? 'btn-primary' : 'btn-ghost'}`}
+                  >
+                    <MapPin size={14} /> Offline
+                  </button>
+                </div>
+              </FormField>
+
+              <FormField id="meeting-topic" label="Topic" required error={errors.topic}>
+                <input
+                  id="meeting-topic"
+                  value={formData.topic}
+                  onChange={(e) => updateField('topic', e.target.value)}
+                  className="ui-input"
+                  placeholder="Core agenda topic"
                 />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Meeting Type</label>
-                  <div className="flex p-1 bg-[#0a0a0c] border border-gray-800 rounded-2xl">
-                    <button 
-                      type="button"
-                      onClick={() => setFormData({...formData, meetingType: 'Online'})}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${formData.meetingType === 'Online' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-500 hover:text-gray-300'}`}
-                    >
-                      <Globe size={16} /> Online
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setFormData({...formData, meetingType: 'Offline'})}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${formData.meetingType === 'Offline' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-500 hover:text-gray-300'}`}
-                    >
-                      <MapPin size={16} /> In-Person
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Topic</label>
-                  <input 
-                    required
-                    className="w-full bg-[#0a0a0c] border border-gray-800 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600/50 focus:border-blue-600 transition-all text-white placeholder:text-gray-700"
-                    placeholder="Core agenda topic"
-                    onChange={e => setFormData({...formData, topic: e.target.value})}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
-                  {formData.meetingType === 'Online' ? 'Meeting Link' : 'Venue / Room Name'}
-                </label>
-                <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600">
-                    {formData.meetingType === 'Online' ? <Video size={18} /> : <MapPin size={18} />}
-                  </div>
-                  <input 
-                    required
-                    className="w-full bg-[#0a0a0c] border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600/50 focus:border-blue-600 transition-all text-white"
-                    placeholder={formData.meetingType === 'Online' ? 'https://zoom.us/j/...' : 'Hall A, 2nd Floor'}
-                    onChange={e => setFormData({...formData, location: e.target.value})}
-                  />
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="backdrop-blur-xl border border-gray-800 p-8 rounded-[2rem] shadow-2xl space-y-6 pro-hover-lift">
-            <div className="flex items-center gap-3 border-b border-gray-800 pb-5">
-              <div className="p-2 bg-purple-600/20 rounded-lg text-purple-500">
-                <CalendarIcon size={20} />
-              </div>
-              <h3 className="font-bold text-lg">Schedule & Time</h3>
+              </FormField>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2">
-                  <Clock size={14} className="text-purple-500" /> Starts
-                </label>
-                <div className="relative group">
-                  <input 
-                    type="datetime-local"
-                    required
-                    className="w-full bg-[#0a0a0c] border border-gray-800 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-purple-600/50 focus:border-purple-600 transition-all text-white [color-scheme:dark]"
-                    onChange={e => setFormData({...formData, startTime: e.target.value})}
-                  />
-                </div>
-              </div>
+            <FormField
+              id="meeting-location"
+              label={formData.meetingType === 'Online' ? 'Meeting Link' : 'Venue / Room'}
+              required
+              error={errors.location}
+            >
+              <input
+                id="meeting-location"
+                value={formData.location}
+                onChange={(e) => updateField('location', e.target.value)}
+                className="ui-input"
+                placeholder={formData.meetingType === 'Online' ? 'https://meet.google.com/...' : 'Room / Hall name'}
+              />
+            </FormField>
 
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2">
-                  <Clock size={14} className="text-purple-500" /> Ends
-                </label>
-                <input 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField id="meeting-start" label="Starts" required error={errors.startTime}>
+                <input
+                  id="meeting-start"
                   type="datetime-local"
-                  required
-                  className="w-full bg-[#0a0a0c] border border-gray-800 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-purple-600/50 focus:border-purple-600 transition-all text-white [color-scheme:dark]"
-                  onChange={e => setFormData({...formData, endTime: e.target.value})}
+                  value={formData.startTime}
+                  onChange={(e) => updateField('startTime', e.target.value)}
+                  className="ui-input [color-scheme:dark]"
                 />
-              </div>
+              </FormField>
+              <FormField id="meeting-end" label="Ends" required error={errors.endTime}>
+                <input
+                  id="meeting-end"
+                  type="datetime-local"
+                  value={formData.endTime}
+                  onChange={(e) => updateField('endTime', e.target.value)}
+                  className="ui-input [color-scheme:dark]"
+                />
+              </FormField>
             </div>
-            <p className="text-[10px] text-gray-600 italic mt-2">* Selecting dates via the calendar icon in the input field ensures better accuracy.</p>
           </section>
         </div>
 
-        {/* Right Column: Participant Selection */}
-        <div className="lg:col-span-1 space-y-6">
-          <section className="backdrop-blur-xl border border-gray-800 p-6 rounded-[2rem] h-full flex flex-col pro-hover-lift">
-            <div className="flex justify-between items-center mb-6">
+        <div className="lg:col-span-1">
+          <section className="border border-gray-800 p-5 rounded-[1.6rem] h-full flex flex-col pro-hover-lift">
+            <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg flex items-center gap-2">
-                <UsersIcon className="text-blue-500" size={20} /> Guests
+                <UsersIcon className="text-blue-500" size={18} /> Participants
               </h3>
-              <span className="bg-blue-600/20 text-blue-500 text-[10px] font-black px-2 py-1 rounded-md">
-                {formData.participants.length} SELECTED
-              </span>
+              <span className="text-[10px] uppercase tracking-widest text-blue-300">{formData.participants.length} selected</span>
             </div>
-
-            <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar" style={{maxHeight: '480px'}}>
-              {eligibleUsers.map((u, index) => (
-                <motion.div 
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
+            <div className="flex-1 space-y-2.5 overflow-y-auto pr-2 custom-scrollbar" style={{ maxHeight: '480px' }}>
+              {eligibleUsers.map((u) => (
+                <div
                   key={u._id}
                   onClick={() => toggleParticipant(u._id)}
-                  className={`group flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all ${
-                    formData.participants.includes(u._id) 
-                    ? 'border-blue-600 bg-blue-600/10 shadow-[0_0_15px_rgba(37,99,235,0.1)]' 
-                    : 'border-gray-800 bg-[#0a0a0c] hover:border-gray-600'
+                  className={`group flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                    formData.participants.includes(u._id)
+                      ? 'border-blue-600 bg-blue-600/10'
+                      : 'border-gray-800 bg-[#0a0a0c] hover:border-gray-600'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${formData.participants.includes(u._id) ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400'}`}>
-                      {u.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className={`text-sm font-bold transition-colors ${formData.participants.includes(u._id) ? 'text-white' : 'text-gray-400'}`}>{u.name}</p>
-                      <p className="text-[10px] text-gray-600 uppercase tracking-tighter">{u.role}</p>
-                    </div>
+                  <div>
+                    <p className={`text-sm font-bold ${formData.participants.includes(u._id) ? 'text-white' : 'text-gray-400'}`}>{u.name}</p>
+                    <p className="text-[10px] text-gray-600 uppercase tracking-widest">{u.role}</p>
                   </div>
-                  <AnimatePresence>
-                    {formData.participants.includes(u._id) && (
-                      <motion.div 
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        exit={{ scale: 0 }}
-                      >
-                        <Check size={16} className="text-blue-500" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
+                  {formData.participants.includes(u._id) ? <Check size={16} className="text-blue-400" /> : null}
+                </div>
               ))}
             </div>
-
-            <button 
-              disabled={loading || !canSchedule}
-              className="mt-8 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-800 disabled:text-gray-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20 flex justify-center items-center gap-3"
-            >
-              {loading ? <Loader2 className="animate-spin" /> : "Confirm Schedule"}
-            </button>
+            {errors.participants ? <p className="ui-field-error mt-2">{errors.participants}</p> : null}
           </section>
         </div>
+
+        <div className="lg:col-span-3 mobile-sticky-action">
+          <button
+            type="submit"
+            disabled={loading || !canSchedule}
+            className="w-full btn btn-primary !py-4 !text-sm disabled:opacity-60"
+          >
+            {loading ? <Loader2 className="animate-spin" size={16} /> : 'Confirm Schedule'}
+          </button>
+        </div>
       </form>
-    </motion.div>
+    </div>
   );
 }

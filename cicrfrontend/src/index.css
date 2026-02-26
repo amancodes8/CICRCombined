@@ -383,6 +383,54 @@ a {
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
 }
 
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+}
+
+.ui-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-2);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.ui-label-required {
+  color: #fca5a5;
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  padding: 0.08rem 0.38rem;
+  border-radius: 999px;
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+}
+
+.ui-label-optional {
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 0.08rem 0.38rem;
+  border-radius: 999px;
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+}
+
+.ui-field-hint {
+  margin: 0;
+  color: var(--text-4);
+  font-size: 0.72rem;
+}
+
+.ui-field-error {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
 .btn {
   border-radius: var(--radius-md);
   border: 1px solid transparent;

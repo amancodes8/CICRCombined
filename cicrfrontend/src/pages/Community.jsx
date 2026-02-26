@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangle,
@@ -122,7 +122,11 @@ const buildIssueTimeline = (issue = {}) => {
 };
 
 export default function Community() {
-  const [activeTab, setActiveTab] = useState('feed');
+  const [searchParams] = useSearchParams();
+  const issueSectionRef = useRef(null);
+  const issueTitleRef = useRef(null);
+  const initialTab = ['feed', 'directory', 'issues'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'feed';
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [loading, setLoading] = useState(true);
 
   const [posts, setPosts] = useState([]);
@@ -179,6 +183,20 @@ export default function Community() {
 
     loadData();
   }, [isStrictAdmin]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab && ['feed', 'directory', 'issues'].includes(requestedTab)) {
+      setActiveTab(requestedTab);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (activeTab !== 'issues') return;
+    if (searchParams.get('quick') !== 'create-issue') return;
+    issueSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => issueTitleRef.current?.focus(), 180);
+  }, [activeTab, searchParams]);
 
   const branchOptions = useMemo(() => {
     const values = new Set(
@@ -754,7 +772,7 @@ export default function Community() {
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-              <section className="xl:col-span-5 border border-gray-800 rounded-[1.8rem] p-5 md:p-6 pro-hover-lift">
+              <section ref={issueSectionRef} className="xl:col-span-5 border border-gray-800 rounded-[1.8rem] p-5 md:p-6 pro-hover-lift">
                 <h4 className="text-sm font-black uppercase tracking-[0.18em] text-gray-200 inline-flex items-center gap-2">
                   <Bug size={14} className="text-rose-300" />
                   New Issue
@@ -762,6 +780,7 @@ export default function Community() {
 
                 <form onSubmit={handleIssueSubmit} className="mt-4 space-y-3">
                   <input
+                    ref={issueTitleRef}
                     value={issueForm.title}
                     onChange={(e) => setIssueForm((prev) => ({ ...prev, title: e.target.value }))}
                     placeholder="Issue title"

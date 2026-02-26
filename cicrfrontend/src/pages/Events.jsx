@@ -1,12 +1,25 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarDays, CheckCircle2, Clock4, MapPin, Plus, Sparkles, Trash2, Users } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { createEvent, deleteEvent, fetchEvents, updateEvent } from '../api';
+import FormField from '../components/FormField';
 import PageHeader from '../components/PageHeader';
 import { DataEmpty, DataLoading } from '../components/DataState';
+import useDraftForm from '../hooks/useDraftForm';
+import useUnsavedChangesWarning from '../hooks/useUnsavedChangesWarning';
 
 const EVENT_TYPES = ['Orientation', 'Workshop', 'Recruitment', 'Competition', 'Seminar', 'Internal'];
+const INITIAL_EVENT_FORM = {
+  title: '',
+  type: 'Internal',
+  location: '',
+  startTime: '',
+  endTime: '',
+  description: '',
+  allowApplications: false,
+  applicationDeadline: '',
+};
 
 const dispatchToast = (message, type = 'info') => {
   try {
@@ -29,24 +42,23 @@ const fmtTime = (value) => {
 };
 
 export default function Events() {
+  const [searchParams] = useSearchParams();
+  const createFormRef = useRef(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({
-    title: '',
-    type: 'Internal',
-    location: '',
-    startTime: '',
-    endTime: '',
-    description: '',
-    allowApplications: false,
-    applicationDeadline: '',
-  });
+  const [errors, setErrors] = useState({});
 
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const user = profile.result || profile;
   const role = String(user.role || '').toLowerCase();
   const isAdminOrHead = role === 'admin' || role === 'head';
+
+  const { values: form, setValues: setForm, isDirty, lastSavedAt, resetForm } = useDraftForm({
+    storageKey: `draft_events_create_${String(user._id || user.collegeId || 'member')}`,
+    initialValues: INITIAL_EVENT_FORM,
+  });
+  useUnsavedChangesWarning(isAdminOrHead && isDirty);
 
   const loadEvents = async () => {
     setLoading(true);
@@ -64,14 +76,48 @@ export default function Events() {
     loadEvents();
   }, []);
 
-  const openEvents = useMemo(
-    () => events.filter((event) => event.status === 'Scheduled'),
-    [events]
-  );
+  useEffect(() => {
+    if (!isAdminOrHead) return;
+    if (searchParams.get('quick') !== 'create') return;
+    createFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => document.getElementById('event-title')?.focus(), 160);
+  }, [isAdminOrHead, searchParams]);
+
+  const openEvents = useMemo(() => events.filter((event) => event.status === 'Scheduled'), [events]);
+
+  const updateField = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }));
+  };
+
+  const validate = () => {
+    const next = {};
+    if (String(form.title || '').trim().length < 4) next.title = 'Title must be at least 4 characters.';
+    if (!String(form.location || '').trim()) next.location = 'Location is required.';
+    if (!form.startTime) next.startTime = 'Start time is required.';
+    if (!form.endTime) next.endTime = 'End time is required.';
+    if (form.startTime && form.endTime && new Date(form.endTime) <= new Date(form.startTime)) {
+      next.endTime = 'End time must be after start time.';
+    }
+    if (form.allowApplications && !form.applicationDeadline) {
+      next.applicationDeadline = 'Deadline is required when applications are enabled.';
+    }
+    if (form.allowApplications && form.applicationDeadline && form.startTime) {
+      if (new Date(form.applicationDeadline) > new Date(form.startTime)) {
+        next.applicationDeadline = 'Deadline must be on or before event date.';
+      }
+    }
+    return next;
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!isAdminOrHead) return;
+
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
     setCreating(true);
     try {
       const payload = {
@@ -81,16 +127,7 @@ export default function Events() {
       };
       const { data } = await createEvent(payload);
       setEvents((prev) => [data, ...prev]);
-      setForm({
-        title: '',
-        type: 'Internal',
-        location: '',
-        startTime: '',
-        endTime: '',
-        description: '',
-        allowApplications: false,
-        applicationDeadline: '',
-      });
+      resetForm(INITIAL_EVENT_FORM);
       dispatchToast('Event created.', 'success');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Failed to create event.', 'error');
@@ -142,89 +179,106 @@ export default function Events() {
         />
       </motion.section>
 
-      {isAdminOrHead && (
+      {isAdminOrHead ? (
         <motion.form
+          ref={createFormRef}
           onSubmit={handleCreate}
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.05 }}
           className="border border-gray-800 rounded-[2rem] p-6 md:p-8 space-y-4 section-motion section-motion-delay-2"
         >
-          <div className="flex items-center gap-2 text-xs text-gray-400 uppercase tracking-[0.22em] font-black">
-            <Plus size={14} /> Create Event
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              value={form.title}
-              onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-              placeholder="Event title"
-              className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0b0e13]/60 text-sm text-white outline-none focus:border-blue-500"
-              required
-            />
-            <select
-              value={form.type}
-              onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
-              className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0b0e13]/60 text-sm text-white outline-none focus:border-blue-500"
-            >
-              {EVENT_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-            <input
-              value={form.location}
-              onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
-              placeholder="Location or link"
-              className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0b0e13]/60 text-sm text-white outline-none focus:border-blue-500"
-              required
-            />
-            <input
-              type="datetime-local"
-              value={form.startTime}
-              onChange={(e) => setForm((prev) => ({ ...prev, startTime: e.target.value }))}
-              className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0b0e13]/60 text-sm text-white outline-none focus:border-blue-500"
-              required
-            />
-            <input
-              type="datetime-local"
-              value={form.endTime}
-              onChange={(e) => setForm((prev) => ({ ...prev, endTime: e.target.value }))}
-              className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0b0e13]/60 text-sm text-white outline-none focus:border-blue-500"
-              required
-            />
-            <div className="flex items-center gap-2 border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0b0e13]/60">
-              <input
-                type="checkbox"
-                checked={form.allowApplications}
-                onChange={(e) => setForm((prev) => ({ ...prev, allowApplications: e.target.checked }))}
-              />
-              <span className="text-xs text-gray-300">Allow applications</span>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-gray-400 uppercase tracking-[0.22em] font-black">
+              <Plus size={14} /> Create Event
             </div>
-            <input
-              type="date"
-              value={form.applicationDeadline}
-              onChange={(e) => setForm((prev) => ({ ...prev, applicationDeadline: e.target.value }))}
-              className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0b0e13]/60 text-xs text-gray-300 outline-none focus:border-blue-500"
-              placeholder="Application deadline"
-            />
+            {lastSavedAt ? (
+              <span className="text-[10px] uppercase tracking-widest text-gray-500">
+                Draft autosaved {new Date(lastSavedAt).toLocaleTimeString()}
+              </span>
+            ) : null}
           </div>
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-            placeholder="Event description"
-            rows={3}
-            className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0b0e13]/60 text-sm text-white outline-none focus:border-blue-500"
-          />
-          <button
-            type="submit"
-            disabled={creating}
-            className="inline-flex items-center gap-2 border border-blue-500/40 text-blue-100 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-[0.16em] hover:bg-blue-500/10 disabled:opacity-60"
-          >
-            {creating ? 'Saving...' : 'Create Event'}
-          </button>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField id="event-title" label="Event Title" required error={errors.title}>
+              <input
+                id="event-title"
+                value={form.title}
+                onChange={(e) => updateField('title', e.target.value)}
+                placeholder="Event title"
+                className="ui-input"
+                maxLength={140}
+              />
+            </FormField>
+            <FormField label="Event Type" required>
+              <select value={form.type} onChange={(e) => updateField('type', e.target.value)} className="ui-input">
+                {EVENT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Location / Link" required error={errors.location}>
+              <input
+                value={form.location}
+                onChange={(e) => updateField('location', e.target.value)}
+                placeholder="Location or link"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Starts At" required error={errors.startTime}>
+              <input
+                type="datetime-local"
+                value={form.startTime}
+                onChange={(e) => updateField('startTime', e.target.value)}
+                className="ui-input [color-scheme:dark]"
+              />
+            </FormField>
+            <FormField label="Ends At" required error={errors.endTime}>
+              <input
+                type="datetime-local"
+                value={form.endTime}
+                onChange={(e) => updateField('endTime', e.target.value)}
+                className="ui-input [color-scheme:dark]"
+              />
+            </FormField>
+            <FormField label="Application Deadline" optional error={errors.applicationDeadline}>
+              <input
+                type="date"
+                value={form.applicationDeadline}
+                onChange={(e) => updateField('applicationDeadline', e.target.value)}
+                className="ui-input"
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Description" optional>
+            <textarea
+              value={form.description}
+              onChange={(e) => updateField('description', e.target.value)}
+              placeholder="Event description"
+              rows={3}
+              className="ui-input resize-none"
+            />
+          </FormField>
+
+          <label className="inline-flex items-center gap-2 text-xs text-gray-300">
+            <input
+              type="checkbox"
+              checked={form.allowApplications}
+              onChange={(e) => updateField('allowApplications', e.target.checked)}
+            />
+            Allow applications for this event
+          </label>
+
+          <div className="mobile-sticky-action">
+            <button type="submit" disabled={creating} className="btn btn-primary !px-4 !py-2.5">
+              {creating ? 'Saving...' : 'Create Event'}
+            </button>
+          </div>
         </motion.form>
-      )}
+      ) : null}
 
       {loading ? (
         <div className="h-64 flex items-center justify-center"><DataLoading label="Loading events..." /></div>
@@ -259,58 +313,58 @@ export default function Events() {
                 <div className="flex items-center gap-2">
                   <MapPin size={12} className="text-emerald-400" /> {event.location}
                 </div>
-                {event.allowApplications && (
+                {event.allowApplications ? (
                   <div className="flex items-center gap-2">
                     <Users size={12} className="text-purple-400" /> Applications open until {fmtDate(event.applicationDeadline)}
                   </div>
-                )}
+                ) : null}
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {event.allowApplications && (
+                {event.allowApplications ? (
                   <Link
                     to={`/apply${event._id ? `?event=${event._id}` : ''}`}
                     className="text-[10px] uppercase tracking-widest border border-emerald-500/40 text-emerald-200 px-3 py-1.5 rounded-lg"
                   >
                     Apply
                   </Link>
-                )}
+                ) : null}
 
-                {isAdminOrHead && event.status === 'Scheduled' && (
+                {isAdminOrHead && event.status === 'Scheduled' ? (
                   <button
                     onClick={() => handleStatusUpdate(event._id, 'Completed')}
                     className="text-[10px] uppercase tracking-widest border border-emerald-500/40 text-emerald-200 px-3 py-1.5 rounded-lg inline-flex items-center gap-1"
                   >
                     <CheckCircle2 size={12} /> Complete
                   </button>
-                )}
-                {isAdminOrHead && (
+                ) : null}
+                {isAdminOrHead ? (
                   <button
                     onClick={() => handleStatusUpdate(event._id, 'Cancelled')}
                     className="text-[10px] uppercase tracking-widest border border-rose-500/40 text-rose-200 px-3 py-1.5 rounded-lg"
                   >
                     Cancel
                   </button>
-                )}
-                {isAdminOrHead && (
+                ) : null}
+                {isAdminOrHead ? (
                   <button
                     onClick={() => handleDelete(event._id)}
                     className="text-[10px] uppercase tracking-widest border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg inline-flex items-center gap-1"
                   >
                     <Trash2 size={12} /> Delete
                   </button>
-                )}
+                ) : null}
               </div>
             </motion.article>
           ))}
         </div>
       )}
 
-      {!loading && events.length === 0 && (
+      {!loading && events.length === 0 ? (
         <div className="section-motion section-motion-delay-3">
           <DataEmpty label="No events created yet." />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

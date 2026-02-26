@@ -3,6 +3,27 @@ import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, ClipboardCheck, Loader2 } from 'lucide-react';
 import { createApplication, fetchEvents } from '../api';
+import FormField from '../components/FormField';
+import useDraftForm from '../hooks/useDraftForm';
+import useUnsavedChangesWarning from '../hooks/useUnsavedChangesWarning';
+
+const INITIAL_FORM = {
+  fullName: '',
+  email: '',
+  phone: '',
+  year: '',
+  branch: '',
+  college: '',
+  interests: '',
+  motivation: '',
+  experience: '',
+  availability: '',
+  linkedin: '',
+  github: '',
+  portfolio: '',
+  eventId: '',
+  website: '',
+};
 
 const dispatchToast = (message, type = 'info') => {
   try {
@@ -20,24 +41,13 @@ export default function Apply() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errors, setErrors] = useState({});
 
-  const [form, setForm] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    year: '',
-    branch: '',
-    college: '',
-    interests: '',
-    motivation: '',
-    experience: '',
-    availability: '',
-    linkedin: '',
-    github: '',
-    portfolio: '',
-    eventId: eventParam,
-    website: '',
+  const { values: form, setValues: setForm, isDirty, lastSavedAt, resetForm } = useDraftForm({
+    storageKey: 'draft_public_apply_form',
+    initialValues: { ...INITIAL_FORM, eventId: eventParam },
   });
+  useUnsavedChangesWarning(isDirty);
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -53,13 +63,41 @@ export default function Apply() {
     loadEvents();
   }, []);
 
+  useEffect(() => {
+    if (!eventParam) return;
+    setForm((prev) => ({ ...prev, eventId: eventParam }));
+  }, [eventParam, setForm]);
+
   const selectedEvent = useMemo(
     () => events.find((event) => String(event._id) === String(form.eventId)),
     [events, form.eventId]
   );
 
+  const updateField = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }));
+  };
+
+  const validate = () => {
+    const next = {};
+    if (String(form.fullName || '').trim().length < 3) next.fullName = 'Enter your full name.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(form.email || '').trim())) next.email = 'Enter a valid email address.';
+    if (String(form.phone || '').trim().length < 8) next.phone = 'Enter a valid phone number.';
+    if (String(form.motivation || '').trim().length < 20) next.motivation = 'Motivation must be at least 20 characters.';
+
+    const yearNum = Number(form.year);
+    if (form.year && (!Number.isFinite(yearNum) || yearNum < 1 || yearNum > 6)) {
+      next.year = 'Year must be between 1 and 6.';
+    }
+    return next;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
     setSubmitting(true);
     try {
       const payload = {
@@ -83,6 +121,7 @@ export default function Apply() {
 
       await createApplication(payload);
       setSubmitted(true);
+      resetForm({ ...INITIAL_FORM, eventId: '' });
       dispatchToast('Application submitted successfully.', 'success');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Unable to submit application.', 'error');
@@ -126,6 +165,11 @@ export default function Apply() {
           <p className="text-gray-400 max-w-2xl">
             Submit your profile for the ongoing recruitment drive. The team will review and schedule interviews where needed.
           </p>
+          {lastSavedAt ? (
+            <p className="text-[10px] uppercase tracking-widest text-gray-500">
+              Draft autosaved at {new Date(lastSavedAt).toLocaleTimeString()}
+            </p>
+          ) : null}
         </motion.header>
 
         <motion.form
@@ -136,138 +180,156 @@ export default function Apply() {
           className="border border-gray-800 rounded-[2rem] p-6 md:p-8 space-y-5"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              required
-              value={form.fullName}
-              onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))}
-              placeholder="Full name"
-              className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-            />
-            <input
-              required
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-              placeholder="Email"
-              className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-            />
-            <input
-              required
-              value={form.phone}
-              onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
-              placeholder="Phone"
-              className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-            />
-            <input
-              value={form.year}
-              onChange={(e) => setForm((prev) => ({ ...prev, year: e.target.value }))}
-              placeholder="Year (e.g. 1)"
-              className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-            />
-            <input
-              value={form.branch}
-              onChange={(e) => setForm((prev) => ({ ...prev, branch: e.target.value }))}
-              placeholder="Branch"
-              className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-            />
-            <input
-              value={form.college}
-              onChange={(e) => setForm((prev) => ({ ...prev, college: e.target.value }))}
-              placeholder="College"
-              className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-            />
+            <FormField label="Full Name" required error={errors.fullName}>
+              <input
+                value={form.fullName}
+                onChange={(e) => updateField('fullName', e.target.value)}
+                placeholder="Full name"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Email" required error={errors.email}>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => updateField('email', e.target.value)}
+                placeholder="Email"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Phone" required error={errors.phone}>
+              <input
+                value={form.phone}
+                onChange={(e) => updateField('phone', e.target.value)}
+                placeholder="Phone"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Year" optional error={errors.year}>
+              <input
+                value={form.year}
+                onChange={(e) => updateField('year', e.target.value)}
+                placeholder="Year (e.g. 1)"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Branch" optional>
+              <input
+                value={form.branch}
+                onChange={(e) => updateField('branch', e.target.value)}
+                placeholder="Branch"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="College" optional>
+              <input
+                value={form.college}
+                onChange={(e) => updateField('college', e.target.value)}
+                placeholder="College"
+                className="ui-input"
+              />
+            </FormField>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              value={form.linkedin}
-              onChange={(e) => setForm((prev) => ({ ...prev, linkedin: e.target.value }))}
-              placeholder="LinkedIn profile"
-              className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-            />
-            <input
-              value={form.github}
-              onChange={(e) => setForm((prev) => ({ ...prev, github: e.target.value }))}
-              placeholder="GitHub profile"
-              className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-            />
-            <input
-              value={form.portfolio}
-              onChange={(e) => setForm((prev) => ({ ...prev, portfolio: e.target.value }))}
-              placeholder="Portfolio / Website"
-              className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-            />
-            <select
-              value={form.eventId}
-              onChange={(e) => setForm((prev) => ({ ...prev, eventId: e.target.value }))}
-              className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-            >
-              <option value="">Select event (optional)</option>
-              {events.map((event) => (
-                <option key={event._id} value={event._id}>
-                  {event.title}
-                </option>
-              ))}
-            </select>
+            <FormField label="LinkedIn" optional>
+              <input
+                value={form.linkedin}
+                onChange={(e) => updateField('linkedin', e.target.value)}
+                placeholder="LinkedIn profile"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="GitHub" optional>
+              <input
+                value={form.github}
+                onChange={(e) => updateField('github', e.target.value)}
+                placeholder="GitHub profile"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Portfolio" optional>
+              <input
+                value={form.portfolio}
+                onChange={(e) => updateField('portfolio', e.target.value)}
+                placeholder="Portfolio / Website"
+                className="ui-input"
+              />
+            </FormField>
+            <FormField label="Event Selection" optional>
+              <select
+                value={form.eventId}
+                onChange={(e) => updateField('eventId', e.target.value)}
+                className="ui-input"
+              >
+                <option value="">Select event (optional)</option>
+                {events.map((event) => (
+                  <option key={event._id} value={event._id}>
+                    {event.title}
+                  </option>
+                ))}
+              </select>
+            </FormField>
           </div>
 
-          <textarea
-            required
-            value={form.motivation}
-            onChange={(e) => setForm((prev) => ({ ...prev, motivation: e.target.value }))}
-            placeholder="Why do you want to join CICR?"
-            rows={4}
-            className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-          />
-          <textarea
-            value={form.experience}
-            onChange={(e) => setForm((prev) => ({ ...prev, experience: e.target.value }))}
-            placeholder="Relevant experience or projects (optional)"
-            rows={3}
-            className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-          />
-          <textarea
-            value={form.interests}
-            onChange={(e) => setForm((prev) => ({ ...prev, interests: e.target.value }))}
-            placeholder="Areas of interest (comma separated)"
-            rows={2}
-            className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-          />
-          <input
-            value={form.availability}
-            onChange={(e) => setForm((prev) => ({ ...prev, availability: e.target.value }))}
-            placeholder="Availability / time commitment"
-            className="w-full border border-gray-800 rounded-xl px-4 py-3 bg-[#0b0e13]/70 text-white text-sm outline-none focus:border-blue-500"
-          />
+          <FormField label="Motivation" required error={errors.motivation}>
+            <textarea
+              value={form.motivation}
+              onChange={(e) => updateField('motivation', e.target.value)}
+              placeholder="Why do you want to join CICR?"
+              rows={4}
+              className="ui-input resize-none"
+            />
+          </FormField>
+          <FormField label="Experience" optional>
+            <textarea
+              value={form.experience}
+              onChange={(e) => updateField('experience', e.target.value)}
+              placeholder="Relevant experience or projects"
+              rows={3}
+              className="ui-input resize-none"
+            />
+          </FormField>
+          <FormField label="Areas of Interest" optional>
+            <textarea
+              value={form.interests}
+              onChange={(e) => updateField('interests', e.target.value)}
+              placeholder="Areas of interest (comma separated)"
+              rows={2}
+              className="ui-input resize-none"
+            />
+          </FormField>
+          <FormField label="Availability" optional>
+            <input
+              value={form.availability}
+              onChange={(e) => updateField('availability', e.target.value)}
+              placeholder="Availability / time commitment"
+              className="ui-input"
+            />
+          </FormField>
 
           <input
             value={form.website}
-            onChange={(e) => setForm((prev) => ({ ...prev, website: e.target.value }))}
+            onChange={(e) => updateField('website', e.target.value)}
             className="hidden"
             tabIndex={-1}
             autoComplete="off"
           />
 
           <div className="mobile-sticky-action">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="btn btn-primary !px-5 !py-3"
-            >
+            <button type="submit" disabled={submitting} className="btn btn-primary !px-5 !py-3">
               {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
               Submit Application
             </button>
           </div>
         </motion.form>
 
-        {loading && (
-          <div className="text-xs text-gray-500">Loading events...</div>
-        )}
-        {!loading && selectedEvent && (
+        {loading ? <div className="text-xs text-gray-500">Loading events...</div> : null}
+        {!loading && selectedEvent ? (
           <div className="text-xs text-gray-400">
             Applying for: <span className="text-gray-200">{selectedEvent.title}</span>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

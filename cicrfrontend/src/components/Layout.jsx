@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Users, FolderKanban, 
   Calendar, ShieldCheck, FileText, UserSquare2,
-  Package, Menu, X, Radio, Sparkles, Bell, CheckCheck, GitBranchPlus, Search, PlusCircle
+  Package, Menu, X, Radio, Sparkles, Bell, GitBranchPlus, Search, PlusCircle, Bug, CalendarPlus
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -15,6 +15,7 @@ import {
 } from '../api';
 import logo from './logo.png';
 import CommandPalette from './CommandPalette';
+import NotificationCenter from './NotificationCenter';
 
 const COMMUNICATION_CONVERSATION_ID = 'admin-stream';
 const COMMUNICATION_LAST_SEEN_KEY = `communication_last_seen_at_${COMMUNICATION_CONVERSATION_ID}`;
@@ -132,7 +133,7 @@ export default function Layout({ children }) {
     };
   }, [isStrictAdmin, location.pathname, user._id]);
 
-  const loadNotifications = async (silent = true) => {
+  const loadNotifications = useCallback(async (silent = true) => {
     const token = localStorage.getItem('token');
     if (!token) {
       setNotifications([]);
@@ -151,25 +152,27 @@ export default function Layout({ children }) {
     } finally {
       if (!silent) setNotificationBusy(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadNotifications(false);
     const poll = setInterval(() => loadNotifications(true), 30000);
     return () => clearInterval(poll);
-  }, []);
+  }, [loadNotifications]);
 
   useEffect(() => {
     setNotificationsOpen(false);
     setIsCommandOpen(false);
   }, [location.pathname]);
 
-  const openNotifications = () => {
-    setNotificationsOpen((prev) => !prev);
-    if (!notificationsOpen) {
-      loadNotifications(false);
-    }
-  };
+  const openNotifications = useCallback(() => {
+    setNotificationsOpen(true);
+    loadNotifications(false);
+  }, [loadNotifications]);
+
+  const closeNotifications = useCallback(() => {
+    setNotificationsOpen(false);
+  }, []);
 
   const handleReadNotification = async (item) => {
     try {
@@ -186,7 +189,7 @@ export default function Layout({ children }) {
 
     if (item.link) {
       setIsMobileOpen(false);
-      setNotificationsOpen(false);
+      closeNotifications();
       navigate(item.link);
     }
   };
@@ -202,10 +205,10 @@ export default function Layout({ children }) {
   };
 
   const openCommandPalette = useCallback(() => {
-    setNotificationsOpen(false);
+    closeNotifications();
     setIsMobileOpen(false);
     setIsCommandOpen(true);
-  }, []);
+  }, [closeNotifications]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -262,15 +265,39 @@ export default function Layout({ children }) {
         subtitle: 'Review latest alerts',
         icon: Bell,
         keywords: 'notifications inbox alerts',
-        onSelect: () => setNotificationsOpen(true),
+        onSelect: () => openNotifications(),
       },
       {
-        id: 'cmd-create-project',
-        label: 'Create Project',
+        id: 'cmd-quick-project',
+        label: 'Quick Create: Project',
         subtitle: 'Open project initiation flow',
         icon: PlusCircle,
-        keywords: 'create project new',
-        onSelect: () => navigate('/create-project'),
+        keywords: 'quick create project new',
+        onSelect: () => navigate('/create-project?quick=create'),
+      },
+      {
+        id: 'cmd-quick-meeting',
+        label: 'Quick Create: Meeting',
+        subtitle: 'Open meeting scheduler',
+        icon: CalendarPlus,
+        keywords: 'quick create meeting schedule',
+        onSelect: () => navigate('/schedule?quick=create'),
+      },
+      {
+        id: 'cmd-quick-event',
+        label: 'Quick Create: Event',
+        subtitle: 'Open event creation section',
+        icon: Sparkles,
+        keywords: 'quick create event recruitment',
+        onSelect: () => navigate('/events?quick=create'),
+      },
+      {
+        id: 'cmd-quick-issue',
+        label: 'Quick Create: Issue Ticket',
+        subtitle: 'Raise issue for admin review',
+        icon: Bug,
+        keywords: 'quick create issue ticket support',
+        onSelect: () => navigate('/community?tab=issues&quick=create-issue'),
       },
       {
         id: 'cmd-profile',
@@ -294,7 +321,7 @@ export default function Layout({ children }) {
     }
 
     return [...primary, ...ops];
-  }, [navLinks, navigate, user.role]);
+  }, [navLinks, navigate, openNotifications, user.role]);
 
   const breadcrumbs = useMemo(() => {
     const segments = location.pathname.split('/').filter(Boolean);
@@ -377,50 +404,6 @@ export default function Layout({ children }) {
             <span className="text-[10px] text-gray-500 uppercase tracking-widest">Clear</span>
           )}
         </button>
-
-        <AnimatePresence>
-          {notificationsOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              className="absolute left-2 right-2 top-[calc(100%+8px)] z-40 border border-gray-800 rounded-2xl bg-[#0a0a0c] shadow-2xl overflow-hidden"
-            >
-              <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-800">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 font-black">Recent Alerts</p>
-                <button
-                  type="button"
-                  onClick={handleMarkAllNotificationsRead}
-                  className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-blue-300 hover:text-blue-200"
-                >
-                  <CheckCheck size={12} />
-                  Read all
-                </button>
-              </div>
-              {notificationBusy ? (
-                <div className="px-3 py-6 text-center text-xs text-gray-500">Loading...</div>
-              ) : notifications.length === 0 ? (
-                <div className="px-3 py-6 text-center text-xs text-gray-500">No notifications</div>
-              ) : (
-                <div className="max-h-72 overflow-y-auto">
-                  {notifications.map((item) => (
-                    <button
-                      key={item._id}
-                      type="button"
-                      onClick={() => handleReadNotification(item)}
-                      className={`w-full text-left px-3 py-2.5 border-b border-gray-800/70 last:border-b-0 hover:bg-white/[0.03] ${
-                        item.isRead ? 'text-gray-400' : 'text-gray-200'
-                      }`}
-                    >
-                      <p className="text-xs font-semibold truncate">{item.title}</p>
-                      <p className="text-[11px] mt-1 line-clamp-2">{item.message}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       <div className="mb-4 px-2">
@@ -528,6 +511,19 @@ export default function Layout({ children }) {
         <div className="flex items-center gap-1">
           <button
             type="button"
+            onClick={openNotifications}
+            className="relative p-2 text-gray-400 hover:text-white"
+            aria-label="Open notifications"
+          >
+            <Bell size={20} />
+            {unreadCount > 0 ? (
+              <span className="absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full bg-blue-500/30 text-[9px] text-blue-100 font-black inline-flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
             onClick={openCommandPalette}
             className="p-2 text-gray-400 hover:text-white"
             aria-label="Open command palette"
@@ -604,6 +600,17 @@ export default function Layout({ children }) {
           {children}
         </motion.div>
       </main>
+
+      <NotificationCenter
+        open={notificationsOpen}
+        onClose={closeNotifications}
+        items={notifications}
+        loading={notificationBusy}
+        unreadCount={unreadCount}
+        onRefresh={() => loadNotifications(false)}
+        onReadAll={handleMarkAllNotificationsRead}
+        onReadItem={handleReadNotification}
+      />
 
       <CommandPalette open={isCommandOpen} onClose={() => setIsCommandOpen(false)} commands={commandItems} />
     </div>
