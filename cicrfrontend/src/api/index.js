@@ -13,25 +13,9 @@ const API = axios.create({
 let backendPrewarmed = false;
 
 export const prewarmBackend = () => {
-  if (backendPrewarmed || typeof window === 'undefined') return;
+  // Browser prewarm intentionally disabled to avoid cross-site CORP/NotSameSite console errors.
+  if (backendPrewarmed) return;
   backendPrewarmed = true;
-
-  const base = String(import.meta.env.VITE_API_BASE_URL || 'https://cicrcombined.onrender.com/api').replace(/\/+$/, '');
-  const healthUrl = `${base}/health`;
-
-  const ping = () =>
-    fetch(healthUrl, {
-      method: 'GET',
-      cache: 'no-store',
-      mode: 'cors',
-      credentials: 'omit',
-      keepalive: true,
-    }).catch(() => {
-      // Intentionally swallow prewarm failures; this should never block UI.
-    });
-
-  ping();
-  window.setTimeout(ping, 12000);
 };
 
 API.interceptors.request.use(
