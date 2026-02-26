@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Users, FolderKanban, 
@@ -37,7 +37,13 @@ const ROUTE_LABELS = {
   add: 'Add',
 };
 
-export default function Layout({ children }) {
+const normalizeRouteKey = (rawPath) => {
+  const value = String(rawPath || '/');
+  if (value === '/') return '/';
+  return value.replace(/\/+$/, '') || '/';
+};
+
+export default function Layout() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const [logoMode, setLogoMode] = useState('bundle');
@@ -48,6 +54,8 @@ export default function Layout({ children }) {
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const routerPathRef = useRef('/');
+  const mismatchCounterRef = useRef(0);
   
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const [user, setUser] = useState(profile.result || profile);
@@ -57,6 +65,52 @@ export default function Layout({ children }) {
     if (logoMode === 'public') return '/cicr-logo.png';
     return '';
   }, [logoMode]);
+
+  const routeKey = useMemo(
+    () => normalizeRouteKey(`${location.pathname}${location.search}${location.hash}`),
+    [location.hash, location.pathname, location.search]
+  );
+
+  useEffect(() => {
+    routerPathRef.current = routeKey;
+  }, [routeKey]);
+
+  // Defensive sync: if the browser URL and router state drift apart, recover automatically.
+  useEffect(() => {
+    let recoveryTimer = 0;
+    const readBrowserPath = () =>
+      normalizeRouteKey(`${window.location.pathname}${window.location.search}${window.location.hash}`);
+
+    const syncIfNeeded = () => {
+      const browserPath = readBrowserPath();
+      const routerPath = routerPathRef.current;
+      if (browserPath === routerPath) {
+        mismatchCounterRef.current = 0;
+        return;
+      }
+
+      mismatchCounterRef.current += 1;
+      if (mismatchCounterRef.current >= 2) {
+        mismatchCounterRef.current = 0;
+        navigate(browserPath, { replace: true });
+        // If router state is still stale after navigate, force a hard recovery.
+        window.clearTimeout(recoveryTimer);
+        recoveryTimer = window.setTimeout(() => {
+          const latestBrowserPath = readBrowserPath();
+          const latestRouterPath = routerPathRef.current;
+          if (latestBrowserPath !== latestRouterPath) {
+            window.location.replace(latestBrowserPath);
+          }
+        }, 220);
+      }
+    };
+
+    const poll = window.setInterval(syncIfNeeded, 500);
+    return () => {
+      window.clearInterval(poll);
+      window.clearTimeout(recoveryTimer);
+    };
+  }, [navigate]);
 
   useEffect(() => {
     const syncProfile = async () => {
@@ -608,7 +662,7 @@ export default function Layout({ children }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          {children || <Outlet />}
+          <Outlet />
         </motion.div>
       </main>
 
