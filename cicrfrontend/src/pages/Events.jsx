@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
+  ArrowRight,
   CalendarDays,
   CheckCircle2,
   Clock4,
@@ -99,6 +100,9 @@ export default function Events() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [exportingEventId, setExportingEventId] = useState('');
+  const [selectedEventId, setSelectedEventId] = useState('');
+  const [selectedEventDetails, setSelectedEventDetails] = useState(null);
+  const [selectedDetailsLoading, setSelectedDetailsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
@@ -143,6 +147,62 @@ export default function Events() {
   }, [isAdmin, searchParams]);
 
   const openEvents = useMemo(() => events.filter((event) => event.status === 'Scheduled'), [events]);
+  const orderedEvents = useMemo(
+    () =>
+      [...events].sort((a, b) => {
+        const aTime = new Date(a.startTime).getTime();
+        const bTime = new Date(b.startTime).getTime();
+        if (!Number.isFinite(aTime) || !Number.isFinite(bTime)) return 0;
+        return aTime - bTime;
+      }),
+    [events]
+  );
+
+  const selectedEvent = useMemo(
+    () => orderedEvents.find((event) => event._id === selectedEventId) || orderedEvents[0] || null,
+    [orderedEvents, selectedEventId]
+  );
+  const selectedEventKey = selectedEvent?._id || '';
+
+  useEffect(() => {
+    if (!orderedEvents.length) {
+      setSelectedEventId('');
+      setSelectedEventDetails(null);
+      return;
+    }
+    if (!orderedEvents.some((event) => event._id === selectedEventId)) {
+      setSelectedEventId(orderedEvents[0]._id);
+    }
+  }, [orderedEvents, selectedEventId]);
+
+  useEffect(() => {
+    if (!selectedEventKey) {
+      setSelectedEventDetails(null);
+      return;
+    }
+
+    let active = true;
+    const loadSelectedEventDetails = async () => {
+      setSelectedDetailsLoading(true);
+      try {
+        const { data } = await fetchEventById(selectedEventKey);
+        if (!active) return;
+        setSelectedEventDetails(data || null);
+      } catch {
+        if (!active) return;
+        setSelectedEventDetails(null);
+      } finally {
+        if (active) {
+          setSelectedDetailsLoading(false);
+        }
+      }
+    };
+
+    loadSelectedEventDetails();
+    return () => {
+      active = false;
+    };
+  }, [selectedEventKey]);
 
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -257,6 +317,7 @@ export default function Events() {
 
       const { data } = await createEvent(payload);
       setEvents((prev) => [data, ...prev]);
+      setSelectedEventId(data?._id || '');
       resetForm(INITIAL_EVENT_FORM);
       setProjectDrafts([]);
       dispatchToast('Event created successfully.', 'success');
@@ -271,6 +332,7 @@ export default function Events() {
     try {
       const { data } = await updateEvent(eventId, { status });
       setEvents((prev) => prev.map((item) => (item._id === data._id ? data : item)));
+      setSelectedEventDetails((prev) => (prev && prev._id === data._id ? { ...prev, ...data } : prev));
       dispatchToast(`Event marked ${status}.`, 'success');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Failed to update event.', 'error');
@@ -282,6 +344,10 @@ export default function Events() {
     try {
       await deleteEvent(eventId);
       setEvents((prev) => prev.filter((item) => item._id !== eventId));
+      if (selectedEventId === eventId) {
+        setSelectedEventId('');
+        setSelectedEventDetails(null);
+      }
       dispatchToast('Event removed.', 'success');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Failed to delete event.', 'error');
@@ -414,6 +480,11 @@ export default function Events() {
       setExportingEventId('');
     }
   };
+
+  const selectedProjects = useMemo(
+    () => (Array.isArray(selectedEventDetails?.projects) ? selectedEventDetails.projects : []),
+    [selectedEventDetails?.projects]
+  );
 
   return (
     <div className="ui-page max-w-6xl space-y-8 pb-16 page-motion-b">
@@ -701,100 +772,171 @@ export default function Events() {
           hint={isAdmin ? 'Create your first event and initialize project tracks.' : 'Please check again later.'}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 section-motion section-motion-delay-3 pro-stagger">
-          {events.map((event) => (
-            <motion.article
-              key={event._id}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35 }}
-              whileHover={{ y: -4 }}
-              className="border border-gray-800 rounded-[1.6rem] p-5 space-y-4 pro-hover-lift"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-lg font-black text-white">{event.title}</h3>
-                  <p className="text-xs text-gray-500 uppercase tracking-widest mt-1">{event.type}</p>
-                </div>
-                <span className="text-[10px] uppercase tracking-widest text-gray-300 border border-gray-700 rounded-lg px-2 py-1">
-                  {event.status}
-                </span>
-              </div>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.08fr)_370px] gap-6 section-motion section-motion-delay-3">
+          <section className="overflow-hidden border border-blue-500/25 rounded-[2rem] bg-gradient-to-b from-[#09111d] via-[#070c14] to-[#070a11] pro-aurora">
+            <div className="grid grid-cols-[minmax(0,1.6fr)_0.7fr_0.75fr] gap-3 px-4 md:px-6 py-3 text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black border-b border-blue-500/20">
+              <span>Event Stream</span>
+              <span className="hidden md:block">Timeline</span>
+              <span className="text-right">Projects</span>
+            </div>
 
-              <p className="text-sm text-gray-300">{event.description || 'No description provided.'}</p>
+            <div className="divide-y divide-gray-800/80">
+              {orderedEvents.map((event, idx) => {
+                const active = selectedEvent?._id === event._id;
+                const statusTone =
+                  event.status === 'Scheduled'
+                    ? 'text-cyan-200 border-cyan-500/40 bg-cyan-500/10'
+                    : event.status === 'Completed'
+                    ? 'text-emerald-200 border-emerald-500/40 bg-emerald-500/10'
+                    : 'text-rose-200 border-rose-500/40 bg-rose-500/10';
 
-              <div className="text-xs text-gray-400 space-y-1">
-                <div className="flex items-center gap-2">
-                  <CalendarDays size={12} className="text-blue-400" /> {fmtDate(event.startTime)}
-                  <Clock4 size={12} className="text-amber-400" /> {fmtTime(event.startTime)} - {fmtTime(event.endTime)}
+                return (
+                  <motion.button
+                    key={event._id}
+                    type="button"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.04, duration: 0.35 }}
+                    onClick={() => setSelectedEventId(event._id)}
+                    className={`w-full text-left px-4 md:px-6 py-4 transition-all pro-row-glide ${
+                      active ? 'bg-blue-500/10' : 'hover:bg-white/[0.03]'
+                    }`}
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.6fr)_0.7fr_0.75fr] gap-3 items-center">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base md:text-lg font-black text-white tracking-tight">{event.title}</h3>
+                          <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded-full border ${statusTone}`}>
+                            {event.status}
+                          </span>
+                        </div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300/90">{event.type}</p>
+                        <p className="text-sm text-gray-400 line-clamp-2">{event.description || 'No event description.'}</p>
+                        <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                          <span className="inline-flex items-center gap-1.5"><MapPin size={12} className="text-emerald-300" /> {event.location}</span>
+                          {event.allowApplications ? (
+                            <span className="inline-flex items-center gap-1.5 text-purple-200">
+                              <Users size={12} /> Applications till {fmtDate(event.applicationDeadline)}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="hidden md:block text-xs text-gray-300">
+                        <p className="inline-flex items-center gap-1.5">
+                          <CalendarDays size={12} className="text-blue-300" /> {fmtDate(event.startTime)}
+                        </p>
+                        <p className="mt-1 inline-flex items-center gap-1.5 text-gray-400">
+                          <Clock4 size={12} className="text-amber-300" /> {fmtTime(event.startTime)} - {fmtTime(event.endTime)}
+                        </p>
+                      </div>
+                      <div className="text-right text-sm">
+                        <p className="text-white font-black">{event.projectCount || 0}</p>
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500">tracks</p>
+                      </div>
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </section>
+
+          <aside className="border border-cyan-500/25 rounded-[2rem] p-5 md:p-6 bg-gradient-to-b from-[#0a1220] via-[#080f1a] to-[#070d16] space-y-5 xl:sticky xl:top-24 h-fit pro-aurora">
+            {selectedEvent ? (
+              <>
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-[0.24em] text-cyan-300 font-black">Event Detail Workspace</p>
+                  <h3 className="text-2xl font-black text-white leading-tight">{selectedEvent.title}</h3>
+                  <p className="text-sm text-gray-400">{selectedEvent.description || 'No event description provided.'}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin size={12} className="text-emerald-400" /> {event.location}
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-xl border border-blue-500/25 px-3 py-2 bg-blue-500/5">
+                    <p className="text-[10px] uppercase tracking-widest text-blue-300">Start</p>
+                    <p className="text-white font-semibold mt-1">{fmtDate(selectedEvent.startTime)}</p>
+                  </div>
+                  <div className="rounded-xl border border-amber-500/25 px-3 py-2 bg-amber-500/5">
+                    <p className="text-[10px] uppercase tracking-widest text-amber-200">End</p>
+                    <p className="text-white font-semibold mt-1">{fmtDate(selectedEvent.endTime)}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Layers3 size={12} className="text-cyan-300" /> {event.projectCount || 0} linked projects
+
+                <div className="flex flex-wrap gap-2">
+                  <Link to={`/events/${selectedEvent._id}`} className="btn btn-secondary !text-[10px] !px-3 !py-2">
+                    <ArrowRight size={12} /> Open Details
+                  </Link>
+                  <Link to={`/projects?event=${selectedEvent._id}`} className="btn btn-secondary !text-[10px] !px-3 !py-2">
+                    <Layers3 size={12} /> Project Tracks
+                  </Link>
+                  {selectedEvent.allowApplications ? (
+                    <Link to={`/apply?event=${selectedEvent._id}`} className="btn btn-secondary !text-[10px] !px-3 !py-2">
+                      <Users size={12} /> Application Form
+                    </Link>
+                  ) : null}
                 </div>
-                {event.allowApplications ? (
-                  <div className="flex items-center gap-2">
-                    <Users size={12} className="text-purple-400" /> Applications open until {fmtDate(event.applicationDeadline)}
+
+                {isAdmin ? (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {selectedEvent.status === 'Scheduled' ? (
+                      <button
+                        onClick={() => handleStatusUpdate(selectedEvent._id, 'Completed')}
+                        className="btn btn-secondary !text-[10px] !px-3 !py-2 !text-emerald-200 !border-emerald-500/40"
+                      >
+                        <CheckCircle2 size={12} /> Complete
+                      </button>
+                    ) : null}
+                    <button
+                      onClick={() => handleStatusUpdate(selectedEvent._id, 'Cancelled')}
+                      className="btn btn-secondary !text-[10px] !px-3 !py-2 !text-rose-200 !border-rose-500/40"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleExportEvent(selectedEvent._id)}
+                      disabled={exportingEventId === selectedEvent._id}
+                      className="btn btn-secondary !text-[10px] !px-3 !py-2 !text-cyan-200 !border-cyan-500/40"
+                    >
+                      <Download size={12} />
+                      {exportingEventId === selectedEvent._id ? 'Exporting...' : 'Export'}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(selectedEvent._id)}
+                      className="btn btn-secondary !text-[10px] !px-3 !py-2 !text-gray-200"
+                    >
+                      <Trash2 size={12} /> Delete
+                    </button>
                   </div>
                 ) : null}
-              </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  to={`/projects?event=${event._id}`}
-                  className="text-[10px] uppercase tracking-widest border border-cyan-500/40 text-cyan-200 px-3 py-1.5 rounded-lg"
-                >
-                  View Projects
-                </Link>
-
-                {event.allowApplications ? (
-                  <Link
-                    to={`/apply${event._id ? `?event=${event._id}` : ''}`}
-                    className="text-[10px] uppercase tracking-widest border border-emerald-500/40 text-emerald-200 px-3 py-1.5 rounded-lg"
-                  >
-                    Apply
-                  </Link>
-                ) : null}
-
-                {isAdmin && event.status === 'Scheduled' ? (
-                  <button
-                    onClick={() => handleStatusUpdate(event._id, 'Completed')}
-                    className="text-[10px] uppercase tracking-widest border border-emerald-500/40 text-emerald-200 px-3 py-1.5 rounded-lg inline-flex items-center gap-1"
-                  >
-                    <CheckCircle2 size={12} /> Complete
-                  </button>
-                ) : null}
-                {isAdmin ? (
-                  <button
-                    onClick={() => handleStatusUpdate(event._id, 'Cancelled')}
-                    className="text-[10px] uppercase tracking-widest border border-rose-500/40 text-rose-200 px-3 py-1.5 rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                ) : null}
-                {isAdmin ? (
-                  <button
-                    onClick={() => handleExportEvent(event._id)}
-                    disabled={exportingEventId === event._id}
-                    className="text-[10px] uppercase tracking-widest border border-cyan-500/40 text-cyan-200 px-3 py-1.5 rounded-lg inline-flex items-center gap-1 disabled:opacity-50"
-                  >
-                    <Download size={12} />
-                    {exportingEventId === event._id ? 'Exporting...' : 'Export Details'}
-                  </button>
-                ) : null}
-                {isAdmin ? (
-                  <button
-                    onClick={() => handleDelete(event._id)}
-                    className="text-[10px] uppercase tracking-widest border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg inline-flex items-center gap-1"
-                  >
-                    <Trash2 size={12} /> Delete
-                  </button>
-                ) : null}
-              </div>
-            </motion.article>
-          ))}
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black">Project Snapshot</p>
+                  {selectedDetailsLoading ? (
+                    <p className="text-xs text-gray-500">Loading project summary...</p>
+                  ) : selectedProjects.length === 0 ? (
+                    <p className="text-xs text-gray-500">No projects seeded for this event yet.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                      {selectedProjects.slice(0, 8).map((project) => (
+                        <article key={project._id || project.title} className="rounded-xl border border-gray-800 px-3 py-2 bg-black/20">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm text-white font-semibold truncate">{project.title}</p>
+                            <span className="text-[10px] text-cyan-200">{Math.round(Number(project.progress || 0))}%</span>
+                          </div>
+                          <div className="mt-2 h-1.5 rounded-full bg-gray-800 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
+                              style={{ width: `${Math.max(0, Math.min(100, Number(project.progress || 0)))}%` }}
+                            />
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500">Select an event to view details.</p>
+            )}
+          </aside>
         </div>
       )}
     </div>

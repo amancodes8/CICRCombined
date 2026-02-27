@@ -22,6 +22,7 @@ const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 const Guidelines = lazy(() => import('./pages/Guidelines'));
 const Communication = lazy(() => import('./pages/Communication'));
 const Events = lazy(() => import('./pages/Events'));
+const EventDetails = lazy(() => import('./pages/EventDetails'));
 const Apply = lazy(() => import('./pages/Apply'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const AddComponent = lazy(() => import('./pages/AddComponent'));
@@ -83,6 +84,7 @@ function App() {
             <Route path="/schedule" element={<ScheduleMeeting />} />
             <Route path="/hierarchy" element={<Hierarchy />} />
             <Route path="/events" element={<Events />} />
+            <Route path="/events/:id" element={<EventDetails />} />
 
             <Route path="/community" element={<Community />} />
             <Route path="/learning" element={<LearningHub />} />

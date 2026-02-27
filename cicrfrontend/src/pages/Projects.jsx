@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Plus,
-  Search,
-  ChevronRight,
-  Users,
-  Target,
-  Loader2,
-  Rocket,
+  ArrowRight,
   CalendarClock,
+  ChevronRight,
   Layers3,
+  Loader2,
+  Plus,
+  Rocket,
+  Search,
+  ShieldCheck,
+  Target,
+  Users,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { fetchProjects } from '../api';
@@ -33,39 +35,13 @@ const formatDateTime = (value) => {
 
 const statusClass = (status) => {
   const normalized = String(status || '').toLowerCase();
-  if (normalized === 'completed') return 'text-emerald-300 border-emerald-500/40';
-  if (normalized === 'awaiting review') return 'text-amber-300 border-amber-500/40';
-  if (normalized === 'on-hold' || normalized === 'delayed') return 'text-rose-300 border-rose-500/40';
-  return 'text-blue-300 border-blue-500/35';
+  if (normalized === 'completed') return 'text-emerald-200 border-emerald-500/35 bg-emerald-500/10';
+  if (normalized === 'awaiting review') return 'text-amber-200 border-amber-500/35 bg-amber-500/10';
+  if (normalized === 'on-hold' || normalized === 'delayed') return 'text-rose-200 border-rose-500/35 bg-rose-500/10';
+  return 'text-cyan-100 border-cyan-500/35 bg-cyan-500/10';
 };
 
-function ProgressDonut({ progress = 0 }) {
-  const clamped = Math.max(0, Math.min(100, Number(progress) || 0));
-  const radius = 24;
-  const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference - (clamped / 100) * circumference;
-
-  return (
-    <svg width="64" height="64" viewBox="0 0 64 64" className="shrink-0">
-      <circle cx="32" cy="32" r={radius} stroke="rgba(148,163,184,0.2)" strokeWidth="6" fill="none" />
-      <circle
-        cx="32"
-        cy="32"
-        r={radius}
-        stroke="rgba(56,189,248,0.95)"
-        strokeWidth="6"
-        fill="none"
-        strokeLinecap="round"
-        strokeDasharray={circumference}
-        strokeDashoffset={dashOffset}
-        transform="rotate(-90 32 32)"
-      />
-      <text x="32" y="36" textAnchor="middle" className="fill-white text-[11px] font-black">
-        {clamped}%
-      </text>
-    </svg>
-  );
-}
+const clampProgress = (value) => Math.max(0, Math.min(100, Number(value) || 0));
 
 export default function Projects() {
   const [searchParams] = useSearchParams();
@@ -73,6 +49,7 @@ export default function Projects() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState('');
 
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const userData = profile.result || profile;
@@ -108,6 +85,28 @@ export default function Projects() {
     [projects, searchTerm, statusFilter]
   );
 
+  useEffect(() => {
+    if (!filteredProjects.length) {
+      setSelectedProjectId('');
+      return;
+    }
+    if (!filteredProjects.some((project) => project._id === selectedProjectId)) {
+      setSelectedProjectId(filteredProjects[0]._id);
+    }
+  }, [filteredProjects, selectedProjectId]);
+
+  const selectedProject = useMemo(
+    () => filteredProjects.find((project) => project._id === selectedProjectId) || filteredProjects[0] || null,
+    [filteredProjects, selectedProjectId]
+  );
+
+  const projectMetrics = useMemo(() => {
+    const completed = filteredProjects.filter((project) => String(project.status || '').toLowerCase() === 'completed').length;
+    const review = filteredProjects.filter((project) => String(project.status || '').toLowerCase() === 'awaiting review').length;
+    const active = filteredProjects.length - completed;
+    return { completed, review, active };
+  }, [filteredProjects]);
+
   if (loading)
     return (
       <div className="h-[70vh] flex flex-col items-center justify-center gap-4">
@@ -117,12 +116,12 @@ export default function Projects() {
     );
 
   return (
-    <div className="ui-page space-y-8 px-4 sm:px-6 lg:px-8 pb-20 page-motion-b">
+    <div className="ui-page space-y-6 px-4 sm:px-6 lg:px-8 pb-20 page-motion-b">
       <header className="pt-4 section-motion section-motion-delay-1">
         <PageHeader
           eyebrow="Project Workspace"
-          title="Event Projects"
-          subtitle="Live view of assigned projects, delivery stages, and completion readiness."
+          title="Project Operations Desk"
+          subtitle="Professional command view of projects, ownership, delivery state, and completion readiness."
           icon={Rocket}
           actions={
             isAdmin ? (
@@ -136,100 +135,190 @@ export default function Projects() {
         />
       </header>
 
-      <div className="flex flex-col lg:flex-row gap-4 items-center justify-between p-3 md:p-4 section-motion section-motion-delay-2">
-        <div className="relative w-full lg:w-96 group">
-          <Search
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors"
-            size={18}
-          />
-          <input
-            type="text"
-            placeholder="Search projects, event, description..."
-            className="w-full bg-[#0a0a0c] border border-gray-800 rounded-xl md:rounded-2xl py-3 pl-12 pr-4 outline-none focus:border-blue-500 transition-all text-white text-sm"
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 section-motion section-motion-delay-1">
+        <Metric label="Active Scope" value={String(projectMetrics.active)} tone="cyan" />
+        <Metric label="Awaiting Review" value={String(projectMetrics.review)} tone="amber" />
+        <Metric label="Completed" value={String(projectMetrics.completed)} tone="emerald" />
+      </section>
+
+      <section className="rounded-[1.5rem] border border-gray-800 bg-[#090d14]/70 p-3 md:p-4 section-motion section-motion-delay-2">
+        <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+          <div className="relative w-full lg:w-[26rem] group">
+            <Search
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-cyan-300 transition-colors"
+              size={18}
+            />
+            <input
+              type="text"
+              placeholder="Search projects, event, description..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-[#070a10] border border-gray-800 rounded-xl py-3 pl-12 pr-4 outline-none focus:border-cyan-500/55 transition-all text-white text-sm"
+            />
+          </div>
+
+          <div className="w-full lg:w-auto flex flex-wrap gap-2">
+            {STATUS_OPTIONS.map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                  statusFilter === status
+                    ? 'text-cyan-100 border border-cyan-500/50 bg-cyan-500/10'
+                    : 'text-gray-500 hover:text-gray-200 border border-gray-800'
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
         </div>
+      </section>
 
-        <div className="w-full lg:w-auto flex flex-wrap gap-2">
-          {STATUS_OPTIONS.map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                statusFilter === status ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300 border border-gray-800'
-              }`}
-            >
-              {status}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 section-motion section-motion-delay-3 pro-stagger">
-        <AnimatePresence>
-          {filteredProjects.map((project, idx) => (
-            <motion.article
-              layout
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.03 }}
-              key={project._id}
-              className="border border-gray-800 rounded-[1.7rem] p-6 flex flex-col gap-4 hover:border-blue-500/45 transition-all group"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] uppercase tracking-widest text-cyan-300 font-black">
-                    {project.event?.title || 'Standalone'}
-                  </p>
-                  <h3 className="text-xl font-black text-white mt-2 tracking-tight">{project.title}</h3>
-                </div>
-                <ProgressDonut progress={project.progress} />
-              </div>
-
-              <p className="text-sm text-gray-400 leading-relaxed line-clamp-3">{project.description}</p>
-
-              <div className="grid grid-cols-2 gap-3 text-xs text-gray-400">
-                <div className="inline-flex items-center gap-2">
-                  <Layers3 size={13} className="text-blue-400" />
-                  <span>{project.stage || 'Planning'}</span>
-                </div>
-                <div className="inline-flex items-center gap-2 justify-end">
-                  <Users size={13} className="text-blue-400" />
-                  <span>{project.team?.length || 0} members</span>
-                </div>
-                <div className="inline-flex items-center gap-2 col-span-2">
-                  <CalendarClock size={13} className="text-amber-400" />
-                  <span>Deadline: {formatDateTime(project.deadline)}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-800">
-                <span className={`text-[10px] px-3 py-1 rounded-full border uppercase tracking-widest font-black ${statusClass(project.status)}`}>
-                  {project.status || 'Planning'}
-                </span>
-                <div className="inline-flex items-center gap-2">
-                  <Link to={`/projects/${project._id}/review`} className="text-[10px] uppercase tracking-widest text-emerald-200">
-                    Review
-                  </Link>
-                  <Link
-                    to={`/projects/${project._id}`}
-                    className="inline-flex items-center gap-1 text-xs uppercase tracking-widest text-cyan-100"
-                  >
-                    Open <ChevronRight size={14} />
-                  </Link>
-                </div>
-              </div>
-            </motion.article>
-          ))}
-        </AnimatePresence>
-      </div>
-
-      {filteredProjects.length === 0 && !loading && (
+      {filteredProjects.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20 rounded-[2rem] border border-dashed border-gray-800">
           <Target className="mx-auto text-gray-700 mb-4" size={46} />
           <p className="text-gray-500 font-black uppercase text-xs tracking-[0.24em]">No projects visible for this filter</p>
         </motion.div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.08fr)_360px] gap-6 section-motion section-motion-delay-3">
+          <section className="rounded-[2rem] border border-blue-500/25 bg-gradient-to-b from-[#09111c] via-[#070d15] to-[#070b12] overflow-hidden pro-aurora">
+            <div className="grid grid-cols-[minmax(0,1.55fr)_0.6fr_0.85fr] gap-2 px-4 md:px-6 py-3 text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black border-b border-blue-500/20">
+              <span>Project</span>
+              <span className="hidden md:block">Deadline</span>
+              <span className="text-right">Status</span>
+            </div>
+
+            <AnimatePresence initial={false}>
+              <div className="divide-y divide-gray-800/80">
+                {filteredProjects.map((project, idx) => {
+                  const active = project._id === selectedProject?._id;
+                  const progress = clampProgress(project.progress);
+                  return (
+                    <motion.article
+                      key={project._id}
+                      layout
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ delay: idx * 0.03, duration: 0.35 }}
+                      onClick={() => setSelectedProjectId(project._id)}
+                      className={`px-4 md:px-6 py-4 cursor-pointer transition-colors pro-row-glide ${
+                        active ? 'bg-blue-500/10' : 'hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.55fr)_0.6fr_0.85fr] gap-2 items-center">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-lg font-black text-white tracking-tight">{project.title}</h3>
+                            <span className="text-[10px] uppercase tracking-widest text-cyan-300">{project.event?.title || 'Standalone'}</span>
+                          </div>
+                          <p className="text-sm text-gray-400 line-clamp-2">{project.description || 'No project summary.'}</p>
+                          <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                            <span className="inline-flex items-center gap-1.5"><Layers3 size={12} className="text-blue-300" /> {project.stage || 'Planning'}</span>
+                            <span className="inline-flex items-center gap-1.5"><Users size={12} className="text-cyan-300" /> {project.team?.length || 0} members</span>
+                          </div>
+                          <div className="mt-1 h-1.5 rounded-full bg-gray-800 overflow-hidden max-w-xl">
+                            <div
+                              className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="hidden md:block text-sm text-gray-300">
+                          <p className="inline-flex items-center gap-1.5"><CalendarClock size={12} className="text-amber-300" /> {formatDateTime(project.deadline)}</p>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2">
+                          <span className={`text-[10px] px-2.5 py-1 rounded-full border uppercase tracking-widest font-black ${statusClass(project.status)}`}>
+                            {project.status || 'Planning'}
+                          </span>
+                          <Link
+                            to={`/projects/${project._id}`}
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-xs uppercase tracking-widest text-cyan-100"
+                          >
+                            Open <ChevronRight size={13} />
+                          </Link>
+                        </div>
+                      </div>
+                    </motion.article>
+                  );
+                })}
+              </div>
+            </AnimatePresence>
+          </section>
+
+          <aside className="rounded-[2rem] border border-cyan-500/25 bg-gradient-to-b from-[#0a1523] via-[#080f1a] to-[#070d16] p-5 md:p-6 space-y-5 xl:sticky xl:top-24 h-fit pro-aurora">
+            {selectedProject ? (
+              <>
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-300 font-black">Project Intelligence</p>
+                  <h3 className="text-2xl font-black text-white mt-2 leading-tight">{selectedProject.title}</h3>
+                  <p className="text-sm text-gray-400 mt-2">{selectedProject.description || 'No project description available.'}</p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border ${statusClass(selectedProject.status)}`}>
+                    {selectedProject.status || 'Planning'}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-blue-500/30 text-blue-100 bg-blue-500/10">
+                    {selectedProject.stage || 'Planning'}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span>Execution progress</span>
+                    <span className="text-cyan-100 font-semibold">{clampProgress(selectedProject.progress)}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
+                      style={{ width: `${clampProgress(selectedProject.progress)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs text-gray-300">
+                  <p>Event: <span className="text-white">{selectedProject.event?.title || 'Standalone project'}</span></p>
+                  <p>Lead: <span className="text-white">{selectedProject.lead?.name || 'Not assigned'}</span></p>
+                  <p>Guide: <span className="text-white">{selectedProject.guide?.name || 'Not assigned'}</span></p>
+                  <p>Deadline: <span className="text-white">{formatDateTime(selectedProject.deadline)}</span></p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Link to={`/projects/${selectedProject._id}`} className="btn btn-secondary !text-[10px] !px-3 !py-2">
+                    <ArrowRight size={12} /> Open Workspace
+                  </Link>
+                  <Link to={`/projects/${selectedProject._id}/review`} className="btn btn-secondary !text-[10px] !px-3 !py-2 !text-emerald-200 !border-emerald-500/40">
+                    <ShieldCheck size={12} /> Review Desk
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500">Select a project to preview details.</p>
+            )}
+          </aside>
+        </div>
       )}
     </div>
+  );
+}
+
+function Metric({ label, value, tone = 'cyan' }) {
+  const toneClass =
+    tone === 'emerald'
+      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100'
+      : tone === 'amber'
+      ? 'border-amber-500/30 bg-amber-500/10 text-amber-100'
+      : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-100';
+
+  return (
+    <article className={`rounded-xl border px-4 py-3 ${toneClass}`}>
+      <p className="text-[10px] uppercase tracking-widest font-black">{label}</p>
+      <p className="text-xl font-black mt-1">{value}</p>
+    </article>
   );
 }

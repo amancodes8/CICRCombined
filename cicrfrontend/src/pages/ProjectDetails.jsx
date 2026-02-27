@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   ClipboardList,
@@ -341,37 +342,47 @@ export default function ProjectDetails() {
   }
 
   return (
-    <div className="ui-page max-w-7xl space-y-5 pb-12 page-motion-d">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <Link to="/projects" className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-sm">
-          <ArrowLeft size={16} /> Back to projects
-        </Link>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Link to={`/projects/${id}/review`} className="btn btn-secondary !text-xs !px-3 !py-2">
-            <ShieldCheck size={14} /> Review Desk
-          </Link>
-          {isAdmin ? (
-            <button
-              type="button"
-              onClick={handleDeleteProject}
-              className="text-[11px] uppercase tracking-widest border border-rose-500/40 text-rose-200 rounded-xl px-3 py-2 inline-flex items-center gap-1"
-            >
-              <Trash2 size={13} /> Delete Project
-            </button>
-          ) : null}
-        </div>
-      </header>
-
-      <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-6">
-        <aside className="border border-gray-800 rounded-3xl p-5 space-y-5 xl:sticky xl:top-24 h-fit bg-[#080d14]/80">
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-cyan-300 font-black">{project.event?.title || 'Project Workspace'}</p>
-            <h1 className="text-2xl font-black text-white mt-2 leading-tight">{project.title}</h1>
-            <p className="text-sm text-gray-400 mt-3">{project.description}</p>
+    <div className="ui-page max-w-7xl space-y-6 pb-12 page-motion-d">
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="rounded-[2rem] border border-cyan-500/25 bg-gradient-to-br from-[#091728] via-[#08121f] to-[#070f1a] p-5 md:p-7 pro-aurora"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <Link to="/projects" className="inline-flex items-center gap-2 text-xs text-gray-400 hover:text-white uppercase tracking-widest">
+              <ArrowLeft size={13} /> Back to projects
+            </Link>
+            <p className="text-[10px] uppercase tracking-[0.22em] text-cyan-300 font-black">{project.event?.title || 'Project Workspace'}</p>
+            <h1 className="text-3xl md:text-4xl font-black text-white leading-tight">{project.title}</h1>
+            <p className="text-sm text-gray-300 max-w-3xl">{project.description}</p>
           </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-[10px] uppercase tracking-widest px-2.5 py-1.5 rounded-full border ${statusTone(project.status)}`}>
+              {project.status}
+            </span>
+            <Link to={`/projects/${id}/review`} className="btn btn-secondary !text-[10px] !px-3 !py-2">
+              <ShieldCheck size={13} /> Review Desk
+            </Link>
+            {isAdmin ? (
+              <button
+                type="button"
+                onClick={handleDeleteProject}
+                className="btn btn-secondary !text-[10px] !px-3 !py-2 !text-rose-200 !border-rose-500/40"
+              >
+                <Trash2 size={13} /> Delete
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </motion.section>
 
-          <div className={`inline-flex text-[10px] uppercase tracking-widest px-2.5 py-1.5 rounded-full border ${statusTone(project.status)}`}>
-            {project.status}
+      <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-6">
+        <aside className="border border-blue-500/25 rounded-[1.8rem] p-5 space-y-5 xl:sticky xl:top-24 h-fit bg-gradient-to-b from-[#0a1423] via-[#08111c] to-[#080f19] pro-aurora">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Delivery Pulse</p>
+            <p className="text-xs text-gray-400 mt-2">Stage alignment and timeline posture for this workspace.</p>
           </div>
 
           <div>
@@ -400,7 +411,7 @@ export default function ProjectDetails() {
             <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Components</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {(project.components || []).map((component, idx) => (
-                <span key={`${component}-${idx}`} className="text-[11px] px-2.5 py-1 rounded-full border border-gray-700 text-gray-200">
+                <span key={`${component}-${idx}`} className="text-[11px] px-2.5 py-1 rounded-full border border-blue-500/25 bg-blue-500/10 text-blue-100">
                   {component}
                 </span>
               ))}
@@ -408,8 +419,8 @@ export default function ProjectDetails() {
           </div>
         </aside>
 
-        <main className="border border-gray-800 rounded-3xl overflow-hidden bg-[#070b11]/75">
-          <section className="p-6 md:p-7 border-b border-gray-800">
+        <main className="border border-cyan-500/20 rounded-[2rem] overflow-hidden bg-gradient-to-b from-[#0a111a] via-[#080e16] to-[#070b12] pro-aurora">
+          <section className="p-6 md:p-7 border-b border-cyan-500/15 bg-white/[0.01]">
             <div className="flex items-center gap-2 mb-4">
               <ClipboardList size={16} className="text-cyan-300" />
               <h2 className="text-lg font-black text-white">Management Console</h2>
@@ -600,7 +611,7 @@ export default function ProjectDetails() {
             </form>
           </section>
 
-          <section className="p-6 md:p-7 border-b border-gray-800">
+          <section className="p-6 md:p-7 border-b border-cyan-500/15 bg-cyan-500/[0.015]">
             <div className="flex items-center gap-2 mb-4">
               <ShieldCheck size={16} className="text-emerald-300" />
               <h2 className="text-lg font-black text-white">Governance & Status Ledger</h2>
@@ -660,7 +671,7 @@ export default function ProjectDetails() {
             </div>
           </section>
 
-          <section className="p-6 md:p-7">
+          <section className="p-6 md:p-7 bg-white/[0.01]">
             <div className="flex items-center gap-2 mb-4">
               <Users size={16} className="text-cyan-300" />
               <h2 className="text-lg font-black text-white">Operational Feed</h2>
