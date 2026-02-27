@@ -138,22 +138,22 @@ const trendDelta = (items, dateAccessor, days = 7) => {
 function DashboardSkeleton() {
   return (
     <div className="ui-page pb-16 space-y-5 page-motion-a">
-      <div className="h-28 rounded-[1.6rem] border border-gray-800 bg-[#0a0e14] animate-pulse" />
+      <div className="h-20 border-b border-gray-800 bg-[#0a0e14] animate-pulse" />
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={`kpi-skeleton-${index}`} className="h-28 rounded-[1.2rem] border border-gray-800 bg-[#090d13] animate-pulse" />
+          <div key={`kpi-skeleton-${index}`} className="h-24 border-y border-gray-800 bg-[#090d13] animate-pulse" />
         ))}
       </div>
-      <div className="h-16 rounded-[1.2rem] border border-gray-800 bg-[#090d13] animate-pulse" />
+      <div className="h-14 border-y border-gray-800 bg-[#090d13] animate-pulse" />
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.42fr)_340px] gap-6">
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={`section-skeleton-${index}`} className="h-56 rounded-[1.4rem] border border-gray-800 bg-[#080d12] animate-pulse" />
+            <div key={`section-skeleton-${index}`} className="h-56 border-y border-gray-800 bg-[#080d12] animate-pulse" />
           ))}
         </div>
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={`rail-skeleton-${index}`} className="h-44 rounded-[1.4rem] border border-gray-800 bg-[#080d12] animate-pulse" />
+            <div key={`rail-skeleton-${index}`} className="h-44 border-y border-gray-800 bg-[#080d12] animate-pulse" />
           ))}
         </div>
       </div>
@@ -194,7 +194,7 @@ function KpiTile({ label, value, delta, hint, tone = 'cyan', icon: Icon = BarCha
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.44, delay: 0.06 + index * 0.05, ease: 'easeOut' }}
-      className={`dash-kpi rounded-[1.1rem] border px-4 py-3 md:px-4 md:py-3.5 ${theme.ring}`}
+      className={`px-3 py-3 md:px-4 md:py-3.5 border-y ${theme.ring}`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
@@ -212,7 +212,7 @@ function KpiTile({ label, value, delta, hint, tone = 'cyan', icon: Icon = BarCha
           {delta}
         </p>
       </div>
-      <div className="mt-2 h-1 rounded-full bg-white/5 overflow-hidden">
+      <div className="mt-2 h-1 bg-white/5 overflow-hidden">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${Math.min(100, Math.max(16, Math.abs(Number(delta || 0)) * 8 + 22))}%` }}
@@ -236,7 +236,7 @@ function SectionShell({ title, subtitle, badge, action, collapsed, onToggle, chi
       };
 
   return (
-    <motion.section {...motionProps} className="dash-panel rounded-[1.25rem] border border-gray-800/80 overflow-hidden">
+    <motion.section {...motionProps} className="border-y border-gray-800/80 overflow-hidden">
       <header className="px-4 md:px-5 py-3 border-b border-gray-800/75 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-white">{title}</h3>
@@ -611,17 +611,13 @@ export default function Dashboard() {
   if (loading) return <DashboardSkeleton />;
 
   return (
-    <div className="ui-page pb-24 space-y-8 page-motion-c relative dashboard-canvas">
+    <div className="ui-page pb-24 space-y-8 page-motion-c relative">
       <motion.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: 'easeOut' }}
-        className="relative overflow-hidden rounded-[1.75rem] border border-cyan-500/30 bg-gradient-to-br from-[#0a131e] via-[#09111a] to-[#080d14] dashboard-hero section-motion section-motion-delay-1"
+        className="relative overflow-hidden border-b border-cyan-500/30 bg-gradient-to-br from-[#0a131e] via-[#09111a] to-[#080d14] section-motion section-motion-delay-1"
       >
-        <div className="dashboard-orb dashboard-orb-cyan" />
-        <div className="dashboard-orb dashboard-orb-blue" />
-        <div className="dashboard-grid-overlay" />
-
         <div className="relative z-10 px-4 md:px-6 py-6 md:py-7">
           <PageHeader
             eyebrow={isAlumni ? 'Alumni Command Center' : 'CICR Operations Dashboard'}
@@ -669,7 +665,7 @@ export default function Dashboard() {
         </section>
       ) : null}
 
-      <section className="sticky top-3 z-20 rounded-[1.1rem] border border-gray-800/80 bg-[#070c12]/88 backdrop-blur-md px-2 py-2 section-motion section-motion-delay-2">
+      <section className="sticky top-3 z-20 border-y border-gray-800/80 bg-[#070c12]/88 backdrop-blur-md px-1 py-2 section-motion section-motion-delay-2">
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           {kpiConfig.map((kpi, index) => (
             <KpiTile
@@ -691,7 +687,7 @@ export default function Dashboard() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.3 }}
         transition={{ duration: 0.45 }}
-        className="dash-panel rounded-[1.1rem] border border-gray-800/75 px-4 py-4 section-motion section-motion-delay-2"
+        className="border-y border-gray-800/75 px-2 py-4 section-motion section-motion-delay-2"
       >
         <div className="grid grid-cols-1 lg:grid-cols-[auto_auto_1fr] gap-4 items-start lg:items-center">
           <div>
@@ -956,7 +952,7 @@ export default function Dashboard() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.25 }}
             transition={{ duration: 0.45 }}
-            className="dash-panel rounded-[1.1rem] border border-gray-800/80 p-4"
+            className="border-y border-gray-800/80 py-4 px-1 md:px-2"
           >
             <div className="flex items-center gap-2">
               <Sparkles size={15} className="text-cyan-300" />
@@ -982,7 +978,7 @@ export default function Dashboard() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.25 }}
             transition={{ duration: 0.45, delay: 0.04 }}
-            className="dash-panel rounded-[1.1rem] border border-gray-800/80 p-4"
+            className="border-y border-gray-800/80 py-4 px-1 md:px-2"
           >
             <h3 className="text-base font-semibold text-white">Profile Snapshot</h3>
             <p className="text-sm text-gray-400 mt-1">Identity and operational profile details.</p>
@@ -1005,7 +1001,7 @@ export default function Dashboard() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.25 }}
             transition={{ duration: 0.45, delay: 0.06 }}
-            className="dash-panel rounded-[1.1rem] border border-gray-800/80 p-4"
+            className="border-y border-gray-800/80 py-4 px-1 md:px-2"
           >
             <h3 className="text-base font-semibold text-white inline-flex items-center gap-2">
               <BarChart3 size={14} className="text-cyan-300" />
@@ -1039,7 +1035,7 @@ export default function Dashboard() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.25 }}
               transition={{ duration: 0.45, delay: 0.08 }}
-              className="dash-panel rounded-[1.1rem] border border-gray-800/80 p-4"
+              className="border-y border-gray-800/80 py-4 px-1 md:px-2"
             >
               <h3 className="text-base font-semibold text-white inline-flex items-center gap-2">
                 <BookOpenCheck size={14} className="text-cyan-300" />
@@ -1072,7 +1068,7 @@ export default function Dashboard() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.25 }}
               transition={{ duration: 0.45, delay: 0.08 }}
-              className="dash-panel rounded-[1.1rem] border border-gray-800/80 p-4"
+              className="border-y border-gray-800/80 py-4 px-1 md:px-2"
             >
               <h3 className="text-base font-semibold text-white inline-flex items-center gap-2">
                 <GraduationCap size={14} className="text-indigo-300" />
@@ -1103,7 +1099,7 @@ export default function Dashboard() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.25 }}
               transition={{ duration: 0.45, delay: 0.08 }}
-              className="dash-panel rounded-[1.1rem] border border-gray-800/80 p-4"
+              className="border-y border-gray-800/80 py-4 px-1 md:px-2"
             >
               <h3 className="text-base font-semibold text-white inline-flex items-center gap-2">
                 <ShieldCheck size={14} className="text-emerald-300" />
