@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   ArrowRight,
   CalendarClock,
@@ -107,13 +107,14 @@ export default function Projects() {
     return { completed, review, active };
   }, [filteredProjects]);
 
-  if (loading)
+  if (loading) {
     return (
       <div className="h-[70vh] flex flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin text-blue-500" size={40} />
-        <p className="text-gray-500 font-black text-[10px] uppercase tracking-widest">Loading Projects...</p>
+        <p className="text-gray-500 font-semibold text-sm">Loading projects...</p>
       </div>
     );
+  }
 
   return (
     <div className="ui-page space-y-6 px-4 sm:px-6 lg:px-8 pb-20 page-motion-b">
@@ -121,7 +122,7 @@ export default function Projects() {
         <PageHeader
           eyebrow="Project Workspace"
           title="Project Operations Desk"
-          subtitle="Professional command view of projects, ownership, delivery state, and completion readiness."
+          subtitle="Unified workspace for delivery state, ownership, and review readiness."
           icon={Rocket}
           actions={
             isAdmin ? (
@@ -129,43 +130,43 @@ export default function Projects() {
                 <Plus size={14} /> Initialize Project
               </Link>
             ) : (
-              <div className="btn btn-ghost">Lead/Admin managed</div>
+              <div className="text-sm text-gray-400">Lead/Admin managed</div>
             )
           }
         />
       </header>
 
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 section-motion section-motion-delay-1">
-        <Metric label="Active Scope" value={String(projectMetrics.active)} tone="cyan" />
-        <Metric label="Awaiting Review" value={String(projectMetrics.review)} tone="amber" />
-        <Metric label="Completed" value={String(projectMetrics.completed)} tone="emerald" />
+      <section className="border-y border-gray-800/70 py-3 section-motion section-motion-delay-1">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <MetricLine label="Active Scope" value={String(projectMetrics.active)} tone="cyan" />
+          <MetricLine label="Awaiting Review" value={String(projectMetrics.review)} tone="amber" />
+          <MetricLine label="Completed" value={String(projectMetrics.completed)} tone="emerald" />
+        </div>
       </section>
 
-      <section className="rounded-[1.5rem] border border-gray-800 bg-[#090d14]/70 p-3 md:p-4 section-motion section-motion-delay-2">
-        <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-          <div className="relative w-full lg:w-[26rem] group">
-            <Search
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-cyan-300 transition-colors"
-              size={18}
-            />
+      <section className="border-b border-gray-800/70 pb-3 section-motion section-motion-delay-2">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-3 items-start lg:items-center">
+          <div className="relative w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
             <input
               type="text"
               placeholder="Search projects, event, description..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#070a10] border border-gray-800 rounded-xl py-3 pl-12 pr-4 outline-none focus:border-cyan-500/55 transition-all text-white text-sm"
+              className="ui-input pl-12"
             />
           </div>
 
-          <div className="w-full lg:w-auto flex flex-wrap gap-2">
+          <div className="w-full flex flex-wrap gap-2">
             {STATUS_OPTIONS.map((status) => (
               <button
                 key={status}
+                type="button"
                 onClick={() => setStatusFilter(status)}
-                className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
                   statusFilter === status
-                    ? 'text-cyan-100 border border-cyan-500/50 bg-cyan-500/10'
-                    : 'text-gray-500 hover:text-gray-200 border border-gray-800'
+                    ? 'text-cyan-100 border-cyan-500/50 bg-cyan-500/10'
+                    : 'text-gray-500 hover:text-gray-200 border-gray-800'
                 }`}
               >
                 {status}
@@ -176,100 +177,96 @@ export default function Projects() {
       </section>
 
       {filteredProjects.length === 0 ? (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20 rounded-[2rem] border border-dashed border-gray-800">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20">
           <Target className="mx-auto text-gray-700 mb-4" size={46} />
-          <p className="text-gray-500 font-black uppercase text-xs tracking-[0.24em]">No projects visible for this filter</p>
+          <p className="text-gray-500 font-semibold text-sm">No projects visible for this filter.</p>
         </motion.div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.08fr)_360px] gap-6 section-motion section-motion-delay-3">
-          <section className="rounded-[2rem] border border-blue-500/25 bg-gradient-to-b from-[#09111c] via-[#070d15] to-[#070b12] overflow-hidden pro-aurora">
-            <div className="grid grid-cols-[minmax(0,1.55fr)_0.6fr_0.85fr] gap-2 px-4 md:px-6 py-3 text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black border-b border-blue-500/20">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.25fr)_340px] gap-8 section-motion section-motion-delay-3">
+          <section className="border-y border-gray-800/80">
+            <div className="grid grid-cols-[minmax(0,1.6fr)_0.62fr_0.88fr] gap-2 px-4 md:px-5 py-2 text-sm text-gray-400 font-semibold border-b border-gray-800/80">
               <span>Project</span>
               <span className="hidden md:block">Deadline</span>
               <span className="text-right">Status</span>
             </div>
 
-            <AnimatePresence initial={false}>
-              <div className="divide-y divide-gray-800/80">
-                {filteredProjects.map((project, idx) => {
-                  const active = project._id === selectedProject?._id;
-                  const progress = clampProgress(project.progress);
-                  return (
-                    <motion.article
-                      key={project._id}
-                      layout
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ delay: idx * 0.03, duration: 0.35 }}
-                      onClick={() => setSelectedProjectId(project._id)}
-                      className={`px-4 md:px-6 py-4 cursor-pointer transition-colors pro-row-glide ${
-                        active ? 'bg-blue-500/10' : 'hover:bg-white/[0.03]'
-                      }`}
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.55fr)_0.6fr_0.85fr] gap-2 items-center">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-lg font-black text-white tracking-tight">{project.title}</h3>
-                            <span className="text-[10px] uppercase tracking-widest text-cyan-300">{project.event?.title || 'Standalone'}</span>
-                          </div>
-                          <p className="text-sm text-gray-400 line-clamp-2">{project.description || 'No project summary.'}</p>
-                          <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-                            <span className="inline-flex items-center gap-1.5"><Layers3 size={12} className="text-blue-300" /> {project.stage || 'Planning'}</span>
-                            <span className="inline-flex items-center gap-1.5"><Users size={12} className="text-cyan-300" /> {project.team?.length || 0} members</span>
-                          </div>
-                          <div className="mt-1 h-1.5 rounded-full bg-gray-800 overflow-hidden max-w-xl">
-                            <div
-                              className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
+            <div className="divide-y divide-gray-800/80">
+              {filteredProjects.map((project, idx) => {
+                const active = project._id === selectedProject?._id;
+                const progress = clampProgress(project.progress);
+                return (
+                  <motion.article
+                    key={project._id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.025, duration: 0.3 }}
+                    onClick={() => setSelectedProjectId(project._id)}
+                    className={`px-4 md:px-5 py-4 cursor-pointer transition-colors ${
+                      active ? 'bg-cyan-500/[0.06]' : 'hover:bg-white/[0.02]'
+                    }`}
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.6fr)_0.62fr_0.88fr] gap-3 items-center">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base md:text-lg font-semibold text-white tracking-tight">{project.title}</h3>
+                          <span className="text-xs text-cyan-300">{project.event?.title || 'Standalone'}</span>
                         </div>
-
-                        <div className="hidden md:block text-sm text-gray-300">
-                          <p className="inline-flex items-center gap-1.5"><CalendarClock size={12} className="text-amber-300" /> {formatDateTime(project.deadline)}</p>
+                        <p className="text-sm text-gray-300 line-clamp-2">{project.description || 'No project summary.'}</p>
+                        <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                          <span className="inline-flex items-center gap-1.5"><Layers3 size={12} className="text-blue-300" /> {project.stage || 'Planning'}</span>
+                          <span className="inline-flex items-center gap-1.5"><Users size={12} className="text-cyan-300" /> {project.team?.length || 0} members</span>
                         </div>
-
-                        <div className="flex items-center justify-end gap-2">
-                          <span className={`text-[10px] px-2.5 py-1 rounded-full border uppercase tracking-widest font-black ${statusClass(project.status)}`}>
-                            {project.status || 'Planning'}
-                          </span>
-                          <Link
-                            to={`/projects/${project._id}`}
-                            onClick={(event) => event.stopPropagation()}
-                            className="inline-flex items-center gap-1 text-xs uppercase tracking-widest text-cyan-100"
-                          >
-                            Open <ChevronRight size={13} />
-                          </Link>
+                        <div className="mt-1 h-1.5 rounded-full bg-gray-800 overflow-hidden max-w-xl">
+                          <div
+                            className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
+                            style={{ width: `${progress}%` }}
+                          />
                         </div>
                       </div>
-                    </motion.article>
-                  );
-                })}
-              </div>
-            </AnimatePresence>
+
+                      <div className="hidden md:block text-sm text-gray-300">
+                        <p className="inline-flex items-center gap-1.5"><CalendarClock size={12} className="text-amber-300" /> {formatDateTime(project.deadline)}</p>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2">
+                        <span className={`text-xs px-2.5 py-1 rounded-full border ${statusClass(project.status)}`}>
+                          {project.status || 'Planning'}
+                        </span>
+                        <Link
+                          to={`/projects/${project._id}`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-xs text-cyan-100 hover:text-white"
+                        >
+                          Open <ChevronRight size={13} />
+                        </Link>
+                      </div>
+                    </div>
+                  </motion.article>
+                );
+              })}
+            </div>
           </section>
 
-          <aside className="rounded-[2rem] border border-cyan-500/25 bg-gradient-to-b from-[#0a1523] via-[#080f1a] to-[#070d16] p-5 md:p-6 space-y-5 xl:sticky xl:top-24 h-fit pro-aurora">
+          <aside className="xl:border-l xl:border-gray-800/80 xl:pl-5 h-fit xl:sticky xl:top-24">
             {selectedProject ? (
-              <>
+              <div className="space-y-4">
                 <div>
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-300 font-black">Project Intelligence</p>
-                  <h3 className="text-2xl font-black text-white mt-2 leading-tight">{selectedProject.title}</h3>
-                  <p className="text-sm text-gray-400 mt-2">{selectedProject.description || 'No project description available.'}</p>
+                  <p className="text-xs text-cyan-300 font-semibold">Project Intelligence</p>
+                  <h3 className="text-2xl font-semibold text-white mt-2 leading-tight">{selectedProject.title}</h3>
+                  <p className="text-sm text-gray-300 mt-2">{selectedProject.description || 'No project description available.'}</p>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border ${statusClass(selectedProject.status)}`}>
+                  <span className={`text-xs px-2.5 py-1 rounded-full border ${statusClass(selectedProject.status)}`}>
                     {selectedProject.status || 'Planning'}
                   </span>
-                  <span className="text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-blue-500/30 text-blue-100 bg-blue-500/10">
+                  <span className="text-xs px-2.5 py-1 rounded-full border border-blue-500/30 text-blue-100 bg-blue-500/10">
                     {selectedProject.stage || 'Planning'}
                   </span>
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-gray-400">
+                  <div className="flex items-center justify-between text-sm text-gray-400">
                     <span>Execution progress</span>
                     <span className="text-cyan-100 font-semibold">{clampProgress(selectedProject.progress)}%</span>
                   </div>
@@ -281,7 +278,7 @@ export default function Projects() {
                   </div>
                 </div>
 
-                <div className="space-y-2 text-xs text-gray-300">
+                <div className="space-y-1.5 text-sm text-gray-300 border-y border-gray-800/70 py-3">
                   <p>Event: <span className="text-white">{selectedProject.event?.title || 'Standalone project'}</span></p>
                   <p>Lead: <span className="text-white">{selectedProject.lead?.name || 'Not assigned'}</span></p>
                   <p>Guide: <span className="text-white">{selectedProject.guide?.name || 'Not assigned'}</span></p>
@@ -289,14 +286,14 @@ export default function Projects() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Link to={`/projects/${selectedProject._id}`} className="btn btn-secondary !text-[10px] !px-3 !py-2">
+                  <Link to={`/projects/${selectedProject._id}`} className="btn btn-secondary !text-xs !px-3 !py-2">
                     <ArrowRight size={12} /> Open Workspace
                   </Link>
-                  <Link to={`/projects/${selectedProject._id}/review`} className="btn btn-secondary !text-[10px] !px-3 !py-2 !text-emerald-200 !border-emerald-500/40">
+                  <Link to={`/projects/${selectedProject._id}/review`} className="btn btn-secondary !text-xs !px-3 !py-2 !text-emerald-200 !border-emerald-500/40">
                     <ShieldCheck size={12} /> Review Desk
                   </Link>
                 </div>
-              </>
+              </div>
             ) : (
               <p className="text-sm text-gray-500">Select a project to preview details.</p>
             )}
@@ -307,18 +304,18 @@ export default function Projects() {
   );
 }
 
-function Metric({ label, value, tone = 'cyan' }) {
+function MetricLine({ label, value, tone = 'cyan' }) {
   const toneClass =
     tone === 'emerald'
-      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100'
+      ? 'border-emerald-500/40 text-emerald-100'
       : tone === 'amber'
-      ? 'border-amber-500/30 bg-amber-500/10 text-amber-100'
-      : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-100';
+      ? 'border-amber-500/45 text-amber-100'
+      : 'border-cyan-500/40 text-cyan-100';
 
   return (
-    <article className={`rounded-xl border px-4 py-3 ${toneClass}`}>
-      <p className="text-[10px] uppercase tracking-widest font-black">{label}</p>
-      <p className="text-xl font-black mt-1">{value}</p>
+    <article className={`border-l-2 pl-3 ${toneClass}`}>
+      <p className="text-sm text-gray-400">{label}</p>
+      <p className="text-2xl font-semibold mt-1">{value}</p>
     </article>
   );
 }

@@ -75,7 +75,6 @@ export default function ProjectReview() {
 
   const readiness = useMemo(() => {
     if (!project) return 0;
-
     const checks = [
       Number(project.progress || 0) >= 100,
       Array.isArray(project.components) && project.components.length > 0,
@@ -84,7 +83,6 @@ export default function ProjectReview() {
       Array.isArray(project.team) && project.team.length > 0,
       blockers.length === 0,
     ];
-
     const passed = checks.filter(Boolean).length;
     return Math.round((passed / checks.length) * 100);
   }, [project, blockers.length]);
@@ -152,7 +150,7 @@ export default function ProjectReview() {
         <Link to="/projects" className="inline-flex items-center gap-2 text-gray-400 hover:text-white">
           <ArrowLeft size={16} /> Back to projects
         </Link>
-        <div className="border border-gray-800 rounded-2xl p-8">
+        <div className="border border-gray-800 rounded-xl p-8">
           <p className="text-red-400 font-semibold">Project not found or not visible for your account.</p>
         </div>
       </div>
@@ -161,61 +159,61 @@ export default function ProjectReview() {
 
   return (
     <div className="ui-page max-w-7xl space-y-6 pb-12 page-motion-c">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800/70 pb-3">
         <Link to={`/projects/${id}`} className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-sm">
           <ArrowLeft size={16} /> Back to management
         </Link>
-        <span className={`text-[10px] uppercase tracking-widest border rounded-full px-3 py-1.5 ${statusTone(project.status)}`}>
+        <span className={`text-xs border rounded-full px-3 py-1.5 ${statusTone(project.status)}`}>
           {project.status}
         </span>
       </header>
 
-      <section className="border border-gray-800 rounded-3xl p-6 md:p-7 space-y-4 bg-[#070d15]/80">
-        <p className="text-[10px] uppercase tracking-widest text-cyan-300 font-black">Project Review Desk</p>
-        <h1 className="text-3xl font-black text-white leading-tight">{project.title}</h1>
-        <p className="text-sm text-gray-400">{project.event?.title || 'Internal Project'} • Lead: {project.lead?.name || 'N/A'} • Guide: {project.guide?.name || 'N/A'}</p>
+      <section className="space-y-3 border-b border-gray-800/70 pb-5">
+        <p className="text-xs text-cyan-300 font-semibold">Project Review Desk</p>
+        <h1 className="text-3xl font-semibold text-white leading-tight">{project.title}</h1>
+        <p className="text-sm text-gray-300">{project.event?.title || 'Internal Project'} • Lead: {project.lead?.name || 'N/A'} • Guide: {project.guide?.name || 'N/A'}</p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
           <Metric icon={BadgeCheck} label="Readiness Score" value={`${readiness}%`} tone={readiness >= 80 ? 'ok' : readiness >= 60 ? 'warn' : 'danger'} />
           <Metric icon={ClipboardCheck} label="Progress" value={`${Math.round(Number(project.progress || 0))}%`} tone={Number(project.progress || 0) >= 100 ? 'ok' : 'warn'} />
           <Metric icon={TriangleAlert} label="Open Blockers" value={String(blockers.length)} tone={blockers.length === 0 ? 'ok' : 'danger'} />
         </div>
       </section>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6">
-        <section className="border border-gray-800 rounded-3xl p-6 md:p-7 bg-[#070c13]/70">
-          <h2 className="text-lg font-black text-white inline-flex items-center gap-2">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-8">
+        <section>
+          <h2 className="text-lg font-semibold text-white inline-flex items-center gap-2">
             <Clock3 size={16} className="text-cyan-300" /> Review Timeline
           </h2>
 
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 border-y border-gray-800/70">
             {orderedHistory.length === 0 ? (
-              <p className="text-sm text-gray-500">No review timeline available yet.</p>
+              <p className="text-sm text-gray-500 py-4">No review timeline available yet.</p>
             ) : (
               orderedHistory.map((row, idx) => (
-                <article key={`${row.status}-${row.changedAt}-${idx}`} className="rounded-xl border border-gray-800 p-3">
+                <article key={`${row.status}-${row.changedAt}-${idx}`} className="py-3 border-b border-gray-800/70 last:border-b-0">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <span className={`text-[10px] uppercase tracking-widest border rounded-full px-2.5 py-1 ${statusTone(row.status)}`}>
+                    <span className={`text-xs border rounded-full px-2.5 py-1 ${statusTone(row.status)}`}>
                       {row.status}
                     </span>
                     <p className="text-xs text-gray-500">{formatDateTime(row.changedAt)}</p>
                   </div>
                   <p className="text-sm text-gray-200 mt-2">{row.changedBy?.name || 'Admin'}</p>
-                  {row.note ? <p className="text-xs text-gray-400 mt-1">{row.note}</p> : null}
+                  {row.note ? <p className="text-sm text-gray-400 mt-1">{row.note}</p> : null}
                 </article>
               ))
             )}
           </div>
         </section>
 
-        <section className="border border-gray-800 rounded-3xl p-6 md:p-7 bg-[#070d15]/80">
-          <h2 className="text-lg font-black text-white inline-flex items-center gap-2">
+        <section className="xl:border-l xl:border-gray-800/70 xl:pl-5">
+          <h2 className="text-lg font-semibold text-white inline-flex items-center gap-2">
             <ShieldCheck size={16} className="text-emerald-300" /> Verdict Panel
           </h2>
           {isAdmin ? (
             <form onSubmit={submitVerdict} className="mt-4 space-y-3">
               <label className="block">
-                <span className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Review Decision</span>
+                <span className="text-xs text-gray-400 font-semibold">Review Decision</span>
                 <select value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value)} className="ui-input mt-1.5">
                   {REVIEW_STATUSES.map((status) => (
                     <option key={status} value={status}>
@@ -226,7 +224,7 @@ export default function ProjectReview() {
               </label>
 
               <label className="block">
-                <span className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Review Note</span>
+                <span className="text-xs text-gray-400 font-semibold">Review Note</span>
                 <textarea
                   rows={5}
                   value={reviewNote}
@@ -251,7 +249,7 @@ export default function ProjectReview() {
                 </button>
               </div>
 
-              <p className="text-[11px] text-gray-500">
+              <p className="text-xs text-gray-500">
                 Final <span className="text-emerald-200">Completed</span> state is admin-controlled for quality assurance.
               </p>
             </form>
@@ -267,17 +265,17 @@ export default function ProjectReview() {
 function Metric({ icon: Icon, label, value, tone }) {
   const toneClass =
     tone === 'ok'
-      ? 'border-emerald-500/40 text-emerald-200 bg-emerald-500/10'
+      ? 'border-emerald-500/40 text-emerald-200'
       : tone === 'warn'
-      ? 'border-amber-500/45 text-amber-200 bg-amber-500/10'
-      : 'border-rose-500/40 text-rose-200 bg-rose-500/10';
+      ? 'border-amber-500/45 text-amber-200'
+      : 'border-rose-500/40 text-rose-200';
 
   return (
-    <article className={`rounded-xl border px-4 py-3 ${toneClass}`}>
-      <p className="text-[10px] uppercase tracking-widest font-black inline-flex items-center gap-1.5">
+    <article className={`border-l-2 pl-3 ${toneClass}`}>
+      <p className="text-xs font-semibold inline-flex items-center gap-1.5">
         <Icon size={12} /> {label}
       </p>
-      <p className="text-xl font-black mt-1">{value}</p>
+      <p className="text-2xl font-semibold mt-1">{value}</p>
     </article>
   );
 }

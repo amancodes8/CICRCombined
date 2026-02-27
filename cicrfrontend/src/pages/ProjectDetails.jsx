@@ -334,7 +334,7 @@ export default function ProjectDetails() {
         <Link to="/projects" className="inline-flex items-center gap-2 text-gray-400 hover:text-white">
           <ArrowLeft size={16} /> Back to projects
         </Link>
-        <div className="border border-gray-800 rounded-2xl p-8">
+        <div className="border border-gray-800 p-8">
           <p className="text-red-400 font-semibold">Project not found or not visible for your account.</p>
         </div>
       </div>
@@ -347,29 +347,29 @@ export default function ProjectDetails() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="rounded-[2rem] border border-cyan-500/25 bg-gradient-to-br from-[#091728] via-[#08121f] to-[#070f1a] p-5 md:p-7 pro-aurora"
+        className="border-b border-gray-800/70 pb-4"
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
-            <Link to="/projects" className="inline-flex items-center gap-2 text-xs text-gray-400 hover:text-white uppercase tracking-widest">
+            <Link to="/projects" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white">
               <ArrowLeft size={13} /> Back to projects
             </Link>
-            <p className="text-[10px] uppercase tracking-[0.22em] text-cyan-300 font-black">{project.event?.title || 'Project Workspace'}</p>
-            <h1 className="text-3xl md:text-4xl font-black text-white leading-tight">{project.title}</h1>
+            <p className="text-xs text-cyan-300 font-semibold">{project.event?.title || 'Project Workspace'}</p>
+            <h1 className="text-3xl md:text-4xl font-semibold text-white leading-tight">{project.title}</h1>
             <p className="text-sm text-gray-300 max-w-3xl">{project.description}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-[10px] uppercase tracking-widest px-2.5 py-1.5 rounded-full border ${statusTone(project.status)}`}>
+            <span className={`text-xs px-2.5 py-1.5 rounded-full border ${statusTone(project.status)}`}>
               {project.status}
             </span>
-            <Link to={`/projects/${id}/review`} className="btn btn-secondary !text-[10px] !px-3 !py-2">
+            <Link to={`/projects/${id}/review`} className="btn btn-secondary !text-xs !px-3 !py-2">
               <ShieldCheck size={13} /> Review Desk
             </Link>
             {isAdmin ? (
               <button
                 type="button"
                 onClick={handleDeleteProject}
-                className="btn btn-secondary !text-[10px] !px-3 !py-2 !text-rose-200 !border-rose-500/40"
+                className="btn btn-secondary !text-xs !px-3 !py-2 !text-rose-200 !border-rose-500/40"
               >
                 <Trash2 size={13} /> Delete
               </button>
@@ -378,11 +378,11 @@ export default function ProjectDetails() {
         </div>
       </motion.section>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-6">
-        <aside className="border border-blue-500/25 rounded-[1.8rem] p-5 space-y-5 xl:sticky xl:top-24 h-fit bg-gradient-to-b from-[#0a1423] via-[#08111c] to-[#080f19] pro-aurora">
+      <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-8">
+        <aside className="space-y-5 xl:sticky xl:top-24 h-fit xl:border-r xl:border-gray-800/70 xl:pr-5">
           <div>
-            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Delivery Pulse</p>
-            <p className="text-xs text-gray-400 mt-2">Stage alignment and timeline posture for this workspace.</p>
+            <p className="text-xs text-gray-400 font-semibold">Delivery Pulse</p>
+            <p className="text-sm text-gray-400 mt-2">Stage alignment and timeline posture for this workspace.</p>
           </div>
 
           <div>
@@ -396,7 +396,7 @@ export default function ProjectDetails() {
             <p className="text-xs text-gray-400 mt-2">Stage: <span className="text-gray-100">{project.stage}</span></p>
           </div>
 
-          <div className="space-y-2 text-xs text-gray-300">
+          <div className="space-y-2 text-sm text-gray-300 border-y border-gray-800/70 py-3">
             <p>Lead: <span className="text-white">{project.lead?.name || 'N/A'}</span></p>
             <p>Guide: <span className="text-white">{project.guide?.name || 'N/A'}</span></p>
             <p>Team: <span className="text-white">{project.team?.length || 0}</span></p>
@@ -408,10 +408,10 @@ export default function ProjectDetails() {
           </div>
 
           <div>
-            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Components</p>
+            <p className="text-xs text-gray-400 font-semibold">Components</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {(project.components || []).map((component, idx) => (
-                <span key={`${component}-${idx}`} className="text-[11px] px-2.5 py-1 rounded-full border border-blue-500/25 bg-blue-500/10 text-blue-100">
+                <span key={`${component}-${idx}`} className="text-xs px-2.5 py-1 rounded-full border border-blue-500/25 bg-blue-500/10 text-blue-100">
                   {component}
                 </span>
               ))}
@@ -419,16 +419,16 @@ export default function ProjectDetails() {
           </div>
         </aside>
 
-        <main className="border border-cyan-500/20 rounded-[2rem] overflow-hidden bg-gradient-to-b from-[#0a111a] via-[#080e16] to-[#070b12] pro-aurora">
-          <section className="p-6 md:p-7 border-b border-cyan-500/15 bg-white/[0.01]">
+        <main className="overflow-hidden border-y border-gray-800/70">
+          <section className="p-6 md:p-7 border-b border-gray-800/70">
             <div className="flex items-center gap-2 mb-4">
               <ClipboardList size={16} className="text-cyan-300" />
-              <h2 className="text-lg font-black text-white">Management Console</h2>
+              <h2 className="text-lg font-semibold text-white">Management Console</h2>
             </div>
 
             <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
               <form onSubmit={submitProgress} className="space-y-3">
-                <p className="text-[11px] uppercase tracking-widest text-gray-500 font-black">Progress & Stage</p>
+                <p className="text-xs text-gray-400 font-semibold">Progress & Stage</p>
                 {canManage ? (
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -460,7 +460,7 @@ export default function ProjectDetails() {
                       {savingProgress ? <Loader2 size={14} className="animate-spin" /> : <Percent size={14} />}
                       Update Progress
                     </button>
-                    <p className="text-[11px] text-gray-500">
+                    <p className="text-xs text-gray-500">
                       At 100%, system moves to <span className="text-amber-200">Awaiting Review</span>. Final completion is admin-only.
                     </p>
                   </>
@@ -470,12 +470,12 @@ export default function ProjectDetails() {
               </form>
 
               <form onSubmit={submitMembers} className="space-y-3">
-                <p className="text-[11px] uppercase tracking-widest text-gray-500 font-black">Team Growth</p>
+                <p className="text-xs text-gray-400 font-semibold">Team Growth</p>
                 {canManage ? (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black mb-2">Add Members</p>
+                        <p className="text-xs text-gray-500 font-semibold mb-2">Add Members</p>
                         <div className="grid grid-cols-1 gap-2 max-h-36 overflow-y-auto pr-1">
                           {memberOptions.map((member) => {
                             const memberId = String(member._id || '');
@@ -501,7 +501,7 @@ export default function ProjectDetails() {
                         </div>
                       </div>
                       <div>
-                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black mb-2">Remove Members</p>
+                        <p className="text-xs text-gray-500 font-semibold mb-2">Remove Members</p>
                         <div className="grid grid-cols-1 gap-2 max-h-36 overflow-y-auto pr-1">
                           {removableTeamMembers.map((member) => {
                             const memberId = String(member?._id || member || '');
@@ -542,7 +542,7 @@ export default function ProjectDetails() {
             </div>
 
             <form onSubmit={submitDetails} className="mt-6 pt-5 border-t border-gray-800 space-y-3">
-              <p className="text-[11px] uppercase tracking-widest text-gray-500 font-black">Project Configuration</p>
+              <p className="text-xs text-gray-400 font-semibold">Project Configuration</p>
               {canManage ? (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -611,15 +611,15 @@ export default function ProjectDetails() {
             </form>
           </section>
 
-          <section className="p-6 md:p-7 border-b border-cyan-500/15 bg-cyan-500/[0.015]">
+          <section className="p-6 md:p-7 border-b border-gray-800/70">
             <div className="flex items-center gap-2 mb-4">
               <ShieldCheck size={16} className="text-emerald-300" />
-              <h2 className="text-lg font-black text-white">Governance & Status Ledger</h2>
+              <h2 className="text-lg font-semibold text-white">Governance & Status Ledger</h2>
             </div>
 
             <div className="grid grid-cols-1 2xl:grid-cols-[360px_minmax(0,1fr)] gap-6">
               <form onSubmit={submitStatus} className="space-y-3">
-                <p className="text-[11px] uppercase tracking-widest text-gray-500 font-black">Admin Status Control</p>
+                <p className="text-xs text-gray-400 font-semibold">Admin Status Control</p>
                 {isAdmin ? (
                   <>
                     <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)} className="ui-input">
@@ -649,7 +649,7 @@ export default function ProjectDetails() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                    <tr className="text-left text-xs text-gray-500 border-b border-gray-800">
                       <th className="py-2 pr-4">Status</th>
                       <th className="py-2 pr-4">Changed By</th>
                       <th className="py-2 pr-4">When</th>
@@ -671,10 +671,10 @@ export default function ProjectDetails() {
             </div>
           </section>
 
-          <section className="p-6 md:p-7 bg-white/[0.01]">
+          <section className="p-6 md:p-7">
             <div className="flex items-center gap-2 mb-4">
               <Users size={16} className="text-cyan-300" />
-              <h2 className="text-lg font-black text-white">Operational Feed</h2>
+              <h2 className="text-lg font-semibold text-white">Operational Feed</h2>
             </div>
 
             {canManage ? (
@@ -703,7 +703,7 @@ export default function ProjectDetails() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                  <tr className="text-left text-xs text-gray-500 border-b border-gray-800">
                     <th className="py-2 pr-3">Type</th>
                     <th className="py-2 pr-3">Message</th>
                     <th className="py-2 pr-3">Actor</th>
@@ -721,7 +721,7 @@ export default function ProjectDetails() {
                     orderedUpdates.map((row, idx) => (
                       <tr key={`${row.createdAt}-${idx}`} className="border-b border-gray-800/60 align-top">
                         <td className="py-2 pr-3">
-                          <span className={`text-[10px] uppercase tracking-widest border rounded-full px-2 py-1 ${updateTone(row.type)}`}>
+                          <span className={`text-xs border rounded-full px-2 py-1 ${updateTone(row.type)}`}>
                             {row.type}
                           </span>
                         </td>

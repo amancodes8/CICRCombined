@@ -159,29 +159,29 @@ export default function CreateProject() {
   };
 
   return (
-    <div className="ui-page max-w-5xl mx-auto space-y-6 page-motion-a pro-stagger">
+    <div className="ui-page max-w-5xl mx-auto space-y-6 page-motion-a pb-16">
       <button onClick={() => navigate('/projects')} className="flex items-center gap-2 text-gray-400 hover:text-white section-motion section-motion-delay-1">
         <ArrowLeft size={18} /> Back to Projects
       </button>
 
-      {!isAdmin && (
-        <div className="border border-amber-500/30 rounded-2xl p-4 text-sm text-amber-200 section-motion section-motion-delay-1">
+      {!isAdmin ? (
+        <div className="border-l-2 border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 section-motion section-motion-delay-1">
           Only administrators can initialize projects. Leads can manage updates once assigned.
         </div>
-      )}
+      ) : null}
 
       <form onSubmit={handleSubmit} className="space-y-6 section-motion section-motion-delay-2">
-        <div className="border border-gray-800 p-6 md:p-8 rounded-3xl space-y-6 pro-hover-lift">
+        <section className="space-y-5 border-b border-gray-800/70 pb-6">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-xl font-bold flex items-center gap-2"><FolderKanban size={20} className="text-blue-500" /> Project Initialization</h3>
+            <h3 className="text-xl font-semibold flex items-center gap-2"><FolderKanban size={20} className="text-blue-400" /> Project Initialization</h3>
             {lastSavedAt ? (
-              <span className="text-[10px] uppercase tracking-widest text-gray-500">
+              <span className="text-xs text-gray-500">
                 Draft saved {new Date(lastSavedAt).toLocaleTimeString()}
               </span>
             ) : null}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <FormField id="project-event" label="Event" required error={errors.eventId}>
               <select
                 id="project-event"
@@ -213,8 +213,8 @@ export default function CreateProject() {
           </div>
 
           {selectedEvent ? (
-            <p className="text-xs text-cyan-200 border border-cyan-500/35 rounded-xl px-3 py-2">
-              Project will be linked to: <span className="font-semibold">{selectedEvent.title}</span>
+            <p className="text-sm text-cyan-200">
+              Linked event: <span className="font-semibold">{selectedEvent.title}</span>
             </p>
           ) : null}
 
@@ -250,7 +250,7 @@ export default function CreateProject() {
             />
           </FormField>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <FormField id="project-start-time" label="Start Time" required error={errors.startTime}>
               <input
                 id="project-start-time"
@@ -285,7 +285,7 @@ export default function CreateProject() {
             </FormField>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <FormField id="project-lead" label="Project Lead" required error={errors.lead}>
               <select
                 id="project-lead"
@@ -318,28 +318,28 @@ export default function CreateProject() {
               </select>
             </FormField>
           </div>
-        </div>
+        </section>
 
-        <div className="border border-gray-800 p-6 md:p-8 rounded-3xl space-y-4 pro-hover-lift">
-          <h3 className="text-xl font-bold flex items-center gap-2"><Users size={20} className="text-blue-500" /> Initial Team Members</h3>
-          <p className="text-xs text-gray-500 uppercase tracking-widest">Click members to include in the project team</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
+        <section className="space-y-3 border-b border-gray-800/70 pb-6">
+          <h3 className="text-lg font-semibold flex items-center gap-2"><Users size={18} className="text-blue-400" /> Initial Team Members</h3>
+          <p className="text-sm text-gray-400">Click members to include in the project team.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-80 overflow-y-auto pr-2">
             {users.map((u) => (
               <button
                 key={u._id}
                 type="button"
                 onClick={() => toggleTeamMember(u._id)}
-                className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all text-left ${
-                  formData.team.includes(u._id) ? 'border-blue-600 bg-blue-600/10' : 'border-gray-800 bg-[#0a0a0c]'
+                className={`flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-colors ${
+                  formData.team.includes(u._id) ? 'border-blue-500/60 bg-blue-500/10 text-blue-100' : 'border-gray-800 text-gray-300'
                 }`}
               >
-                <span className="text-sm font-bold">{u.name}</span>
-                {formData.team.includes(u._id) && <Check size={18} className="text-blue-500" />}
+                <span className="text-sm">{u.name}</span>
+                {formData.team.includes(u._id) ? <Check size={16} className="text-blue-300" /> : null}
               </button>
             ))}
           </div>
           {errors.team ? <p className="ui-field-error">{errors.team}</p> : null}
-        </div>
+        </section>
 
         <div className="mobile-sticky-action">
           <button
