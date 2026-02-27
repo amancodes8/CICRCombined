@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   Activity,
+  AlertTriangle,
+  ArrowUpRight,
+  BarChart3,
   BookOpenCheck,
   Building2,
   CalendarDays,
@@ -20,6 +23,7 @@ import {
   Phone,
   ShieldCheck,
   Sparkles,
+  Target,
   Users,
 } from 'lucide-react';
 import {
@@ -49,7 +53,6 @@ const ROLE_OPTIONS = [
 ];
 
 const PROJECT_STATUS_OPTIONS = ['all', 'planning', 'active', 'on-hold', 'delayed', 'awaiting review', 'completed', 'archived', 'ongoing'];
-
 const SECTION_KEYS = ['timeline', 'meetings', 'projects', 'discussions'];
 
 const fmtDate = (d) => {
@@ -135,22 +138,22 @@ const trendDelta = (items, dateAccessor, days = 7) => {
 function DashboardSkeleton() {
   return (
     <div className="ui-page pb-16 space-y-5 page-motion-a">
-      <div className="h-20 rounded-3xl border border-gray-800 bg-[#0a0e14] animate-pulse" />
+      <div className="h-28 rounded-[1.6rem] border border-gray-800 bg-[#0a0e14] animate-pulse" />
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={`kpi-skeleton-${index}`} className="h-24 rounded-2xl border border-gray-800 bg-[#090d13] animate-pulse" />
+          <div key={`kpi-skeleton-${index}`} className="h-28 rounded-[1.2rem] border border-gray-800 bg-[#090d13] animate-pulse" />
         ))}
       </div>
-      <div className="h-14 rounded-2xl border border-gray-800 bg-[#090d13] animate-pulse" />
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_360px] gap-6">
+      <div className="h-16 rounded-[1.2rem] border border-gray-800 bg-[#090d13] animate-pulse" />
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.42fr)_340px] gap-6">
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={`section-skeleton-${index}`} className="h-56 rounded-3xl border border-gray-800 bg-[#080d12] animate-pulse" />
+            <div key={`section-skeleton-${index}`} className="h-56 rounded-[1.4rem] border border-gray-800 bg-[#080d12] animate-pulse" />
           ))}
         </div>
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={`rail-skeleton-${index}`} className="h-44 rounded-3xl border border-gray-800 bg-[#080d12] animate-pulse" />
+            <div key={`rail-skeleton-${index}`} className="h-44 rounded-[1.4rem] border border-gray-800 bg-[#080d12] animate-pulse" />
           ))}
         </div>
       </div>
@@ -158,57 +161,86 @@ function DashboardSkeleton() {
   );
 }
 
-function KpiTile({ label, value, delta, tone = 'cyan' }) {
-  const toneClass =
-    tone === 'emerald'
-      ? 'bg-emerald-400'
-      : tone === 'amber'
-      ? 'bg-amber-400'
-      : tone === 'blue'
-      ? 'bg-blue-400'
-      : 'bg-cyan-400';
+function KpiTile({ label, value, delta, hint, tone = 'cyan', icon: Icon = BarChart3, index = 0 }) {
+  const toneMap = {
+    cyan: {
+      accent: 'from-cyan-300 to-blue-400',
+      ring: 'border-cyan-500/35',
+      icon: 'text-cyan-200 bg-cyan-500/10 border-cyan-500/35',
+    },
+    blue: {
+      accent: 'from-blue-300 to-indigo-400',
+      ring: 'border-blue-500/35',
+      icon: 'text-blue-200 bg-blue-500/10 border-blue-500/35',
+    },
+    amber: {
+      accent: 'from-amber-300 to-orange-400',
+      ring: 'border-amber-500/35',
+      icon: 'text-amber-200 bg-amber-500/10 border-amber-500/35',
+    },
+    emerald: {
+      accent: 'from-emerald-300 to-teal-400',
+      ring: 'border-emerald-500/35',
+      icon: 'text-emerald-200 bg-emerald-500/10 border-emerald-500/35',
+    },
+  };
 
+  const theme = toneMap[tone] || toneMap.cyan;
   const deltaTone = delta > 0 ? 'text-emerald-300' : delta < 0 ? 'text-rose-300' : 'text-gray-400';
   const deltaPrefix = delta > 0 ? '+' : '';
 
   return (
     <motion.article
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
-      className="px-2 py-2 border-b border-gray-800/80"
+      transition={{ duration: 0.44, delay: 0.06 + index * 0.05, ease: 'easeOut' }}
+      className={`dash-kpi rounded-[1.1rem] border px-4 py-3 md:px-4 md:py-3.5 ${theme.ring}`}
     >
-      <div className="flex items-center gap-2">
-        <span className={`w-2 h-2 rounded-full ${toneClass}`} />
-        <p className="text-sm text-gray-300 font-semibold">{label}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-[0.14em] text-gray-400 font-semibold truncate">{label}</p>
+          <p className="text-3xl md:text-[2.1rem] font-black tracking-tight text-white mt-1">{value}</p>
+        </div>
+        <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border ${theme.icon}`}>
+          <Icon size={15} />
+        </span>
       </div>
-      <div className="mt-1 flex items-end justify-between gap-2">
-        <p className="text-3xl md:text-[2.1rem] font-black tracking-tight text-white">{value}</p>
-        <p className={`text-xs font-semibold ${deltaTone}`}>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="text-xs text-gray-500 truncate">{hint || 'Current operational signal'}</p>
+        <p className={`text-xs font-semibold whitespace-nowrap ${deltaTone}`}>
           {deltaPrefix}
           {delta}
         </p>
       </div>
-      <p className="text-xs text-gray-500 mt-1">vs previous 7 days</p>
+      <div className="mt-2 h-1 rounded-full bg-white/5 overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min(100, Math.max(16, Math.abs(Number(delta || 0)) * 8 + 22))}%` }}
+          transition={{ duration: 0.8, delay: 0.1 + index * 0.05 }}
+          className={`h-full bg-gradient-to-r ${theme.accent}`}
+        />
+      </div>
     </motion.article>
   );
 }
 
-function SectionShell({
-  title,
-  subtitle,
-  badge,
-  action,
-  collapsed,
-  onToggle,
-  children,
-}) {
+function SectionShell({ title, subtitle, badge, action, collapsed, onToggle, children, index = 0 }) {
+  const reduceMotion = useReducedMotion();
+  const motionProps = reduceMotion
+    ? {}
+    : {
+        initial: { opacity: 0, y: 24 },
+        whileInView: { opacity: 1, y: 0 },
+        viewport: { once: true, amount: 0.18 },
+        transition: { duration: 0.55, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] },
+      };
+
   return (
-    <section className="py-1">
-      <header className="px-1 md:px-2 py-3 border-b border-gray-800/70 flex flex-wrap items-center justify-between gap-3">
+    <motion.section {...motionProps} className="dash-panel rounded-[1.25rem] border border-gray-800/80 overflow-hidden">
+      <header className="px-4 md:px-5 py-3 border-b border-gray-800/75 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-white">{title}</h3>
-          <p className="text-sm text-gray-300 mt-0.5">{subtitle}</p>
+          <p className="text-sm text-gray-400 mt-0.5">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {badge ? (
@@ -227,14 +259,28 @@ function SectionShell({
           </button>
         </div>
       </header>
-      {!collapsed ? <div className="px-1 md:px-2 py-3">{children}</div> : null}
-    </section>
+
+      <AnimatePresence initial={false}>
+        {!collapsed ? (
+          <motion.div
+            key={`${title}-content`}
+            initial={reduceMotion ? false : { opacity: 0, height: 0 }}
+            animate={reduceMotion ? undefined : { opacity: 1, height: 'auto' }}
+            exit={reduceMotion ? undefined : { opacity: 0, height: 0 }}
+            transition={{ duration: 0.28, ease: 'easeOut' }}
+            className="px-4 md:px-5 py-4"
+          >
+            {children}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </motion.section>
   );
 }
 
 function EmptyInline({ title, ctaLabel, to }) {
   return (
-    <div className="py-3 text-sm text-gray-500">
+    <div className="py-4 text-sm text-gray-500">
       <p>{title}</p>
       {to ? (
         <Link to={to} className="inline-flex mt-2 text-sm font-semibold text-cyan-200">
@@ -288,7 +334,7 @@ export default function Dashboard() {
         fetchMeetings(),
         fetchMyInsights(),
         isAdminOrHead ? fetchApplications() : Promise.resolve({ data: [] }),
-        (isAlumni || isAdminOrHead) ? fetchDirectoryMembers() : Promise.resolve({ data: [] }),
+        isAlumni || isAdminOrHead ? fetchDirectoryMembers() : Promise.resolve({ data: [] }),
         isJuniorMember ? fetchLearningOverview() : Promise.resolve({ data: null }),
       ];
 
@@ -458,6 +504,18 @@ export default function Dashboard() {
     [alumniProfile?.tenures]
   );
 
+  const projectPulse = useMemo(() => {
+    const total = Math.max(1, filteredProjects.length);
+    const completed = filteredProjects.filter((row) => String(row.status || '').toLowerCase() === 'completed').length;
+    const atRisk = filteredProjects.filter((row) => ['delayed', 'on-hold'].includes(String(row.status || '').toLowerCase())).length;
+    const active = Math.max(0, filteredProjects.length - completed - atRisk);
+    return [
+      { label: 'Completed', value: completed, percent: Math.round((completed / total) * 100), tone: 'from-emerald-400 to-teal-400' },
+      { label: 'Active', value: active, percent: Math.round((active / total) * 100), tone: 'from-cyan-400 to-blue-400' },
+      { label: 'At Risk', value: atRisk, percent: Math.round((atRisk / total) * 100), tone: 'from-rose-400 to-orange-400' },
+    ];
+  }, [filteredProjects]);
+
   const kpiConfig = useMemo(
     () => [
       {
@@ -465,18 +523,24 @@ export default function Dashboard() {
         value: filteredProjects.length,
         delta: trendDelta(projects, (row) => row.updatedAt || row.createdAt || row.deadline),
         tone: 'cyan',
+        icon: FolderKanban,
+        hint: 'Delivery tracks in current scope',
       },
       {
         label: 'Meetings',
         value: filteredMeetings.length,
         delta: trendDelta(meetings, (row) => row.startTime),
         tone: 'blue',
+        icon: CalendarDays,
+        hint: 'Session cadence this window',
       },
       {
         label: 'Discussions',
         value: filteredPosts.length,
         delta: trendDelta(posts, (row) => row.createdAt),
         tone: 'amber',
+        icon: MessageSquareText,
+        hint: 'Community communication volume',
       },
       isAdminOrHead
         ? {
@@ -484,12 +548,16 @@ export default function Dashboard() {
             value: applicationStats.total,
             delta: trendDelta(applications, (row) => row.updatedAt || row.createdAt),
             tone: 'emerald',
+            icon: Target,
+            hint: 'Pipeline movement this window',
           }
         : {
             label: 'Learning Points',
             value: Number(learningOverview?.stats?.myPoints || 0),
             delta: Number(learningOverview?.stats?.myApprovedTasks || 0),
             tone: 'emerald',
+            icon: BookOpenCheck,
+            hint: 'Approved task outcomes',
           },
     ],
     [
@@ -543,41 +611,57 @@ export default function Dashboard() {
   if (loading) return <DashboardSkeleton />;
 
   return (
-    <div className="ui-page pb-24 space-y-7 page-motion-c">
+    <div className="ui-page pb-24 space-y-8 page-motion-c relative dashboard-canvas">
       <motion.section
-        className="section-motion section-motion-delay-1"
-        initial={{ opacity: 0, y: 14 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: 'easeOut' }}
+        transition={{ duration: 0.55, ease: 'easeOut' }}
+        className="relative overflow-hidden rounded-[1.75rem] border border-cyan-500/30 bg-gradient-to-br from-[#0a131e] via-[#09111a] to-[#080d14] dashboard-hero section-motion section-motion-delay-1"
       >
-        <PageHeader
-          eyebrow={isAlumni ? 'Alumni Dashboard' : 'CICR Dashboard'}
-          title={isAlumni ? `Welcome Back, ${member?.name || 'Alumni Member'}` : 'Operations Dashboard'}
-          subtitle="Role-based workspace with filtered signals, operational timelines, and quick actions."
-          icon={isAlumni ? Handshake : Activity}
-          actions={
-            <>
-              <Link to="/projects" className="btn btn-primary">Projects</Link>
-              <Link to="/events" className="btn btn-secondary">Events</Link>
-              {isAdminOrHead ? <Link to="/admin" className="btn btn-secondary">Admin</Link> : null}
-            </>
-          }
-        />
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-          <span className="px-2.5 py-1 rounded-full border border-gray-700 text-gray-300">
-            {isAlumni ? 'Alumni View' : isAdminOrHead ? 'Admin View' : 'Member View'}
-          </span>
-          <span className="px-2.5 py-1 rounded-full border border-cyan-500/35 bg-cyan-500/10 text-cyan-200">
-            {filteredProjects.length} projects in scope
-          </span>
-          <span className="px-2.5 py-1 rounded-full border border-blue-500/35 bg-blue-500/10 text-blue-200">
-            {filteredMeetings.length} meetings in scope
-          </span>
+        <div className="dashboard-orb dashboard-orb-cyan" />
+        <div className="dashboard-orb dashboard-orb-blue" />
+        <div className="dashboard-grid-overlay" />
+
+        <div className="relative z-10 px-4 md:px-6 py-6 md:py-7">
+          <PageHeader
+            eyebrow={isAlumni ? 'Alumni Command Center' : 'CICR Operations Dashboard'}
+            title={isAlumni ? `Welcome Back, ${member?.name || 'Alumni Member'}` : 'Operational Command Center'}
+            subtitle="Live, role-based intelligence across projects, meetings, discussions, and recruitment movement."
+            icon={isAlumni ? Handshake : Activity}
+            actions={
+              <>
+                <Link to="/projects" className="btn btn-primary">Projects</Link>
+                <Link to="/events" className="btn btn-secondary">Events</Link>
+                {isAdminOrHead ? <Link to="/admin" className="btn btn-secondary">Admin</Link> : null}
+              </>
+            }
+            badge={
+              <>
+                <Sparkles size={12} className="text-cyan-300" />
+                Synced command view
+              </>
+            }
+          />
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="px-2.5 py-1 rounded-full border border-gray-700 text-gray-300 text-xs">
+              {isAlumni ? 'Alumni View' : isAdminOrHead ? 'Admin View' : 'Member View'}
+            </span>
+            <span className="px-2.5 py-1 rounded-full border border-cyan-500/35 bg-cyan-500/10 text-cyan-200 text-xs">
+              {filteredProjects.length} projects in scope
+            </span>
+            <span className="px-2.5 py-1 rounded-full border border-blue-500/35 bg-blue-500/10 text-blue-200 text-xs">
+              {filteredMeetings.length} meetings in scope
+            </span>
+            <span className="px-2.5 py-1 rounded-full border border-amber-500/35 bg-amber-500/10 text-amber-200 text-xs">
+              {filteredPosts.length} discussions visible
+            </span>
+          </div>
         </div>
       </motion.section>
 
       {loadError ? (
-        <section className="border-l-2 border-amber-500/50 bg-amber-500/10 px-4 py-3 flex items-center justify-between gap-3">
+        <section className="border border-amber-500/35 bg-amber-500/10 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
           <p className="text-sm text-amber-100">{loadError}</p>
           <button type="button" onClick={loadDashboard} className="btn btn-secondary !w-auto !text-xs">
             <Loader2 size={12} /> Retry
@@ -585,24 +669,33 @@ export default function Dashboard() {
         </section>
       ) : null}
 
-      <section className="sticky top-3 z-20 section-motion section-motion-delay-2 border-y border-gray-800/70 bg-[#070b10]/92 backdrop-blur py-2">
+      <section className="sticky top-3 z-20 rounded-[1.1rem] border border-gray-800/80 bg-[#070c12]/88 backdrop-blur-md px-2 py-2 section-motion section-motion-delay-2">
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-          {kpiConfig.map((kpi) => (
+          {kpiConfig.map((kpi, index) => (
             <KpiTile
               key={kpi.label}
               label={kpi.label}
               value={kpi.value}
               delta={kpi.delta}
               tone={kpi.tone}
+              icon={kpi.icon}
+              hint={kpi.hint}
+              index={index}
             />
           ))}
         </div>
       </section>
 
-      <section className="border-b border-gray-800/70 py-3 section-motion section-motion-delay-2">
-        <div className="grid grid-cols-1 lg:grid-cols-[auto_auto_1fr] gap-3 items-start lg:items-center">
+      <motion.section
+        initial={{ opacity: 0, y: 14 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 0.45 }}
+        className="dash-panel rounded-[1.1rem] border border-gray-800/75 px-4 py-4 section-motion section-motion-delay-2"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-[auto_auto_1fr] gap-4 items-start lg:items-center">
           <div>
-            <p className="text-xs text-gray-400 font-semibold mb-1.5">Time window</p>
+            <p className="text-xs text-gray-400 font-semibold mb-1.5">Time Window</p>
             <div className="flex flex-wrap gap-2">
               {TIME_WINDOWS.map((option) => (
                 <button
@@ -623,7 +716,7 @@ export default function Dashboard() {
           </div>
 
           <div>
-            <p className="text-xs text-gray-400 font-semibold mb-1.5">Role scope</p>
+            <p className="text-xs text-gray-400 font-semibold mb-1.5">Role Scope</p>
             <select
               aria-label="Role scope filter"
               value={roleFilter}
@@ -639,7 +732,7 @@ export default function Dashboard() {
           </div>
 
           <div>
-            <p className="text-xs text-gray-400 font-semibold mb-1.5">Project status</p>
+            <p className="text-xs text-gray-400 font-semibold mb-1.5">Project Status</p>
             <div className="flex flex-wrap gap-2">
               {PROJECT_STATUS_OPTIONS.map((status) => (
                 <button
@@ -659,24 +752,33 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_340px] gap-8 section-motion section-motion-delay-3">
-        <main className="space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.45fr)_340px] gap-7 section-motion section-motion-delay-3">
+        <main className="space-y-5">
           <SectionShell
             title="Activity Timeline"
-            subtitle={isAdminOrHead ? 'Who changed what, when, with current status context.' : 'Recent operational changes relevant to your workspace.'}
+            subtitle={isAdminOrHead ? 'Who changed what, when, with context and status.' : 'Recent operational changes relevant to your workspace.'}
             badge={`${activityTimeline.length} entries`}
             collapsed={collapsed.timeline}
             onToggle={() => toggleSection('timeline')}
             action={isAdminOrHead ? <span className="text-xs font-semibold text-emerald-300">Admin trace</span> : null}
+            index={0}
           >
             {activityTimeline.length === 0 ? (
               <EmptyInline title="No timeline entries for the current filters." ctaLabel="Reset filters" to="/dashboard" />
             ) : (
-              <div className="divide-y divide-gray-800">
-                {activityTimeline.map((entry) => (
-                  <div key={entry.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-3 hover:bg-white/[0.02] transition-colors">
+              <div className="space-y-2">
+                {activityTimeline.map((entry, index) => (
+                  <motion.article
+                    key={entry.id}
+                    initial={{ opacity: 0, x: -12 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, amount: 0.6 }}
+                    transition={{ duration: 0.3, delay: index * 0.02 }}
+                    className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 py-2.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors"
+                  >
+                    <span className="mt-1.5 w-2 h-2 rounded-full bg-cyan-400" />
                     <div className="min-w-0">
                       <p className="text-sm text-white font-semibold truncate">{entry.title}</p>
                       <p className="text-sm text-gray-300 mt-1 truncate">{entry.detail}</p>
@@ -693,7 +795,7 @@ export default function Dashboard() {
                         {fmtDate(entry.time)} {fmtTime(entry.time)}
                       </span>
                     </div>
-                  </div>
+                  </motion.article>
                 ))}
               </div>
             )}
@@ -706,6 +808,7 @@ export default function Dashboard() {
             collapsed={collapsed.meetings}
             onToggle={() => toggleSection('meetings')}
             action={<Link to="/meetings" className="text-xs font-semibold text-cyan-200">Open all</Link>}
+            index={1}
           >
             {filteredMeetings.length === 0 ? (
               <EmptyInline title="No meetings for current filters." ctaLabel="Schedule meeting" to="/schedule" />
@@ -717,8 +820,15 @@ export default function Dashboard() {
                     <span>When</span>
                     <span>Type</span>
                   </div>
-                  {filteredMeetings.map((meeting) => (
-                    <div key={meeting._id} className="grid grid-cols-[minmax(0,1.2fr)_0.9fr_0.7fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/[0.02] transition-colors">
+                  {filteredMeetings.map((meeting, index) => (
+                    <motion.div
+                      key={meeting._id}
+                      initial={{ opacity: 0, x: -8 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true, amount: 0.7 }}
+                      transition={{ delay: index * 0.02, duration: 0.26 }}
+                      className="grid grid-cols-[minmax(0,1.2fr)_0.9fr_0.7fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/[0.02] transition-colors"
+                    >
                       <div className="min-w-0">
                         <p className="text-sm text-white font-semibold truncate">{meeting.title}</p>
                         <p className="text-xs text-gray-400 truncate">{meeting.details?.topic || 'Session details not added'}</p>
@@ -729,7 +839,7 @@ export default function Dashboard() {
                       <span className={`text-xs px-2 py-1 rounded-full border h-fit ${statusBadgeClass('Scheduled')}`}>
                         {meeting.meetingType || 'General'}
                       </span>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </div>
@@ -738,37 +848,53 @@ export default function Dashboard() {
 
           <SectionShell
             title="Projects"
-            subtitle="Delivery overview with stage and status alignment."
+            subtitle="Delivery overview with stage, status, and progress alignment."
             badge={`${filteredProjects.length} visible`}
             collapsed={collapsed.projects}
             onToggle={() => toggleSection('projects')}
             action={<Link to="/projects" className="text-xs font-semibold text-cyan-200">Workspace</Link>}
+            index={2}
           >
             {filteredProjects.length === 0 ? (
               <EmptyInline title="No projects for the selected filters." ctaLabel="Open projects" to="/projects" />
             ) : (
               <div className="overflow-x-auto">
-                <div className="min-w-[560px]">
-                  <div className="grid grid-cols-[minmax(0,1.3fr)_0.65fr_0.65fr] gap-3 text-sm text-gray-400 font-semibold py-2 border-b border-gray-800">
+                <div className="min-w-[640px]">
+                  <div className="grid grid-cols-[minmax(0,1.15fr)_0.6fr_0.65fr_0.45fr] gap-3 text-sm text-gray-400 font-semibold py-2 border-b border-gray-800">
                     <span>Project</span>
                     <span>Stage</span>
                     <span>Status</span>
+                    <span>Done</span>
                   </div>
-                  {filteredProjects.slice(0, 10).map((project) => (
-                    <Link
-                      to={`/projects/${project._id}`}
+                  {filteredProjects.slice(0, 10).map((project, index) => (
+                    <motion.div
                       key={project._id}
-                      className="grid grid-cols-[minmax(0,1.3fr)_0.65fr_0.65fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/[0.02] transition-colors"
+                      initial={{ opacity: 0, x: -8 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true, amount: 0.65 }}
+                      transition={{ delay: index * 0.02, duration: 0.26 }}
                     >
-                      <div className="min-w-0">
-                        <p className="text-sm text-white font-semibold truncate">{project.title}</p>
-                        <p className="text-xs text-gray-400 truncate">{project.event?.title || 'Standalone'}</p>
-                      </div>
-                      <p className="text-xs text-gray-300">{project.stage || 'Planning'}</p>
-                      <span className={`text-xs px-2 py-1 rounded-full border h-fit ${statusBadgeClass(project.status)}`}>
-                        {project.status || 'Planning'}
-                      </span>
-                    </Link>
+                      <Link
+                        to={`/projects/${project._id}`}
+                        className="grid grid-cols-[minmax(0,1.15fr)_0.6fr_0.65fr_0.45fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/[0.02] transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm text-white font-semibold truncate">{project.title}</p>
+                          <p className="text-xs text-gray-400 truncate">{project.event?.title || 'Standalone'}</p>
+                          <div className="mt-2 h-1.5 rounded-full bg-gray-800 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
+                              style={{ width: `${Math.max(0, Math.min(100, Number(project.progress || 0)))}%` }}
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-300">{project.stage || 'Planning'}</p>
+                        <span className={`text-xs px-2 py-1 rounded-full border h-fit ${statusBadgeClass(project.status)}`}>
+                          {project.status || 'Planning'}
+                        </span>
+                        <p className="text-xs text-cyan-200 font-semibold">{Math.round(Number(project.progress || 0))}%</p>
+                      </Link>
+                    </motion.div>
                   ))}
                 </div>
               </div>
@@ -782,6 +908,7 @@ export default function Dashboard() {
             collapsed={collapsed.discussions}
             onToggle={() => toggleSection('discussions')}
             action={<Link to="/community" className="text-xs font-semibold text-cyan-200">Open feed</Link>}
+            index={3}
           >
             {filteredPosts.length === 0 ? (
               <EmptyInline title="No discussions match your filters." ctaLabel="Start discussion" to="/community" />
@@ -793,22 +920,29 @@ export default function Dashboard() {
                     <span>Author</span>
                     <span>When</span>
                   </div>
-                  {filteredPosts.slice(0, 10).map((post) => (
-                    <Link
-                      to="/community"
+                  {filteredPosts.slice(0, 10).map((post, index) => (
+                    <motion.div
                       key={post._id}
-                      className="grid grid-cols-[minmax(0,1.35fr)_0.65fr_0.55fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/[0.02] transition-colors"
+                      initial={{ opacity: 0, x: -8 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true, amount: 0.7 }}
+                      transition={{ delay: index * 0.02, duration: 0.26 }}
                     >
-                      <div className="min-w-0">
-                        <p className="text-xs text-blue-300 font-semibold">{post.type || 'Update'}</p>
-                        <p className="text-sm text-white truncate mt-1">{post.content || 'No message content'}</p>
-                      </div>
-                      <p className="text-xs text-gray-300 truncate">
-                        {post.user?.name || 'Member'}
-                        {post.user?.role ? ` • ${post.user.role}` : ''}
-                      </p>
-                      <p className="text-xs text-gray-400 whitespace-nowrap">{fmtDate(post.createdAt)}</p>
-                    </Link>
+                      <Link
+                        to="/community"
+                        className="grid grid-cols-[minmax(0,1.35fr)_0.65fr_0.55fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/[0.02] transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs text-blue-300 font-semibold">{post.type || 'Update'}</p>
+                          <p className="text-sm text-white truncate mt-1">{post.content || 'No message content'}</p>
+                        </div>
+                        <p className="text-xs text-gray-300 truncate">
+                          {post.user?.name || 'Member'}
+                          {post.user?.role ? ` • ${post.user.role}` : ''}
+                        </p>
+                        <p className="text-xs text-gray-400 whitespace-nowrap">{fmtDate(post.createdAt)}</p>
+                      </Link>
+                    </motion.div>
                   ))}
                 </div>
               </div>
@@ -816,8 +950,14 @@ export default function Dashboard() {
           </SectionShell>
         </main>
 
-        <aside className="space-y-5 xl:border-l xl:border-gray-800/70 xl:pl-5">
-          <section className="pb-5 border-b border-gray-800/70">
+        <aside className="space-y-5">
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.25 }}
+            transition={{ duration: 0.45 }}
+            className="dash-panel rounded-[1.1rem] border border-gray-800/80 p-4"
+          >
             <div className="flex items-center gap-2">
               <Sparkles size={15} className="text-cyan-300" />
               <h3 className="text-base font-semibold text-white">Quick Actions</h3>
@@ -831,31 +971,76 @@ export default function Dashboard() {
                   className="flex items-center justify-between py-2.5 text-sm text-gray-200 hover:text-white transition-colors"
                 >
                   <span>{action.label}</span>
-                  <span className="text-cyan-300">↗</span>
+                  <ArrowUpRight size={14} className="text-cyan-300" />
                 </Link>
               ))}
             </div>
-          </section>
+          </motion.section>
 
-          <section className="pb-5 border-b border-gray-800/70">
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.25 }}
+            transition={{ duration: 0.45, delay: 0.04 }}
+            className="dash-panel rounded-[1.1rem] border border-gray-800/80 p-4"
+          >
             <h3 className="text-base font-semibold text-white">Profile Snapshot</h3>
-            <p className="text-sm text-gray-400 mt-1">Visible identity and operational profile details.</p>
-            <div className="mt-3 space-y-2 text-sm text-gray-300">
+            <p className="text-sm text-gray-400 mt-1">Identity and operational profile details.</p>
+            <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-gray-300">
               <p className="inline-flex items-center gap-2"><Users size={12} className="text-cyan-300" /> {member.name || 'N/A'}</p>
               <p className="inline-flex items-center gap-2"><IdCard size={12} className="text-blue-300" /> {member.collegeId || 'N/A'}</p>
               <p className="inline-flex items-center gap-2"><Mail size={12} className="text-indigo-300" /> {member.email || 'N/A'}</p>
               <p className="inline-flex items-center gap-2"><Phone size={12} className="text-emerald-300" /> {member.phone || 'N/A'}</p>
               <p className="inline-flex items-center gap-2"><Clock3 size={12} className="text-amber-300" /> {member.yearsInCICR ?? 0} years in CICR</p>
-              <p className="inline-flex items-center gap-2"><FolderKanban size={12} className="text-cyan-300" /> {metrics.totalProjectContributions || filteredProjects.length} project contributions</p>
+              <p className="inline-flex items-center gap-2"><FolderKanban size={12} className="text-cyan-300" /> {metrics.totalProjectContributions || filteredProjects.length} contributions</p>
               <p className="inline-flex items-center gap-2"><Users size={12} className="text-blue-300" /> {directoryMembers.length} members in directory</p>
             </div>
             <div className="mt-3">
               <Link to="/profile" className="btn btn-ghost !w-auto !text-xs">Open Profile</Link>
             </div>
-          </section>
+          </motion.section>
+
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.25 }}
+            transition={{ duration: 0.45, delay: 0.06 }}
+            className="dash-panel rounded-[1.1rem] border border-gray-800/80 p-4"
+          >
+            <h3 className="text-base font-semibold text-white inline-flex items-center gap-2">
+              <BarChart3 size={14} className="text-cyan-300" />
+              Project Pulse
+            </h3>
+            <p className="text-sm text-gray-400 mt-1">Completion, active execution, and risk profile.</p>
+            <div className="mt-3 space-y-3">
+              {projectPulse.map((item) => (
+                <article key={item.label}>
+                  <div className="flex items-center justify-between text-xs">
+                    <p className="text-gray-300">{item.label}</p>
+                    <p className="text-gray-400">{item.value} • {item.percent}%</p>
+                  </div>
+                  <div className="mt-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      whileInView={{ width: `${Math.max(8, item.percent)}%` }}
+                      viewport={{ once: true, amount: 0.7 }}
+                      transition={{ duration: 0.75, ease: 'easeOut' }}
+                      className={`h-full bg-gradient-to-r ${item.tone}`}
+                    />
+                  </div>
+                </article>
+              ))}
+            </div>
+          </motion.section>
 
           {isJuniorMember ? (
-            <section className="pb-5 border-b border-gray-800/70">
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              transition={{ duration: 0.45, delay: 0.08 }}
+              className="dash-panel rounded-[1.1rem] border border-gray-800/80 p-4"
+            >
               <h3 className="text-base font-semibold text-white inline-flex items-center gap-2">
                 <BookOpenCheck size={14} className="text-cyan-300" />
                 Junior Launchpad
@@ -878,11 +1063,17 @@ export default function Dashboard() {
                   ))
                 )}
               </div>
-            </section>
+            </motion.section>
           ) : null}
 
           {isAlumni ? (
-            <section className="pb-5 border-b border-gray-800/70">
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              transition={{ duration: 0.45, delay: 0.08 }}
+              className="dash-panel rounded-[1.1rem] border border-gray-800/80 p-4"
+            >
               <h3 className="text-base font-semibold text-white inline-flex items-center gap-2">
                 <GraduationCap size={14} className="text-indigo-300" />
                 Alumni Overview
@@ -903,11 +1094,17 @@ export default function Dashboard() {
                   ))
                 )}
               </div>
-            </section>
+            </motion.section>
           ) : null}
 
           {isAdminOrHead ? (
-            <section className="pb-5">
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              transition={{ duration: 0.45, delay: 0.08 }}
+              className="dash-panel rounded-[1.1rem] border border-gray-800/80 p-4"
+            >
               <h3 className="text-base font-semibold text-white inline-flex items-center gap-2">
                 <ShieldCheck size={14} className="text-emerald-300" />
                 Recruitment Snapshot
@@ -918,10 +1115,16 @@ export default function Dashboard() {
                 <MiniMetric label="Interview" value={applicationStats.interview} />
                 <MiniMetric label="Selected" value={applicationStats.selected} />
               </div>
+              {applicationStats.new > 0 ? (
+                <p className="mt-3 text-xs text-amber-200 inline-flex items-center gap-1">
+                  <AlertTriangle size={12} />
+                  {applicationStats.new} applications need triage.
+                </p>
+              ) : null}
               <div className="mt-3">
                 <Link to="/admin" className="btn btn-ghost !w-auto !text-xs">Open Recruitment</Link>
               </div>
-            </section>
+            </motion.section>
           ) : null}
         </aside>
       </div>
