@@ -68,10 +68,19 @@ export const sendInviteEmail = (data) => API.post('/admin/send-invite', data);
 export const generatePasswordResetCode = (id) => API.post(`/admin/users/${id}/password-reset-code`);
 
 // Project management
-export const fetchProjects = () => API.get('/projects');
+export const fetchProjects = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return API.get(`/projects${suffix}`);
+};
 export const fetchProjectById = (id) => API.get(`/projects/${id}`);
 export const createProject = (data) => API.post('/projects', data);
 export const addProjectSuggestion = (id, text) => API.post(`/projects/${id}/suggestions`, { text });
+export const addProjectUpdate = (id, payload) => API.post(`/projects/${id}/updates`, payload);
+export const updateProjectProgress = (id, payload) => API.patch(`/projects/${id}/progress`, payload);
+export const updateProjectStatus = (id, payload) => API.patch(`/projects/${id}/status`, payload);
+export const updateProjectTeam = (id, payload) => API.patch(`/projects/${id}/team`, payload);
+export const deleteProject = (id) => API.delete(`/projects/${id}`);
 
 // community
 export const fetchPosts = () => API.get('/community/posts');
@@ -269,6 +278,7 @@ export const fetchEvents = (params = {}) => {
   const suffix = query.toString() ? `?${query.toString()}` : '';
   return API.get(`/events${suffix}`);
 };
+export const fetchEventById = (id) => API.get(`/events/${id}`);
 export const createEvent = (payload) => API.post('/events', payload);
 export const updateEvent = (id, payload) => API.put(`/events/${id}`, payload);
 export const deleteEvent = (id) => API.delete(`/events/${id}`);

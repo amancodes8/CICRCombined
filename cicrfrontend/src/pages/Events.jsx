@@ -1,8 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, CheckCircle2, Clock4, MapPin, Plus, Sparkles, Trash2, Users } from 'lucide-react';
-import { createEvent, deleteEvent, fetchEvents, updateEvent } from '../api';
+import {
+  CalendarDays,
+  CheckCircle2,
+  Clock4,
+  Layers3,
+  MapPin,
+  Plus,
+  Sparkles,
+  Trash2,
+  Users,
+} from 'lucide-react';
+import { createEvent, deleteEvent, fetchDirectoryMembers, fetchEvents, updateEvent } from '../api';
 import FormField from '../components/FormField';
 import PageHeader from '../components/PageHeader';
 import { DataEmpty, DataLoading } from '../components/DataState';
@@ -10,6 +20,9 @@ import useDraftForm from '../hooks/useDraftForm';
 import useUnsavedChangesWarning from '../hooks/useUnsavedChangesWarning';
 
 const EVENT_TYPES = ['Orientation', 'Workshop', 'Recruitment', 'Competition', 'Seminar', 'Internal'];
+const PROJECT_DOMAINS = ['Tech', 'Management', 'PR'];
+const PROJECT_STAGES = ['Planning', 'Execution', 'Testing', 'Review', 'Deployment'];
+
 const INITIAL_EVENT_FORM = {
   title: '',
   type: 'Internal',
@@ -20,6 +33,19 @@ const INITIAL_EVENT_FORM = {
   allowApplications: false,
   applicationDeadline: '',
 };
+
+const buildProjectDraft = () => ({
+  title: '',
+  description: '',
+  domain: 'Tech',
+  components: '',
+  startTime: '',
+  deadline: '',
+  lead: '',
+  guide: '',
+  team: [],
+  stage: 'Planning',
+});
 
 const dispatchToast = (message, type = 'info') => {
   try {
@@ -45,6 +71,8 @@ export default function Events() {
   const [searchParams] = useSearchParams();
   const createFormRef = useRef(null);
   const [events, setEvents] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [projectDrafts, setProjectDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [errors, setErrors] = useState({});
@@ -52,13 +80,13 @@ export default function Events() {
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const user = profile.result || profile;
   const role = String(user.role || '').toLowerCase();
-  const isAdminOrHead = role === 'admin' || role === 'head';
+  const isAdmin = role === 'admin';
 
   const { values: form, setValues: setForm, isDirty, lastSavedAt, resetForm } = useDraftForm({
     storageKey: `draft_events_create_${String(user._id || user.collegeId || 'member')}`,
     initialValues: INITIAL_EVENT_FORM,
   });
-  useUnsavedChangesWarning(isAdminOrHead && isDirty);
+  useUnsavedChangesWarning(isAdmin && (isDirty || projectDrafts.length > 0));
 
   const loadEvents = async () => {
     setLoading(true);
@@ -77,17 +105,58 @@ export default function Events() {
   }, []);
 
   useEffect(() => {
-    if (!isAdminOrHead) return;
+    if (!isAdmin) return;
+    fetchDirectoryMembers()
+      .then((res) => setMembers(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setMembers([]));
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
     if (searchParams.get('quick') !== 'create') return;
     createFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     window.setTimeout(() => document.getElementById('event-title')?.focus(), 160);
-  }, [isAdminOrHead, searchParams]);
+  }, [isAdmin, searchParams]);
 
   const openEvents = useMemo(() => events.filter((event) => event.status === 'Scheduled'), [events]);
 
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }));
+  };
+
+  const setProjectField = (index, key, value) => {
+    setProjectDrafts((prev) => prev.map((row, idx) => (idx === index ? { ...row, [key]: value } : row)));
+    const errorKey = `project_${index}_${key}`;
+    if (errors[errorKey]) {
+      setErrors((prev) => ({ ...prev, [errorKey]: '' }));
+    }
+  };
+
+  const toggleProjectMember = (index, userId) => {
+    setProjectDrafts((prev) =>
+      prev.map((row, idx) => {
+        if (idx !== index) return row;
+        const hasUser = row.team.includes(userId);
+        return {
+          ...row,
+          team: hasUser ? row.team.filter((id) => id !== userId) : [...row.team, userId],
+        };
+      })
+    );
+
+    const errorKey = `project_${index}_team`;
+    if (errors[errorKey]) {
+      setErrors((prev) => ({ ...prev, [errorKey]: '' }));
+    }
+  };
+
+  const addProjectDraft = () => {
+    setProjectDrafts((prev) => [...prev, buildProjectDraft()]);
+  };
+
+  const removeProjectDraft = (index) => {
+    setProjectDrafts((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   const validate = () => {
@@ -107,12 +176,33 @@ export default function Events() {
         next.applicationDeadline = 'Deadline must be on or before event date.';
       }
     }
+
+    projectDrafts.forEach((row, index) => {
+      if (String(row.title || '').trim().length < 4) next[`project_${index}_title`] = 'Project name must be at least 4 characters.';
+      if (String(row.description || '').trim().length < 20) {
+        next[`project_${index}_description`] = 'Description must be at least 20 characters.';
+      }
+      const components = String(row.components || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (!components.length) next[`project_${index}_components`] = 'Add at least one component/resource.';
+      if (!row.startTime) next[`project_${index}_startTime`] = 'Project start time is required.';
+      if (!row.deadline) next[`project_${index}_deadline`] = 'Project deadline is required.';
+      if (row.startTime && row.deadline && new Date(row.deadline) <= new Date(row.startTime)) {
+        next[`project_${index}_deadline`] = 'Deadline must be after start time.';
+      }
+      if (!String(row.lead || '').trim()) next[`project_${index}_lead`] = 'Select a lead.';
+      if (!String(row.guide || '').trim()) next[`project_${index}_guide`] = 'Select a guide.';
+      if (!Array.isArray(row.team) || row.team.length === 0) next[`project_${index}_team`] = 'Select at least one team member.';
+    });
+
     return next;
   };
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!isAdminOrHead) return;
+    if (!isAdmin) return;
 
     const nextErrors = validate();
     setErrors(nextErrors);
@@ -124,11 +214,28 @@ export default function Events() {
         ...form,
         applicationDeadline: form.applicationDeadline || null,
         allowApplications: !!form.allowApplications,
+        projects: projectDrafts.map((row) => ({
+          title: row.title,
+          description: row.description,
+          domain: row.domain,
+          components: String(row.components || '')
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean),
+          startTime: row.startTime,
+          deadline: row.deadline,
+          lead: row.lead,
+          guide: row.guide,
+          team: row.team,
+          stage: row.stage,
+        })),
       };
+
       const { data } = await createEvent(payload);
       setEvents((prev) => [data, ...prev]);
       resetForm(INITIAL_EVENT_FORM);
-      dispatchToast('Event created.', 'success');
+      setProjectDrafts([]);
+      dispatchToast('Event created successfully.', 'success');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Failed to create event.', 'error');
     } finally {
@@ -147,7 +254,7 @@ export default function Events() {
   };
 
   const handleDelete = async (eventId) => {
-    if (!window.confirm('Delete this event?')) return;
+    if (!window.confirm('Delete this event and all linked projects?')) return;
     try {
       await deleteEvent(eventId);
       setEvents((prev) => prev.filter((item) => item._id !== eventId));
@@ -167,8 +274,8 @@ export default function Events() {
       >
         <PageHeader
           eyebrow="CICR Events"
-          title="Events & Recruitment Drives"
-          subtitle="Track workshops, orientation sessions, and recruitment pipelines. Open events can host applications from new members."
+          title="Events & Project Tracks"
+          subtitle="Create events and initialize delivery projects with lead, guide, and team assignments in one workflow."
           icon={CalendarDays}
           badge={
             <>
@@ -179,14 +286,14 @@ export default function Events() {
         />
       </motion.section>
 
-      {isAdminOrHead ? (
+      {isAdmin ? (
         <motion.form
           ref={createFormRef}
           onSubmit={handleCreate}
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.05 }}
-          className="border border-gray-800 rounded-[2rem] p-6 md:p-8 space-y-4 section-motion section-motion-delay-2"
+          className="border border-gray-800 rounded-[2rem] p-6 md:p-8 space-y-5 section-motion section-motion-delay-2"
         >
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 text-xs text-gray-400 uppercase tracking-[0.22em] font-black">
@@ -272,6 +379,161 @@ export default function Events() {
             Allow applications for this event
           </label>
 
+          <div className="border border-gray-800/90 rounded-2xl p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                <Layers3 size={14} className="text-cyan-300" /> Initialize Projects (Optional)
+              </h3>
+              <button type="button" onClick={addProjectDraft} className="btn btn-secondary !px-3 !py-1.5 !text-[10px]">
+                Add Project
+              </button>
+            </div>
+
+            {projectDrafts.length === 0 ? (
+              <p className="text-xs text-gray-500">No project blueprints added yet.</p>
+            ) : null}
+
+            {projectDrafts.map((row, index) => (
+              <div key={`seed-${index}`} className="border border-gray-800 rounded-xl p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-widest text-gray-400 font-black">Project {index + 1}</p>
+                  <button
+                    type="button"
+                    onClick={() => removeProjectDraft(index)}
+                    className="text-[10px] uppercase tracking-widest text-rose-300"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <FormField label="Name" required error={errors[`project_${index}_title`]}>
+                    <input
+                      value={row.title}
+                      onChange={(e) => setProjectField(index, 'title', e.target.value)}
+                      className="ui-input"
+                    />
+                  </FormField>
+                  <FormField label="Domain" required>
+                    <select
+                      value={row.domain}
+                      onChange={(e) => setProjectField(index, 'domain', e.target.value)}
+                      className="ui-input"
+                    >
+                      {PROJECT_DOMAINS.map((domain) => (
+                        <option key={domain} value={domain}>
+                          {domain}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                </div>
+
+                <FormField label="Description" required error={errors[`project_${index}_description`]}>
+                  <textarea
+                    rows={3}
+                    value={row.description}
+                    onChange={(e) => setProjectField(index, 'description', e.target.value)}
+                    className="ui-input resize-none"
+                  />
+                </FormField>
+
+                <FormField label="Components / Resources" required error={errors[`project_${index}_components`]}>
+                  <input
+                    value={row.components}
+                    onChange={(e) => setProjectField(index, 'components', e.target.value)}
+                    placeholder="Comma separated resources"
+                    className="ui-input"
+                  />
+                </FormField>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <FormField label="Start" required error={errors[`project_${index}_startTime`]}>
+                    <input
+                      type="datetime-local"
+                      value={row.startTime}
+                      onChange={(e) => setProjectField(index, 'startTime', e.target.value)}
+                      className="ui-input [color-scheme:dark]"
+                    />
+                  </FormField>
+                  <FormField label="Deadline" required error={errors[`project_${index}_deadline`]}>
+                    <input
+                      type="datetime-local"
+                      value={row.deadline}
+                      onChange={(e) => setProjectField(index, 'deadline', e.target.value)}
+                      className="ui-input [color-scheme:dark]"
+                    />
+                  </FormField>
+                  <FormField label="Stage" required>
+                    <select
+                      value={row.stage}
+                      onChange={(e) => setProjectField(index, 'stage', e.target.value)}
+                      className="ui-input"
+                    >
+                      {PROJECT_STAGES.map((stage) => (
+                        <option key={stage} value={stage}>
+                          {stage}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <FormField label="Lead" required error={errors[`project_${index}_lead`]}>
+                    <select
+                      value={row.lead}
+                      onChange={(e) => setProjectField(index, 'lead', e.target.value)}
+                      className="ui-input"
+                    >
+                      <option value="">Select lead</option>
+                      {members.map((member) => (
+                        <option key={member._id} value={member._id}>
+                          {member.name} ({member.role})
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                  <FormField label="Guide" required error={errors[`project_${index}_guide`]}>
+                    <select
+                      value={row.guide}
+                      onChange={(e) => setProjectField(index, 'guide', e.target.value)}
+                      className="ui-input"
+                    >
+                      <option value="">Select guide</option>
+                      {members.map((member) => (
+                        <option key={member._id} value={member._id}>
+                          {member.name} ({member.role})
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                </div>
+
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Initial Team</p>
+                  <div className="mt-2 max-h-36 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2 pr-1">
+                    {members.map((member) => (
+                      <button
+                        key={`seed-${index}-${member._id}`}
+                        type="button"
+                        onClick={() => toggleProjectMember(index, member._id)}
+                        className={`text-left text-xs px-3 py-2 rounded-lg border transition-colors ${
+                          row.team.includes(member._id)
+                            ? 'border-blue-500/60 text-blue-100 bg-blue-500/10'
+                            : 'border-gray-800 text-gray-300'
+                        }`}
+                      >
+                        {member.name}
+                      </button>
+                    ))}
+                  </div>
+                  {errors[`project_${index}_team`] ? <p className="ui-field-error mt-2">{errors[`project_${index}_team`]}</p> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+
           <div className="mobile-sticky-action">
             <button type="submit" disabled={creating} className="btn btn-primary !px-4 !py-2.5">
               {creating ? 'Saving...' : 'Create Event'}
@@ -282,6 +544,11 @@ export default function Events() {
 
       {loading ? (
         <div className="h-64 flex items-center justify-center"><DataLoading label="Loading events..." /></div>
+      ) : events.length === 0 ? (
+        <DataEmpty
+          title="No events created yet"
+          hint={isAdmin ? 'Create your first event and initialize project tracks.' : 'Please check again later.'}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 section-motion section-motion-delay-3 pro-stagger">
           {events.map((event) => (
@@ -313,6 +580,9 @@ export default function Events() {
                 <div className="flex items-center gap-2">
                   <MapPin size={12} className="text-emerald-400" /> {event.location}
                 </div>
+                <div className="flex items-center gap-2">
+                  <Layers3 size={12} className="text-cyan-300" /> {event.projectCount || 0} linked projects
+                </div>
                 {event.allowApplications ? (
                   <div className="flex items-center gap-2">
                     <Users size={12} className="text-purple-400" /> Applications open until {fmtDate(event.applicationDeadline)}
@@ -321,6 +591,13 @@ export default function Events() {
               </div>
 
               <div className="flex flex-wrap gap-2">
+                <Link
+                  to={`/projects?event=${event._id}`}
+                  className="text-[10px] uppercase tracking-widest border border-cyan-500/40 text-cyan-200 px-3 py-1.5 rounded-lg"
+                >
+                  View Projects
+                </Link>
+
                 {event.allowApplications ? (
                   <Link
                     to={`/apply${event._id ? `?event=${event._id}` : ''}`}
@@ -330,7 +607,7 @@ export default function Events() {
                   </Link>
                 ) : null}
 
-                {isAdminOrHead && event.status === 'Scheduled' ? (
+                {isAdmin && event.status === 'Scheduled' ? (
                   <button
                     onClick={() => handleStatusUpdate(event._id, 'Completed')}
                     className="text-[10px] uppercase tracking-widest border border-emerald-500/40 text-emerald-200 px-3 py-1.5 rounded-lg inline-flex items-center gap-1"
@@ -338,7 +615,7 @@ export default function Events() {
                     <CheckCircle2 size={12} /> Complete
                   </button>
                 ) : null}
-                {isAdminOrHead ? (
+                {isAdmin ? (
                   <button
                     onClick={() => handleStatusUpdate(event._id, 'Cancelled')}
                     className="text-[10px] uppercase tracking-widest border border-rose-500/40 text-rose-200 px-3 py-1.5 rounded-lg"
@@ -346,7 +623,7 @@ export default function Events() {
                     Cancel
                   </button>
                 ) : null}
-                {isAdminOrHead ? (
+                {isAdmin ? (
                   <button
                     onClick={() => handleDelete(event._id)}
                     className="text-[10px] uppercase tracking-widest border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg inline-flex items-center gap-1"
@@ -359,12 +636,6 @@ export default function Events() {
           ))}
         </div>
       )}
-
-      {!loading && events.length === 0 ? (
-        <div className="section-motion section-motion-delay-3">
-          <DataEmpty label="No events created yet." />
-        </div>
-      ) : null}
     </div>
   );
 }
