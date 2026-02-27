@@ -86,6 +86,21 @@ export default function EventDetails() {
     return map;
   }, [projects]);
 
+  const projectStageCounts = useMemo(() => {
+    const map = {};
+    for (const project of projects) {
+      const stage = String(project.stage || 'Planning');
+      map[stage] = (map[stage] || 0) + 1;
+    }
+    return map;
+  }, [projects]);
+
+  const averageProgress = useMemo(() => {
+    if (!projects.length) return 0;
+    const total = projects.reduce((sum, project) => sum + Math.max(0, Math.min(100, Number(project.progress || 0))), 0);
+    return Math.round(total / projects.length);
+  }, [projects]);
+
   if (loading) {
     return (
       <div className="h-[70vh] flex items-center justify-center">
@@ -145,6 +160,7 @@ export default function EventDetails() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
           <Metric label="Event Type" value={event.type || 'Internal'} tone="cyan" />
           <Metric label="Project Tracks" value={String(projects.length)} tone="blue" />
+          <Metric label="Avg Progress" value={`${averageProgress}%`} tone="violet" />
           <Metric label="Start" value={formatDate(event.startTime)} tone="emerald" />
           <Metric label="End" value={formatDate(event.endTime)} tone="amber" />
         </div>
@@ -177,6 +193,28 @@ export default function EventDetails() {
                   <span className="text-cyan-200">{count}</span>
                 </div>
               ))
+            )}
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-gray-800/70">
+            <p className="text-xs text-gray-400 font-semibold">Stage Distribution</p>
+            {Object.keys(projectStageCounts).length === 0 ? (
+              <p className="text-sm text-gray-500">No stage data available yet.</p>
+            ) : (
+              Object.entries(projectStageCounts).map(([stage, count]) => {
+                const width = projects.length ? Math.max(8, (count / projects.length) * 100) : 0;
+                return (
+                  <div key={stage} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs text-gray-300">
+                      <span>{stage}</span>
+                      <span className="text-cyan-200">{count}</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400" style={{ width: `${width}%` }} />
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </aside>
@@ -237,6 +275,8 @@ function Metric({ label, value, tone = 'cyan' }) {
       ? 'border-blue-500/40 text-blue-100'
       : tone === 'emerald'
       ? 'border-emerald-500/40 text-emerald-100'
+      : tone === 'violet'
+      ? 'border-violet-500/40 text-violet-100'
       : tone === 'amber'
       ? 'border-amber-500/40 text-amber-100'
       : 'border-cyan-500/40 text-cyan-100';

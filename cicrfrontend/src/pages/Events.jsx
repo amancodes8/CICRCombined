@@ -10,6 +10,7 @@ import {
   Layers3,
   MapPin,
   Plus,
+  Search,
   Sparkles,
   Trash2,
   Users,
@@ -24,6 +25,7 @@ import useUnsavedChangesWarning from '../hooks/useUnsavedChangesWarning';
 const EVENT_TYPES = ['Orientation', 'Workshop', 'Recruitment', 'Competition', 'Seminar', 'Internal'];
 const PROJECT_DOMAINS = ['Tech', 'Management', 'PR'];
 const PROJECT_STAGES = ['Planning', 'Execution', 'Testing', 'Review', 'Deployment'];
+const EVENT_STATUS_FILTERS = ['All', 'Scheduled', 'Completed', 'Cancelled'];
 
 const INITIAL_EVENT_FORM = {
   title: '',
@@ -103,6 +105,8 @@ export default function Events() {
   const [selectedEventId, setSelectedEventId] = useState('');
   const [selectedEventDetails, setSelectedEventDetails] = useState(null);
   const [selectedDetailsLoading, setSelectedDetailsLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [errors, setErrors] = useState({});
 
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
@@ -158,22 +162,44 @@ export default function Events() {
     [events]
   );
 
+  const eventCounts = useMemo(() => {
+    const counts = { all: events.length, scheduled: 0, completed: 0, cancelled: 0 };
+    events.forEach((event) => {
+      const normalized = String(event.status || '').toLowerCase();
+      if (normalized === 'scheduled') counts.scheduled += 1;
+      if (normalized === 'completed') counts.completed += 1;
+      if (normalized === 'cancelled') counts.cancelled += 1;
+    });
+    return counts;
+  }, [events]);
+
+  const filteredEvents = useMemo(() => {
+    const normalizedQuery = String(searchQuery || '').trim().toLowerCase();
+    return orderedEvents.filter((event) => {
+      const statusMatch = statusFilter === 'All' ? true : String(event.status || '') === statusFilter;
+      const queryMatch = normalizedQuery
+        ? `${event.title || ''} ${event.type || ''} ${event.location || ''}`.toLowerCase().includes(normalizedQuery)
+        : true;
+      return statusMatch && queryMatch;
+    });
+  }, [orderedEvents, searchQuery, statusFilter]);
+
   const selectedEvent = useMemo(
-    () => orderedEvents.find((event) => event._id === selectedEventId) || orderedEvents[0] || null,
-    [orderedEvents, selectedEventId]
+    () => filteredEvents.find((event) => event._id === selectedEventId) || filteredEvents[0] || null,
+    [filteredEvents, selectedEventId]
   );
   const selectedEventKey = selectedEvent?._id || '';
 
   useEffect(() => {
-    if (!orderedEvents.length) {
+    if (!filteredEvents.length) {
       setSelectedEventId('');
       setSelectedEventDetails(null);
       return;
     }
-    if (!orderedEvents.some((event) => event._id === selectedEventId)) {
-      setSelectedEventId(orderedEvents[0]._id);
+    if (!filteredEvents.some((event) => event._id === selectedEventId)) {
+      setSelectedEventId(filteredEvents[0]._id);
     }
-  }, [orderedEvents, selectedEventId]);
+  }, [filteredEvents, selectedEventId]);
 
   useEffect(() => {
     if (!selectedEventKey) {
@@ -487,7 +513,7 @@ export default function Events() {
   );
 
   return (
-    <div className="ui-page max-w-6xl space-y-8 pb-16 page-motion-b">
+    <div className="ui-page max-w-7xl space-y-8 pb-16 page-motion-b">
       <motion.section
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
@@ -508,6 +534,13 @@ export default function Events() {
         />
       </motion.section>
 
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-4 border-y border-gray-800/70 py-3">
+        <StreamMetric label="All Events" value={eventCounts.all} tone="white" />
+        <StreamMetric label="Scheduled" value={eventCounts.scheduled} tone="cyan" />
+        <StreamMetric label="Completed" value={eventCounts.completed} tone="emerald" />
+        <StreamMetric label="Cancelled" value={eventCounts.cancelled} tone="rose" />
+      </section>
+
       {isAdmin ? (
         <motion.form
           ref={createFormRef}
@@ -515,14 +548,14 @@ export default function Events() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.05 }}
-          className="border border-gray-800 rounded-[2rem] p-6 md:p-8 space-y-5 section-motion section-motion-delay-2"
+          className="border-y border-gray-800/70 py-5 px-1 md:px-2 space-y-5 section-motion section-motion-delay-2"
         >
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 text-xs text-gray-400 uppercase tracking-[0.22em] font-black">
+            <div className="flex items-center gap-2 text-sm text-gray-300 font-semibold">
               <Plus size={14} /> Create Event
             </div>
             {lastSavedAt ? (
-              <span className="text-[10px] uppercase tracking-widest text-gray-500">
+              <span className="text-xs text-gray-500">
                 Draft autosaved {new Date(lastSavedAt).toLocaleTimeString()}
               </span>
             ) : null}
@@ -592,7 +625,7 @@ export default function Events() {
             />
           </FormField>
 
-          <label className="inline-flex items-center gap-2 text-xs text-gray-300">
+          <label className="inline-flex items-center gap-2 text-sm text-gray-300">
             <input
               type="checkbox"
               checked={form.allowApplications}
@@ -601,12 +634,12 @@ export default function Events() {
             Allow applications for this event
           </label>
 
-          <div className="border border-gray-800/90 rounded-2xl p-4 space-y-4">
+          <div className="border-t border-gray-800/90 pt-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                 <Layers3 size={14} className="text-cyan-300" /> Initialize Projects (Optional)
               </h3>
-              <button type="button" onClick={addProjectDraft} className="btn btn-secondary !px-3 !py-1.5 !text-[10px]">
+              <button type="button" onClick={addProjectDraft} className="btn btn-secondary !px-3 !py-1.5 !text-xs">
                 Add Project
               </button>
             </div>
@@ -616,13 +649,13 @@ export default function Events() {
             ) : null}
 
             {projectDrafts.map((row, index) => (
-              <div key={`seed-${index}`} className="border border-gray-800 rounded-xl p-4 space-y-4">
+              <div key={`seed-${index}`} className="border-t border-gray-800/80 pt-4 pb-1 space-y-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs uppercase tracking-widest text-gray-400 font-black">Project {index + 1}</p>
+                  <p className="text-sm text-gray-300 font-semibold">Project {index + 1}</p>
                   <button
                     type="button"
                     onClick={() => removeProjectDraft(index)}
-                    className="text-[10px] uppercase tracking-widest text-rose-300"
+                    className="text-xs text-rose-300"
                   >
                     Remove
                   </button>
@@ -733,7 +766,7 @@ export default function Events() {
                 </div>
 
                 <div>
-                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Initial Team</p>
+                  <p className="text-xs text-gray-400 font-semibold">Initial Team</p>
                   <div className="mt-2 max-h-36 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2 pr-1">
                     {members.map((member) => (
                       <button
@@ -757,7 +790,7 @@ export default function Events() {
           </div>
 
           <div className="mobile-sticky-action">
-            <button type="submit" disabled={creating} className="btn btn-primary !px-4 !py-2.5">
+            <button type="submit" disabled={creating} className="btn btn-primary !px-4 !py-2.5 !text-xs">
               {creating ? 'Saving...' : 'Create Event'}
             </button>
           </div>
@@ -772,16 +805,47 @@ export default function Events() {
           hint={isAdmin ? 'Create your first event and initialize project tracks.' : 'Please check again later.'}
         />
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.08fr)_370px] gap-6 section-motion section-motion-delay-3">
-          <section className="overflow-hidden border border-blue-500/25 rounded-[2rem] bg-gradient-to-b from-[#09111d] via-[#070c14] to-[#070a11] pro-aurora">
-            <div className="grid grid-cols-[minmax(0,1.6fr)_0.7fr_0.75fr] gap-3 px-4 md:px-6 py-3 text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black border-b border-blue-500/20">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.12fr)_360px] gap-8 section-motion section-motion-delay-3">
+          <section className="overflow-hidden border-y border-gray-800/80">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 md:px-6 py-3 border-b border-gray-800/80">
+              <div className="relative min-w-[220px] flex-1 max-w-md">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search title, type, location..."
+                  className="ui-input !pl-9 !py-2"
+                />
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {EVENT_STATUS_FILTERS.map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setStatusFilter(filter)}
+                    className={`px-3 py-1.5 text-xs border transition-colors ${
+                      statusFilter === filter
+                        ? 'border-cyan-500/60 text-cyan-100 bg-cyan-500/10'
+                        : 'border-gray-800 text-gray-400 hover:text-gray-200 hover:border-gray-700'
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[minmax(0,1.6fr)_0.7fr_0.75fr] gap-3 px-4 md:px-6 py-2 text-sm text-gray-400 font-semibold border-b border-gray-800/80">
               <span>Event Stream</span>
               <span className="hidden md:block">Timeline</span>
               <span className="text-right">Projects</span>
             </div>
 
-            <div className="divide-y divide-gray-800/80">
-              {orderedEvents.map((event, idx) => {
+            {filteredEvents.length === 0 ? (
+              <p className="px-4 md:px-6 py-10 text-sm text-gray-500">No events match your current filters.</p>
+            ) : (
+              <div className="divide-y divide-gray-800/80">
+                {filteredEvents.map((event, idx) => {
                 const active = selectedEvent?._id === event._id;
                 const statusTone =
                   event.status === 'Scheduled'
@@ -798,19 +862,19 @@ export default function Events() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.04, duration: 0.35 }}
                     onClick={() => setSelectedEventId(event._id)}
-                    className={`w-full text-left px-4 md:px-6 py-4 transition-all pro-row-glide ${
-                      active ? 'bg-blue-500/10' : 'hover:bg-white/[0.03]'
+                    className={`w-full text-left px-4 md:px-6 py-4 transition-all ${
+                      active ? 'bg-cyan-500/[0.06]' : 'hover:bg-white/[0.03]'
                     }`}
                   >
                     <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.6fr)_0.7fr_0.75fr] gap-3 items-center">
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-base md:text-lg font-black text-white tracking-tight">{event.title}</h3>
-                          <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded-full border ${statusTone}`}>
+                          <h3 className="text-base md:text-lg font-semibold text-white tracking-tight">{event.title}</h3>
+                          <span className={`text-xs px-2 py-1 rounded-full border ${statusTone}`}>
                             {event.status}
                           </span>
                         </div>
-                        <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-300/90">{event.type}</p>
+                        <p className="text-xs text-cyan-300/90">{event.type}</p>
                         <p className="text-sm text-gray-400 line-clamp-2">{event.description || 'No event description.'}</p>
                         <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
                           <span className="inline-flex items-center gap-1.5"><MapPin size={12} className="text-emerald-300" /> {event.location}</span>
@@ -830,45 +894,46 @@ export default function Events() {
                         </p>
                       </div>
                       <div className="text-right text-sm">
-                        <p className="text-white font-black">{event.projectCount || 0}</p>
-                        <p className="text-[10px] uppercase tracking-widest text-gray-500">tracks</p>
+                        <p className="text-white font-semibold">{event.projectCount || 0}</p>
+                        <p className="text-xs text-gray-500">tracks</p>
                       </div>
                     </div>
                   </motion.button>
                 );
-              })}
-            </div>
+                })}
+              </div>
+            )}
           </section>
 
-          <aside className="border border-cyan-500/25 rounded-[2rem] p-5 md:p-6 bg-gradient-to-b from-[#0a1220] via-[#080f1a] to-[#070d16] space-y-5 xl:sticky xl:top-24 h-fit pro-aurora">
+          <aside className="space-y-5 xl:sticky xl:top-24 h-fit xl:border-l xl:border-gray-800/70 xl:pl-5">
             {selectedEvent ? (
               <>
                 <div className="space-y-2">
-                  <p className="text-[10px] uppercase tracking-[0.24em] text-cyan-300 font-black">Event Detail Workspace</p>
-                  <h3 className="text-2xl font-black text-white leading-tight">{selectedEvent.title}</h3>
-                  <p className="text-sm text-gray-400">{selectedEvent.description || 'No event description provided.'}</p>
+                  <p className="text-xs text-cyan-300 font-semibold">Event Detail Workspace</p>
+                  <h3 className="text-2xl font-semibold text-white leading-tight">{selectedEvent.title}</h3>
+                  <p className="text-sm text-gray-300">{selectedEvent.description || 'No event description provided.'}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-xl border border-blue-500/25 px-3 py-2 bg-blue-500/5">
-                    <p className="text-[10px] uppercase tracking-widest text-blue-300">Start</p>
+                <div className="grid grid-cols-2 gap-2 text-sm border-y border-gray-800/70 py-3">
+                  <div>
+                    <p className="text-xs text-blue-300">Start</p>
                     <p className="text-white font-semibold mt-1">{fmtDate(selectedEvent.startTime)}</p>
                   </div>
-                  <div className="rounded-xl border border-amber-500/25 px-3 py-2 bg-amber-500/5">
-                    <p className="text-[10px] uppercase tracking-widest text-amber-200">End</p>
+                  <div>
+                    <p className="text-xs text-amber-200">End</p>
                     <p className="text-white font-semibold mt-1">{fmtDate(selectedEvent.endTime)}</p>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Link to={`/events/${selectedEvent._id}`} className="btn btn-secondary !text-[10px] !px-3 !py-2">
+                  <Link to={`/events/${selectedEvent._id}`} className="btn btn-secondary !text-xs !px-3 !py-2">
                     <ArrowRight size={12} /> Open Details
                   </Link>
-                  <Link to={`/projects?event=${selectedEvent._id}`} className="btn btn-secondary !text-[10px] !px-3 !py-2">
+                  <Link to={`/projects?event=${selectedEvent._id}`} className="btn btn-secondary !text-xs !px-3 !py-2">
                     <Layers3 size={12} /> Project Tracks
                   </Link>
                   {selectedEvent.allowApplications ? (
-                    <Link to={`/apply?event=${selectedEvent._id}`} className="btn btn-secondary !text-[10px] !px-3 !py-2">
+                    <Link to={`/apply?event=${selectedEvent._id}`} className="btn btn-secondary !text-xs !px-3 !py-2">
                       <Users size={12} /> Application Form
                     </Link>
                   ) : null}
@@ -879,28 +944,28 @@ export default function Events() {
                     {selectedEvent.status === 'Scheduled' ? (
                       <button
                         onClick={() => handleStatusUpdate(selectedEvent._id, 'Completed')}
-                        className="btn btn-secondary !text-[10px] !px-3 !py-2 !text-emerald-200 !border-emerald-500/40"
+                        className="btn btn-secondary !text-xs !px-3 !py-2 !text-emerald-200 !border-emerald-500/40"
                       >
                         <CheckCircle2 size={12} /> Complete
                       </button>
                     ) : null}
                     <button
                       onClick={() => handleStatusUpdate(selectedEvent._id, 'Cancelled')}
-                      className="btn btn-secondary !text-[10px] !px-3 !py-2 !text-rose-200 !border-rose-500/40"
+                      className="btn btn-secondary !text-xs !px-3 !py-2 !text-rose-200 !border-rose-500/40"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={() => handleExportEvent(selectedEvent._id)}
                       disabled={exportingEventId === selectedEvent._id}
-                      className="btn btn-secondary !text-[10px] !px-3 !py-2 !text-cyan-200 !border-cyan-500/40"
+                      className="btn btn-secondary !text-xs !px-3 !py-2 !text-cyan-200 !border-cyan-500/40"
                     >
                       <Download size={12} />
                       {exportingEventId === selectedEvent._id ? 'Exporting...' : 'Export'}
                     </button>
                     <button
                       onClick={() => handleDelete(selectedEvent._id)}
-                      className="btn btn-secondary !text-[10px] !px-3 !py-2 !text-gray-200"
+                      className="btn btn-secondary !text-xs !px-3 !py-2 !text-gray-200"
                     >
                       <Trash2 size={12} /> Delete
                     </button>
@@ -908,18 +973,18 @@ export default function Events() {
                 ) : null}
 
                 <div className="space-y-2">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black">Project Snapshot</p>
+                  <p className="text-xs text-gray-400 font-semibold">Project Snapshot</p>
                   {selectedDetailsLoading ? (
-                    <p className="text-xs text-gray-500">Loading project summary...</p>
+                    <p className="text-sm text-gray-500">Loading project summary...</p>
                   ) : selectedProjects.length === 0 ? (
-                    <p className="text-xs text-gray-500">No projects seeded for this event yet.</p>
+                    <p className="text-sm text-gray-500">No projects seeded for this event yet.</p>
                   ) : (
                     <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                       {selectedProjects.slice(0, 8).map((project) => (
-                        <article key={project._id || project.title} className="rounded-xl border border-gray-800 px-3 py-2 bg-black/20">
+                        <article key={project._id || project.title} className="px-3 py-2 border-b border-gray-800/70">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm text-white font-semibold truncate">{project.title}</p>
-                            <span className="text-[10px] text-cyan-200">{Math.round(Number(project.progress || 0))}%</span>
+                            <span className="text-xs text-cyan-200">{Math.round(Number(project.progress || 0))}%</span>
                           </div>
                           <div className="mt-2 h-1.5 rounded-full bg-gray-800 overflow-hidden">
                             <div
@@ -940,5 +1005,23 @@ export default function Events() {
         </div>
       )}
     </div>
+  );
+}
+
+function StreamMetric({ label, value, tone = 'white' }) {
+  const toneClass =
+    tone === 'cyan'
+      ? 'border-cyan-500/40 text-cyan-100'
+      : tone === 'emerald'
+      ? 'border-emerald-500/40 text-emerald-100'
+      : tone === 'rose'
+      ? 'border-rose-500/40 text-rose-100'
+      : 'border-gray-700 text-gray-200';
+
+  return (
+    <article className={`border-l-2 pl-3 ${toneClass}`}>
+      <p className="text-xs text-gray-400">{label}</p>
+      <p className="text-lg font-semibold mt-1">{value}</p>
+    </article>
   );
 }
