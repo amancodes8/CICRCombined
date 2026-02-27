@@ -59,6 +59,12 @@ const canManageProject = (user, project) => {
   return resolveId(project.lead) === userId;
 };
 
+const stampProjectEdit = (project, actorId, action) => {
+  project.lastEditedBy = actorId;
+  project.lastEditedAt = new Date();
+  project.lastEditedAction = sanitize(action || 'Updated');
+};
+
 const requireAdmin = (req, res) => {
   if (!isAdmin(req.user)) {
     res.status(403).json({ message: 'Only administrators can perform this action.' });
@@ -161,6 +167,7 @@ const populateProject = (query) =>
     .populate('lead', 'name email role collegeId')
     .populate('guide', 'name email role collegeId')
     .populate('team', 'name email role collegeId year branch')
+    .populate('lastEditedBy', 'name role email collegeId')
     .populate('updates.createdBy', 'name role collegeId')
     .populate('statusHistory.changedBy', 'name role collegeId')
     .populate('suggestions.author', 'name role collegeId');
@@ -193,6 +200,9 @@ const createProject = async (req, res) => {
     const project = await Project.create({
       ...normalized.project,
       event: event._id,
+      lastEditedBy: actorId,
+      lastEditedAt: new Date(),
+      lastEditedAction: 'Initialized by admin',
       statusHistory: [
         {
           status: 'Planning',
@@ -300,6 +310,158 @@ const getProjectById = async (req, res) => {
 };
 
 /**
+ * @desc    Update core project details (metadata/components/timeline/guide)
+ * @route   PATCH /api/projects/:id/details
+ * @access  Private (Lead/Admin)
+ */
+const updateProjectDetails = async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.id);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found.' });
+    }
+
+    if (!canManageProject(req.user, project)) {
+      return res.status(403).json({ message: 'Only project lead or admin can update project details.' });
+    }
+
+    const before = {
+      title: project.title,
+      description: project.description,
+      domain: project.domain,
+      components: project.components,
+      startTime: project.startTime,
+      deadline: project.deadline,
+      guide: String(project.guide || ''),
+    };
+
+    let touched = false;
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'title')) {
+      const title = sanitize(req.body.title);
+      if (!title || title.length < 4) {
+        return res.status(400).json({ message: 'Project title must be at least 4 characters.' });
+      }
+      project.title = title;
+      touched = true;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'description')) {
+      const description = sanitize(req.body.description);
+      if (!description || description.length < 20) {
+        return res.status(400).json({ message: 'Project description must be at least 20 characters.' });
+      }
+      project.description = description;
+      touched = true;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'domain')) {
+      const domain = sanitize(req.body.domain);
+      if (!['Tech', 'Management', 'PR'].includes(domain)) {
+        return res.status(400).json({ message: 'Invalid project domain.' });
+      }
+      project.domain = domain;
+      touched = true;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'components')) {
+      const components = Array.isArray(req.body.components)
+        ? req.body.components.map((item) => sanitize(item)).filter(Boolean)
+        : sanitize(req.body.components)
+            .split(',')
+            .map((item) => sanitize(item))
+            .filter(Boolean);
+
+      if (!components.length) {
+        return res.status(400).json({ message: 'At least one project component/resource is required.' });
+      }
+
+      project.components = components;
+      touched = true;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'startTime')) {
+      const parsedStart = parseDate(req.body.startTime);
+      if (!parsedStart) {
+        return res.status(400).json({ message: 'Invalid start time value.' });
+      }
+      project.startTime = parsedStart;
+      touched = true;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'deadline')) {
+      const parsedDeadline = parseDate(req.body.deadline);
+      if (!parsedDeadline) {
+        return res.status(400).json({ message: 'Invalid deadline value.' });
+      }
+      project.deadline = parsedDeadline;
+      touched = true;
+    }
+
+    if (project.startTime && project.deadline && project.deadline <= project.startTime) {
+      return res.status(400).json({ message: 'Project deadline must be later than start time.' });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'guide')) {
+      const guideId = toObjectIdString(req.body.guide);
+      if (!guideId) {
+        return res.status(400).json({ message: 'Guide is required.' });
+      }
+      const guideUser = await User.findById(guideId).select('_id');
+      if (!guideUser) {
+        return res.status(400).json({ message: 'Selected guide was not found.' });
+      }
+      project.guide = guideId;
+      touched = true;
+    }
+
+    const note = sanitize(req.body.note);
+    const actorId = getActorId(req);
+
+    if (note) {
+      project.updates.unshift({
+        type: 'Status',
+        text: note,
+        createdBy: actorId,
+        createdAt: new Date(),
+      });
+      touched = true;
+    }
+
+    if (!touched) {
+      return res.status(400).json({ message: 'No valid detail changes were provided.' });
+    }
+
+    stampProjectEdit(project, actorId, 'Project details updated');
+    await project.save();
+
+    await logAudit({
+      actor: actorId,
+      action: 'PROJECT_DETAILS_UPDATED',
+      entityType: 'Project',
+      entityId: project._id,
+      before,
+      after: {
+        title: project.title,
+        description: project.description,
+        domain: project.domain,
+        components: project.components,
+        startTime: project.startTime,
+        deadline: project.deadline,
+        guide: String(project.guide || ''),
+        lastEditedAt: project.lastEditedAt,
+      },
+      req,
+    });
+
+    const populated = await populateProject(Project.findById(project._id));
+    return res.json(populated);
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+};
+
+/**
  * @desc    Update team members for a project
  * @route   PATCH /api/projects/:id/team
  * @access  Private (Lead/Admin)
@@ -317,6 +479,7 @@ const updateProjectTeam = async (req, res) => {
 
     const addMemberIds = normalizeIdList(req.body.addMemberIds);
     const removeMemberIds = normalizeIdList(req.body.removeMemberIds);
+    const actorId = getActorId(req);
 
     const allIncoming = [...new Set([...addMemberIds, ...removeMemberIds])];
     if (allIncoming.length) {
@@ -343,6 +506,7 @@ const updateProjectTeam = async (req, res) => {
     }
 
     project.team = nextTeam;
+    stampProjectEdit(project, actorId, 'Team composition updated');
     await project.save();
 
     if (addMemberIds.length) {
@@ -353,12 +517,12 @@ const updateProjectTeam = async (req, res) => {
         type: 'action',
         link: `/projects/${project._id}`,
         meta: { projectId: project._id },
-        createdBy: getActorId(req),
+        createdBy: actorId,
       });
     }
 
     await logAudit({
-      actor: getActorId(req),
+      actor: actorId,
       action: 'PROJECT_TEAM_UPDATED',
       entityType: 'Project',
       entityId: project._id,
@@ -432,6 +596,7 @@ const updateProjectProgress = async (req, res) => {
       });
     }
 
+    stampProjectEdit(project, actorId, 'Progress updated');
     await project.save();
 
     await logAudit({
@@ -472,13 +637,14 @@ const updateProjectStatus = async (req, res) => {
     if (!PROJECT_STATUS_OPTIONS.includes(status)) {
       return res.status(400).json({ message: 'Invalid project status.' });
     }
+    const actorId = getActorId(req);
 
     if (status !== project.status) {
       project.status = status;
       project.lastStatusChangedAt = new Date();
       project.statusHistory.unshift({
         status,
-        changedBy: getActorId(req),
+        changedBy: actorId,
         note: sanitize(req.body.note),
         changedAt: new Date(),
       });
@@ -498,15 +664,16 @@ const updateProjectStatus = async (req, res) => {
       project.updates.unshift({
         type: 'Status',
         text: note,
-        createdBy: getActorId(req),
+        createdBy: actorId,
         createdAt: new Date(),
       });
     }
 
+    stampProjectEdit(project, actorId, 'Status updated');
     await project.save();
 
     await logAudit({
-      actor: getActorId(req),
+      actor: actorId,
       action: 'PROJECT_STATUS_UPDATED',
       entityType: 'Project',
       entityId: project._id,
@@ -591,18 +758,20 @@ const addProjectUpdate = async (req, res) => {
     }
 
     const type = PROJECT_UPDATE_TYPES.includes(sanitize(req.body.type)) ? sanitize(req.body.type) : 'Comment';
+    const actorId = getActorId(req);
 
     project.updates.unshift({
       type,
       text,
-      createdBy: getActorId(req),
+      createdBy: actorId,
       createdAt: new Date(),
     });
 
+    stampProjectEdit(project, actorId, 'Operational update added');
     await project.save();
 
     await logAudit({
-      actor: getActorId(req),
+      actor: actorId,
       action: 'PROJECT_UPDATE_ADDED',
       entityType: 'Project',
       entityId: project._id,
@@ -640,13 +809,15 @@ const addSuggestion = async (req, res) => {
     if (!text) {
       return res.status(400).json({ message: 'Suggestion text is required.' });
     }
+    const actorId = getActorId(req);
 
     project.suggestions.unshift({
       text,
-      author: getActorId(req),
+      author: actorId,
       createdAt: new Date(),
     });
 
+    stampProjectEdit(project, actorId, 'Suggestion added');
     await project.save();
     return res.status(201).json(project.suggestions);
   } catch (err) {
@@ -658,6 +829,7 @@ module.exports = {
   createProject,
   getAllProjects,
   getProjectById,
+  updateProjectDetails,
   updateProjectTeam,
   updateProjectProgress,
   updateProjectStatus,

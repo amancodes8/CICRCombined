@@ -4,6 +4,7 @@ const {
   createProject,
   getAllProjects,
   getProjectById,
+  updateProjectDetails,
   updateProjectTeam,
   updateProjectProgress,
   updateProjectStatus,
@@ -25,6 +26,7 @@ router.route('/:id')
   .delete(protect, authorize('Admin'), deleteProject);
 
 router.patch('/:id/team', protect, updateProjectTeam);
+router.patch('/:id/details', protect, updateProjectDetails);
 router.patch('/:id/progress', protect, updateProjectProgress);
 router.patch('/:id/status', protect, authorize('Admin'), updateProjectStatus);
 router.post('/:id/updates', protect, addProjectUpdate);

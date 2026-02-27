@@ -7,6 +7,7 @@ const Auth = lazy(() => import('./pages/Auth'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Projects = lazy(() => import('./pages/Projects'));
 const ProjectDetails = lazy(() => import('./pages/ProjectDetails'));
+const ProjectReview = lazy(() => import('./pages/ProjectReview'));
 const Meetings = lazy(() => import('./pages/Meetings'));
 const ScheduleMeeting = lazy(() => import('./pages/ScheduleMeeting'));
 const Hierarchy = lazy(() => import('./pages/Hierarchy'));
@@ -75,6 +76,7 @@ function App() {
 
             <Route path="/projects" element={<Projects />} />
             <Route path="/projects/:id" element={<ProjectDetails />} />
+            <Route path="/projects/:id/review" element={<ProjectReview />} />
             <Route path="/create-project" element={<CreateProject />} />
 
             <Route path="/meetings" element={<Meetings />} />

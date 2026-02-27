@@ -2,35 +2,41 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  CalendarDays,
+  ClipboardList,
   Loader2,
   MessageSquarePlus,
-  Users,
-  Activity,
-  Flag,
   Percent,
   ShieldCheck,
   Trash2,
   UserPlus,
+  Users,
 } from 'lucide-react';
 import {
   addProjectUpdate,
   deleteProject,
   fetchDirectoryMembers,
   fetchProjectById,
+  updateProjectDetails,
   updateProjectProgress,
   updateProjectStatus,
   updateProjectTeam,
 } from '../api';
 
+const PROJECT_DOMAINS = ['Tech', 'Management', 'PR'];
 const PROJECT_STAGES = ['Planning', 'Execution', 'Testing', 'Review', 'Deployment'];
 const PROJECT_STATUSES = ['Planning', 'Active', 'On-Hold', 'Delayed', 'Awaiting Review', 'Completed', 'Archived', 'Ongoing'];
 const UPDATE_TYPES = ['Comment', 'Blocker', 'Achievement', 'Status'];
 
-const fmt = (value) => {
+const formatDateTime = (value) => {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return 'TBD';
   return d.toLocaleString();
+};
+const toDateTimeLocal = (value) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
 };
 
 const dispatchToast = (message, type = 'info') => {
@@ -43,22 +49,27 @@ const dispatchToast = (message, type = 'info') => {
 
 const statusTone = (status) => {
   const normalized = String(status || '').toLowerCase();
-  if (normalized === 'completed') return 'border-emerald-500/40 text-emerald-200';
-  if (normalized === 'awaiting review') return 'border-amber-500/40 text-amber-200';
-  if (normalized === 'on-hold' || normalized === 'delayed') return 'border-rose-500/40 text-rose-200';
-  return 'border-blue-500/40 text-blue-200';
+  if (normalized === 'completed') return 'text-emerald-200 border-emerald-500/40 bg-emerald-500/10';
+  if (normalized === 'awaiting review') return 'text-amber-200 border-amber-500/45 bg-amber-500/10';
+  if (normalized === 'on-hold' || normalized === 'delayed') return 'text-rose-200 border-rose-500/40 bg-rose-500/10';
+  return 'text-cyan-100 border-cyan-500/40 bg-cyan-500/10';
+};
+
+const updateTone = (type) => {
+  const normalized = String(type || '').toLowerCase();
+  if (normalized === 'achievement') return 'text-emerald-200 border-emerald-500/40';
+  if (normalized === 'blocker') return 'text-rose-200 border-rose-500/40';
+  if (normalized === 'status') return 'text-amber-200 border-amber-500/40';
+  return 'text-cyan-100 border-cyan-500/40';
 };
 
 export default function ProjectDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [project, setProject] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState([]);
 
-  const [updateText, setUpdateText] = useState('');
-  const [updateType, setUpdateType] = useState('Comment');
-  const [savingUpdate, setSavingUpdate] = useState(false);
+  const [project, setProject] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [progressValue, setProgressValue] = useState(0);
   const [stageValue, setStageValue] = useState('Planning');
@@ -69,14 +80,39 @@ export default function ProjectDetails() {
   const [statusNote, setStatusNote] = useState('');
   const [savingStatus, setSavingStatus] = useState(false);
 
-  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [selectedAddMembers, setSelectedAddMembers] = useState([]);
+  const [selectedRemoveMembers, setSelectedRemoveMembers] = useState([]);
   const [savingMembers, setSavingMembers] = useState(false);
+
+  const [updateType, setUpdateType] = useState('Comment');
+  const [updateText, setUpdateText] = useState('');
+  const [savingUpdate, setSavingUpdate] = useState(false);
+
+  const [detailTitle, setDetailTitle] = useState('');
+  const [detailDescription, setDetailDescription] = useState('');
+  const [detailDomain, setDetailDomain] = useState('Tech');
+  const [detailComponents, setDetailComponents] = useState('');
+  const [detailStartTime, setDetailStartTime] = useState('');
+  const [detailDeadline, setDetailDeadline] = useState('');
+  const [detailGuide, setDetailGuide] = useState('');
+  const [detailNote, setDetailNote] = useState('');
+  const [savingDetails, setSavingDetails] = useState(false);
 
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const user = profile.result || profile;
   const role = String(user.role || '').toLowerCase();
   const actorId = String(user._id || user.id || '');
   const isAdmin = role === 'admin';
+
+  const syncDetailForm = useCallback((data) => {
+    setDetailTitle(String(data?.title || ''));
+    setDetailDescription(String(data?.description || ''));
+    setDetailDomain(String(data?.domain || 'Tech'));
+    setDetailComponents(Array.isArray(data?.components) ? data.components.join(', ') : '');
+    setDetailStartTime(toDateTimeLocal(data?.startTime));
+    setDetailDeadline(toDateTimeLocal(data?.deadline));
+    setDetailGuide(String(data?.guide?._id || data?.guide || ''));
+  }, []);
 
   const loadProject = useCallback(async () => {
     setLoading(true);
@@ -86,12 +122,13 @@ export default function ProjectDetails() {
       setProgressValue(Number(data?.progress || 0));
       setStageValue(String(data?.stage || 'Planning'));
       setStatusValue(String(data?.status || 'Planning'));
+      syncDetailForm(data);
     } catch {
       setProject(null);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, syncDetailForm]);
 
   useEffect(() => {
     loadProject();
@@ -104,13 +141,30 @@ export default function ProjectDetails() {
   }, []);
 
   const leadId = String(project?.lead?._id || project?.lead || '');
+  const isLead = actorId && leadId === actorId;
+  const canManage = isAdmin || isLead;
+
   const teamIds = useMemo(
     () => (project?.team || []).map((member) => String(member?._id || member || '')),
     [project?.team]
   );
 
-  const isLead = actorId && leadId === actorId;
-  const canManage = isAdmin || isLead;
+  const memberOptions = useMemo(
+    () =>
+      users.filter((member) => {
+        const memberId = String(member._id || '');
+        return memberId && !teamIds.includes(memberId);
+      }),
+    [users, teamIds]
+  );
+  const removableTeamMembers = useMemo(
+    () =>
+      (project?.team || []).filter((member) => {
+        const memberId = String(member?._id || member || '');
+        return memberId && memberId !== leadId;
+      }),
+    [project?.team, leadId]
+  );
 
   const progressPercent = Math.max(0, Math.min(100, Number(project?.progress || 0)));
 
@@ -123,35 +177,6 @@ export default function ProjectDetails() {
     () => [...(project?.statusHistory || [])].sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt)),
     [project?.statusHistory]
   );
-
-  const memberOptions = useMemo(
-    () =>
-      users.filter((member) => {
-        const memberId = String(member._id || '');
-        return memberId && !teamIds.includes(memberId);
-      }),
-    [users, teamIds]
-  );
-
-  const submitUpdate = async (e) => {
-    e.preventDefault();
-    if (!canManage) return;
-    const text = updateText.trim();
-    if (!text) return;
-
-    setSavingUpdate(true);
-    try {
-      const { data } = await addProjectUpdate(id, { text, type: updateType });
-      setProject(data);
-      setUpdateText('');
-      setUpdateType('Comment');
-      dispatchToast('Project update posted.', 'success');
-    } catch (err) {
-      dispatchToast(err.response?.data?.message || 'Failed to post update.', 'error');
-    } finally {
-      setSavingUpdate(false);
-    }
-  };
 
   const submitProgress = async (e) => {
     e.preventDefault();
@@ -170,7 +195,7 @@ export default function ProjectDetails() {
       setStageValue(String(data?.stage || 'Planning'));
       setStatusValue(String(data?.status || 'Planning'));
       setProgressNote('');
-      dispatchToast('Project progress updated.', 'success');
+      dispatchToast('Progress updated.', 'success');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Failed to update progress.', 'error');
     } finally {
@@ -189,7 +214,7 @@ export default function ProjectDetails() {
       setStatusValue(String(data?.status || 'Planning'));
       setProgressValue(Number(data?.progress || 0));
       setStatusNote('');
-      dispatchToast('Project status updated.', 'success');
+      dispatchToast('Status updated.', 'success');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Failed to update status.', 'error');
     } finally {
@@ -199,18 +224,85 @@ export default function ProjectDetails() {
 
   const submitMembers = async (e) => {
     e.preventDefault();
-    if (!canManage || selectedMembers.length === 0) return;
+    if (!canManage || (selectedAddMembers.length === 0 && selectedRemoveMembers.length === 0)) return;
 
     setSavingMembers(true);
     try {
-      const { data } = await updateProjectTeam(id, { addMemberIds: selectedMembers });
+      const { data } = await updateProjectTeam(id, {
+        addMemberIds: selectedAddMembers,
+        removeMemberIds: selectedRemoveMembers,
+      });
       setProject(data);
-      setSelectedMembers([]);
-      dispatchToast('Team members added.', 'success');
+      setSelectedAddMembers([]);
+      setSelectedRemoveMembers([]);
+      dispatchToast('Team details updated.', 'success');
     } catch (err) {
-      dispatchToast(err.response?.data?.message || 'Failed to add members.', 'error');
+      dispatchToast(err.response?.data?.message || 'Failed to update team.', 'error');
     } finally {
       setSavingMembers(false);
+    }
+  };
+
+  const submitDetails = async (e) => {
+    e.preventDefault();
+    if (!canManage) return;
+
+    const parsedComponents = String(detailComponents || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (parsedComponents.length === 0) {
+      dispatchToast('At least one component/resource is required.', 'error');
+      return;
+    }
+    if (!String(detailGuide || '').trim()) {
+      dispatchToast('Select a guide to continue.', 'error');
+      return;
+    }
+
+    setSavingDetails(true);
+    try {
+      const payload = {
+        title: detailTitle,
+        description: detailDescription,
+        domain: detailDomain,
+        components: parsedComponents,
+        startTime: detailStartTime,
+        deadline: detailDeadline,
+        guide: detailGuide,
+        note: detailNote,
+      };
+
+      const { data } = await updateProjectDetails(id, payload);
+      setProject(data);
+      syncDetailForm(data);
+      setDetailNote('');
+      dispatchToast('Project details updated.', 'success');
+    } catch (err) {
+      dispatchToast(err.response?.data?.message || 'Failed to update project details.', 'error');
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
+  const submitUpdate = async (e) => {
+    e.preventDefault();
+    if (!canManage) return;
+    const text = updateText.trim();
+    if (!text) return;
+
+    setSavingUpdate(true);
+    try {
+      const { data } = await addProjectUpdate(id, { text, type: updateType });
+      setProject(data);
+      setUpdateText('');
+      setUpdateType('Comment');
+      dispatchToast('Operational update posted.', 'success');
+    } catch (err) {
+      dispatchToast(err.response?.data?.message || 'Failed to post update.', 'error');
+    } finally {
+      setSavingUpdate(false);
     }
   };
 
@@ -238,10 +330,10 @@ export default function ProjectDetails() {
   if (!project) {
     return (
       <div className="max-w-5xl mx-auto space-y-6 page-motion-b">
-        <Link to="/projects" className="inline-flex items-center gap-2 text-gray-400 hover:text-white section-motion section-motion-delay-1">
+        <Link to="/projects" className="inline-flex items-center gap-2 text-gray-400 hover:text-white">
           <ArrowLeft size={16} /> Back to projects
         </Link>
-        <div className="border border-gray-800 rounded-3xl p-8 section-motion section-motion-delay-2">
+        <div className="border border-gray-800 rounded-2xl p-8">
           <p className="text-red-400 font-semibold">Project not found or not visible for your account.</p>
         </div>
       </div>
@@ -249,280 +341,391 @@ export default function ProjectDetails() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12 page-motion-b pro-stagger">
-      <Link to="/projects" className="inline-flex items-center gap-2 text-gray-400 hover:text-white section-motion section-motion-delay-1">
-        <ArrowLeft size={16} /> Back to projects
-      </Link>
-
-      <section className="border border-gray-800 rounded-3xl p-6 md:p-8 space-y-5 section-motion section-motion-delay-2">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <p className="text-xs uppercase tracking-widest text-cyan-300 font-black">
-              {project.event?.title || 'Project Workspace'}
-            </p>
-            <h1 className="text-3xl font-black text-white mt-2">{project.title}</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-[10px] uppercase tracking-widest border rounded-full px-3 py-1 ${statusTone(project.status)}`}>
-              {project.status}
-            </span>
-            {isAdmin ? (
-              <button
-                type="button"
-                onClick={handleDeleteProject}
-                className="text-[10px] uppercase tracking-widest border border-rose-500/40 text-rose-200 rounded-full px-3 py-1 inline-flex items-center gap-1"
-              >
-                <Trash2 size={11} /> Delete
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        <p className="text-gray-300 leading-relaxed">{project.description}</p>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="border border-gray-800 rounded-2xl p-4">
-            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Progress</p>
-            <div className="mt-2 h-2 rounded-full bg-gray-800 overflow-hidden">
-              <div className="h-full bg-cyan-400 transition-all" style={{ width: `${progressPercent}%` }} />
-            </div>
-            <p className="text-sm text-cyan-100 mt-2">{progressPercent}% • {project.stage}</p>
-          </div>
-
-          <div className="border border-gray-800 rounded-2xl p-4">
-            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Timeline</p>
-            <p className="text-sm text-gray-200 mt-2">Start: {fmt(project.startTime)}</p>
-            <p className="text-sm text-gray-200 mt-1">Deadline: {fmt(project.deadline)}</p>
-          </div>
-
-          <div className="border border-gray-800 rounded-2xl p-4">
-            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Stakeholders</p>
-            <p className="text-sm text-gray-200 mt-2">Lead: {project.lead?.name || 'N/A'}</p>
-            <p className="text-sm text-gray-200 mt-1">Guide: {project.guide?.name || 'N/A'}</p>
-            <p className="text-sm text-gray-200 mt-1">Team: {project.team?.length || 0} members</p>
-          </div>
-        </div>
-
-        <div className="border border-gray-800 rounded-2xl p-4">
-          <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Required Components / Resources</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {(project.components || []).map((item, idx) => (
-              <span key={`${item}-${idx}`} className="text-xs px-2.5 py-1 rounded-full border border-gray-700 text-gray-200">
-                {item}
-              </span>
-            ))}
-            {(project.components || []).length === 0 ? <span className="text-xs text-gray-500">No components listed.</span> : null}
-          </div>
-        </div>
-      </section>
-
-      <section className="border border-gray-800 rounded-3xl p-6 md:p-8 section-motion section-motion-delay-2 space-y-5">
-        <h2 className="text-xl font-black text-white flex items-center gap-2">
-          <Users size={18} className="text-indigo-300" /> Team Roster
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {[project.lead, project.guide, ...(project.team || [])]
-            .filter(Boolean)
-            .reduce((acc, member) => {
-              const idValue = String(member?._id || member || '');
-              if (!idValue || acc.some((row) => String(row?._id || row || '') === idValue)) return acc;
-              acc.push(member);
-              return acc;
-            }, [])
-            .map((member) => (
-              <Link
-                key={member._id}
-                to={`/profile/${member.collegeId || ''}`}
-                className="border border-gray-800 rounded-xl p-4 hover:border-cyan-500/40 transition-colors"
-              >
-                <p className="text-white font-semibold">{member.name || 'Member'}</p>
-                <p className="text-xs text-gray-400 mt-1">{member.role || 'User'} • {member.email || 'No email'}</p>
-              </Link>
-            ))}
-        </div>
-
-        {canManage ? (
-          <form onSubmit={submitMembers} className="border border-gray-800 rounded-2xl p-4 space-y-3">
-            <p className="text-xs uppercase tracking-widest text-gray-500 font-black inline-flex items-center gap-2">
-              <UserPlus size={12} className="text-cyan-300" /> Add Members
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-              {memberOptions.map((member) => {
-                const memberId = String(member._id || '');
-                const selected = selectedMembers.includes(memberId);
-                return (
-                  <button
-                    key={memberId}
-                    type="button"
-                    onClick={() =>
-                      setSelectedMembers((prev) =>
-                        selected ? prev.filter((idValue) => idValue !== memberId) : [...prev, memberId]
-                      )
-                    }
-                    className={`text-left text-xs px-3 py-2 rounded-lg border ${
-                      selected ? 'border-cyan-500/60 bg-cyan-500/10 text-cyan-100' : 'border-gray-800 text-gray-300'
-                    }`}
-                  >
-                    {member.name}
-                  </button>
-                );
-              })}
-            </div>
-            <button disabled={savingMembers || selectedMembers.length === 0} className="btn btn-secondary !w-auto !text-xs">
-              {savingMembers ? <Loader2 size={14} className="animate-spin" /> : 'Add Selected Members'}
-            </button>
-          </form>
-        ) : (
-          <p className="text-xs text-gray-500">Team updates are restricted to assigned lead/admin accounts.</p>
-        )}
-      </section>
-
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-6 section-motion section-motion-delay-3">
-        <div className="border border-gray-800 rounded-3xl p-6 space-y-4">
-          <h2 className="text-xl font-black text-white flex items-center gap-2"><Percent size={18} className="text-cyan-300" /> Progress Control</h2>
-          {canManage ? (
-            <form onSubmit={submitProgress} className="space-y-3">
-              <FormRow label="Progress %">
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={progressValue}
-                  onChange={(e) => setProgressValue(e.target.value)}
-                  className="ui-input"
-                />
-              </FormRow>
-              <FormRow label="Stage">
-                <select value={stageValue} onChange={(e) => setStageValue(e.target.value)} className="ui-input">
-                  {PROJECT_STAGES.map((stage) => (
-                    <option key={stage} value={stage}>
-                      {stage}
-                    </option>
-                  ))}
-                </select>
-              </FormRow>
-              <FormRow label="Progress Note (optional)">
-                <textarea
-                  rows={3}
-                  value={progressNote}
-                  onChange={(e) => setProgressNote(e.target.value)}
-                  className="ui-input resize-none"
-                  placeholder="Document blockers, achievements, or execution notes."
-                />
-              </FormRow>
-              <button disabled={savingProgress} className="btn btn-primary !w-auto !text-xs">
-                {savingProgress ? <Loader2 size={14} className="animate-spin" /> : 'Update Progress'}
-              </button>
-              <p className="text-[11px] text-gray-500">
-                Reaching 100% progress moves project to <span className="text-amber-200">Awaiting Review</span>. Only admin can mark Completed.
-              </p>
-            </form>
-          ) : (
-            <p className="text-sm text-gray-400">Read-only for team members and guide role.</p>
-          )}
-        </div>
-
-        <div className="border border-gray-800 rounded-3xl p-6 space-y-4">
-          <h2 className="text-xl font-black text-white flex items-center gap-2"><ShieldCheck size={18} className="text-emerald-300" /> Admin Status Control</h2>
+    <div className="ui-page max-w-7xl space-y-5 pb-12 page-motion-d">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <Link to="/projects" className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-sm">
+          <ArrowLeft size={16} /> Back to projects
+        </Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link to={`/projects/${id}/review`} className="btn btn-secondary !text-xs !px-3 !py-2">
+            <ShieldCheck size={14} /> Review Desk
+          </Link>
           {isAdmin ? (
-            <form onSubmit={submitStatus} className="space-y-3">
-              <FormRow label="Status">
-                <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)} className="ui-input">
-                  {PROJECT_STATUSES.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
+            <button
+              type="button"
+              onClick={handleDeleteProject}
+              className="text-[11px] uppercase tracking-widest border border-rose-500/40 text-rose-200 rounded-xl px-3 py-2 inline-flex items-center gap-1"
+            >
+              <Trash2 size={13} /> Delete Project
+            </button>
+          ) : null}
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-6">
+        <aside className="border border-gray-800 rounded-3xl p-5 space-y-5 xl:sticky xl:top-24 h-fit bg-[#080d14]/80">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-cyan-300 font-black">{project.event?.title || 'Project Workspace'}</p>
+            <h1 className="text-2xl font-black text-white mt-2 leading-tight">{project.title}</h1>
+            <p className="text-sm text-gray-400 mt-3">{project.description}</p>
+          </div>
+
+          <div className={`inline-flex text-[10px] uppercase tracking-widest px-2.5 py-1.5 rounded-full border ${statusTone(project.status)}`}>
+            {project.status}
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between text-xs text-gray-400">
+              <span>Progress</span>
+              <span className="text-cyan-100 font-semibold">{progressPercent}%</span>
+            </div>
+            <div className="mt-2 h-2 rounded-full bg-gray-800 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-cyan-400 to-blue-400" style={{ width: `${progressPercent}%` }} />
+            </div>
+            <p className="text-xs text-gray-400 mt-2">Stage: <span className="text-gray-100">{project.stage}</span></p>
+          </div>
+
+          <div className="space-y-2 text-xs text-gray-300">
+            <p>Lead: <span className="text-white">{project.lead?.name || 'N/A'}</span></p>
+            <p>Guide: <span className="text-white">{project.guide?.name || 'N/A'}</span></p>
+            <p>Team: <span className="text-white">{project.team?.length || 0}</span></p>
+            <p>Start: <span className="text-white">{formatDateTime(project.startTime)}</span></p>
+            <p>Deadline: <span className="text-white">{formatDateTime(project.deadline)}</span></p>
+            <p>Last Edited By: <span className="text-white">{project.lastEditedBy?.name || 'Not tracked yet'}</span></p>
+            <p>Last Edited At: <span className="text-white">{project.lastEditedAt ? formatDateTime(project.lastEditedAt) : 'N/A'}</span></p>
+            <p>Last Action: <span className="text-white">{project.lastEditedAction || 'Initialized'}</span></p>
+          </div>
+
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Components</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(project.components || []).map((component, idx) => (
+                <span key={`${component}-${idx}`} className="text-[11px] px-2.5 py-1 rounded-full border border-gray-700 text-gray-200">
+                  {component}
+                </span>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <main className="border border-gray-800 rounded-3xl overflow-hidden bg-[#070b11]/75">
+          <section className="p-6 md:p-7 border-b border-gray-800">
+            <div className="flex items-center gap-2 mb-4">
+              <ClipboardList size={16} className="text-cyan-300" />
+              <h2 className="text-lg font-black text-white">Management Console</h2>
+            </div>
+
+            <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
+              <form onSubmit={submitProgress} className="space-y-3">
+                <p className="text-[11px] uppercase tracking-widest text-gray-500 font-black">Progress & Stage</p>
+                {canManage ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={progressValue}
+                        onChange={(e) => setProgressValue(e.target.value)}
+                        className="ui-input"
+                        placeholder="Progress %"
+                      />
+                      <select value={stageValue} onChange={(e) => setStageValue(e.target.value)} className="ui-input">
+                        {PROJECT_STAGES.map((stage) => (
+                          <option key={stage} value={stage}>
+                            {stage}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={progressNote}
+                      onChange={(e) => setProgressNote(e.target.value)}
+                      className="ui-input resize-none"
+                      placeholder="Execution note (blocker, milestone, dependency)"
+                    />
+                    <button disabled={savingProgress} className="btn btn-primary !w-auto !text-xs">
+                      {savingProgress ? <Loader2 size={14} className="animate-spin" /> : <Percent size={14} />}
+                      Update Progress
+                    </button>
+                    <p className="text-[11px] text-gray-500">
+                      At 100%, system moves to <span className="text-amber-200">Awaiting Review</span>. Final completion is admin-only.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">Read-only. Lead/Admin can update progress.</p>
+                )}
+              </form>
+
+              <form onSubmit={submitMembers} className="space-y-3">
+                <p className="text-[11px] uppercase tracking-widest text-gray-500 font-black">Team Growth</p>
+                {canManage ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black mb-2">Add Members</p>
+                        <div className="grid grid-cols-1 gap-2 max-h-36 overflow-y-auto pr-1">
+                          {memberOptions.map((member) => {
+                            const memberId = String(member._id || '');
+                            const selected = selectedAddMembers.includes(memberId);
+                            return (
+                              <button
+                                key={`add-${memberId}`}
+                                type="button"
+                                onClick={() =>
+                                  setSelectedAddMembers((prev) =>
+                                    selected ? prev.filter((idValue) => idValue !== memberId) : [...prev, memberId]
+                                  )
+                                }
+                                className={`text-left text-xs px-3 py-2 rounded-lg border ${
+                                  selected ? 'border-cyan-500/60 bg-cyan-500/10 text-cyan-100' : 'border-gray-800 text-gray-300'
+                                }`}
+                              >
+                                {member.name}
+                              </button>
+                            );
+                          })}
+                          {memberOptions.length === 0 ? <p className="text-xs text-gray-500">No eligible members to add.</p> : null}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black mb-2">Remove Members</p>
+                        <div className="grid grid-cols-1 gap-2 max-h-36 overflow-y-auto pr-1">
+                          {removableTeamMembers.map((member) => {
+                            const memberId = String(member?._id || member || '');
+                            const selected = selectedRemoveMembers.includes(memberId);
+                            return (
+                              <button
+                                key={`remove-${memberId}`}
+                                type="button"
+                                onClick={() =>
+                                  setSelectedRemoveMembers((prev) =>
+                                    selected ? prev.filter((idValue) => idValue !== memberId) : [...prev, memberId]
+                                  )
+                                }
+                                className={`text-left text-xs px-3 py-2 rounded-lg border ${
+                                  selected ? 'border-rose-500/60 bg-rose-500/10 text-rose-100' : 'border-gray-800 text-gray-300'
+                                }`}
+                              >
+                                {member.name}
+                              </button>
+                            );
+                          })}
+                          {removableTeamMembers.length === 0 ? <p className="text-xs text-gray-500">No removable members.</p> : null}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      disabled={savingMembers || (selectedAddMembers.length === 0 && selectedRemoveMembers.length === 0)}
+                      className="btn btn-secondary !w-auto !text-xs"
+                    >
+                      {savingMembers ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                      Save Team Changes
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">Read-only. Lead/Admin can add members.</p>
+                )}
+              </form>
+            </div>
+
+            <form onSubmit={submitDetails} className="mt-6 pt-5 border-t border-gray-800 space-y-3">
+              <p className="text-[11px] uppercase tracking-widest text-gray-500 font-black">Project Configuration</p>
+              {canManage ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <input
+                      value={detailTitle}
+                      onChange={(e) => setDetailTitle(e.target.value)}
+                      className="ui-input"
+                      placeholder="Project title"
+                    />
+                    <select value={detailDomain} onChange={(e) => setDetailDomain(e.target.value)} className="ui-input">
+                      {PROJECT_DOMAINS.map((domain) => (
+                        <option key={domain} value={domain}>
+                          {domain}
+                        </option>
+                      ))}
+                    </select>
+                    <textarea
+                      rows={4}
+                      value={detailDescription}
+                      onChange={(e) => setDetailDescription(e.target.value)}
+                      className="ui-input resize-none md:col-span-2"
+                      placeholder="Detailed project description"
+                    />
+                    <input
+                      value={detailComponents}
+                      onChange={(e) => setDetailComponents(e.target.value)}
+                      className="ui-input md:col-span-2"
+                      placeholder="Components/resources (comma separated)"
+                    />
+                    <input
+                      type="datetime-local"
+                      value={detailStartTime}
+                      onChange={(e) => setDetailStartTime(e.target.value)}
+                      className="ui-input [color-scheme:dark]"
+                    />
+                    <input
+                      type="datetime-local"
+                      value={detailDeadline}
+                      onChange={(e) => setDetailDeadline(e.target.value)}
+                      className="ui-input [color-scheme:dark]"
+                    />
+                    <select value={detailGuide} onChange={(e) => setDetailGuide(e.target.value)} className="ui-input md:col-span-2">
+                      <option value="">Select guide</option>
+                      {users.map((member) => (
+                        <option key={member._id} value={member._id}>
+                          {member.name} ({member.role})
+                        </option>
+                      ))}
+                    </select>
+                    <textarea
+                      rows={2}
+                      value={detailNote}
+                      onChange={(e) => setDetailNote(e.target.value)}
+                      className="ui-input resize-none md:col-span-2"
+                      placeholder="Optional note for this detail change"
+                    />
+                  </div>
+                  <button disabled={savingDetails} className="btn btn-primary !w-auto !text-xs">
+                    {savingDetails ? <Loader2 size={14} className="animate-spin" /> : <ClipboardList size={14} />}
+                    Save Project Details
+                  </button>
+                </>
+              ) : (
+                <p className="text-sm text-gray-500">Read-only. Lead/Admin can edit project configuration.</p>
+              )}
+            </form>
+          </section>
+
+          <section className="p-6 md:p-7 border-b border-gray-800">
+            <div className="flex items-center gap-2 mb-4">
+              <ShieldCheck size={16} className="text-emerald-300" />
+              <h2 className="text-lg font-black text-white">Governance & Status Ledger</h2>
+            </div>
+
+            <div className="grid grid-cols-1 2xl:grid-cols-[360px_minmax(0,1fr)] gap-6">
+              <form onSubmit={submitStatus} className="space-y-3">
+                <p className="text-[11px] uppercase tracking-widest text-gray-500 font-black">Admin Status Control</p>
+                {isAdmin ? (
+                  <>
+                    <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)} className="ui-input">
+                      {PROJECT_STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                    <textarea
+                      rows={3}
+                      value={statusNote}
+                      onChange={(e) => setStatusNote(e.target.value)}
+                      className="ui-input resize-none"
+                      placeholder="Reason for status transition"
+                    />
+                    <button disabled={savingStatus} className="btn btn-primary !w-auto !text-xs">
+                      {savingStatus ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                      Apply Status
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">Only admin can apply global status and final completion.</p>
+                )}
+              </form>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                      <th className="py-2 pr-4">Status</th>
+                      <th className="py-2 pr-4">Changed By</th>
+                      <th className="py-2 pr-4">When</th>
+                      <th className="py-2">Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderedStatusHistory.map((row, idx) => (
+                      <tr key={`${row.status}-${row.changedAt}-${idx}`} className="border-b border-gray-800/70 align-top">
+                        <td className="py-2 pr-4 text-gray-100 font-semibold">{row.status}</td>
+                        <td className="py-2 pr-4 text-gray-300">{row.changedBy?.name || 'Admin'}</td>
+                        <td className="py-2 pr-4 text-gray-400 whitespace-nowrap">{formatDateTime(row.changedAt)}</td>
+                        <td className="py-2 text-gray-300">{row.note || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section className="p-6 md:p-7">
+            <div className="flex items-center gap-2 mb-4">
+              <Users size={16} className="text-cyan-300" />
+              <h2 className="text-lg font-black text-white">Operational Feed</h2>
+            </div>
+
+            {canManage ? (
+              <form onSubmit={submitUpdate} className="grid grid-cols-1 md:grid-cols-[180px_minmax(0,1fr)_auto] gap-3 mb-5">
+                <select value={updateType} onChange={(e) => setUpdateType(e.target.value)} className="ui-input">
+                  {UPDATE_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
                     </option>
                   ))}
                 </select>
-              </FormRow>
-              <FormRow label="Status Note (optional)">
                 <textarea
-                  rows={3}
-                  value={statusNote}
-                  onChange={(e) => setStatusNote(e.target.value)}
+                  rows={2}
+                  value={updateText}
+                  onChange={(e) => setUpdateText(e.target.value)}
+                  placeholder="Add update, blocker, or milestone details"
                   className="ui-input resize-none"
-                  placeholder="Reason for status transition"
                 />
-              </FormRow>
-              <button disabled={savingStatus} className="btn btn-primary !w-auto !text-xs">
-                {savingStatus ? <Loader2 size={14} className="animate-spin" /> : 'Update Status'}
-              </button>
-            </form>
-          ) : (
-            <p className="text-sm text-gray-400">Only administrators can close or globally move project status.</p>
-          )}
-        </div>
-      </section>
+                <button disabled={savingUpdate} className="btn btn-secondary !text-xs !px-3 !py-2 h-fit">
+                  {savingUpdate ? <Loader2 size={14} className="animate-spin" /> : <MessageSquarePlus size={14} />}
+                  Publish
+                </button>
+              </form>
+            ) : null}
 
-      <section className="border border-gray-800 rounded-3xl p-6 md:p-8 space-y-4 section-motion section-motion-delay-3">
-        <h2 className="text-xl font-black text-white flex items-center gap-2"><Activity size={18} className="text-cyan-300" /> Updates & Comments</h2>
-
-        {canManage ? (
-          <form onSubmit={submitUpdate} className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <select value={updateType} onChange={(e) => setUpdateType(e.target.value)} className="ui-input md:col-span-1">
-                {UPDATE_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-              <textarea
-                rows={3}
-                value={updateText}
-                onChange={(e) => setUpdateText(e.target.value)}
-                placeholder="Document roadblocks, achievements, or action items."
-                className="ui-input resize-none md:col-span-3"
-              />
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                    <th className="py-2 pr-3">Type</th>
+                    <th className="py-2 pr-3">Message</th>
+                    <th className="py-2 pr-3">Actor</th>
+                    <th className="py-2">Timestamp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orderedUpdates.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-5 text-center text-sm text-gray-500">
+                        No operational updates yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    orderedUpdates.map((row, idx) => (
+                      <tr key={`${row.createdAt}-${idx}`} className="border-b border-gray-800/60 align-top">
+                        <td className="py-2 pr-3">
+                          <span className={`text-[10px] uppercase tracking-widest border rounded-full px-2 py-1 ${updateTone(row.type)}`}>
+                            {row.type}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-3 text-gray-200 max-w-[540px]">{row.text}</td>
+                        <td className="py-2 pr-3 text-gray-400 whitespace-nowrap">{row.createdBy?.name || 'Member'}</td>
+                        <td className="py-2 text-gray-500 whitespace-nowrap">{formatDateTime(row.createdAt)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-            <button disabled={savingUpdate} className="btn btn-secondary !w-auto !text-xs inline-flex items-center gap-2">
-              {savingUpdate ? <Loader2 size={14} className="animate-spin" /> : <MessageSquarePlus size={14} />}
-              Publish Update
-            </button>
-          </form>
-        ) : (
-          <p className="text-sm text-gray-500">Update publishing is restricted to lead/admin accounts.</p>
-        )}
-
-        <div className="space-y-3">
-          {orderedUpdates.length === 0 && <p className="text-sm text-gray-500">No updates yet.</p>}
-          {orderedUpdates.map((row, idx) => (
-            <div key={`${row.createdAt}-${idx}`} className="border border-gray-800 rounded-2xl p-4">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <span className="text-[10px] uppercase tracking-widest text-cyan-200 border border-cyan-500/35 rounded-full px-2 py-1">
-                  {row.type}
-                </span>
-                <p className="text-xs text-gray-500">{row.createdBy?.name || 'Member'} • {fmt(row.createdAt)}</p>
-              </div>
-              <p className="text-gray-200 mt-2 text-sm">{row.text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="border border-gray-800 rounded-3xl p-6 md:p-8 section-motion section-motion-delay-3">
-        <h2 className="text-xl font-black text-white flex items-center gap-2"><Flag size={18} className="text-amber-300" /> Status Timeline</h2>
-        <div className="mt-4 space-y-3">
-          {orderedStatusHistory.length === 0 ? <p className="text-sm text-gray-500">No status changes recorded yet.</p> : null}
-          {orderedStatusHistory.map((row, idx) => (
-            <div key={`${row.status}-${row.changedAt}-${idx}`} className="border border-gray-800 rounded-xl p-3">
-              <p className="text-sm text-white font-semibold">{row.status}</p>
-              <p className="text-xs text-gray-400 mt-1">{row.changedBy?.name || 'Admin'} • {fmt(row.changedAt)}</p>
-              {row.note ? <p className="text-xs text-gray-300 mt-2">{row.note}</p> : null}
-            </div>
-          ))}
-        </div>
-      </section>
+          </section>
+        </main>
+      </div>
     </div>
-  );
-}
-
-function FormRow({ label, children }) {
-  return (
-    <label className="block">
-      <span className="text-[10px] uppercase tracking-widest text-gray-500 font-black">{label}</span>
-      <div className="mt-1.5">{children}</div>
-    </label>
   );
 }

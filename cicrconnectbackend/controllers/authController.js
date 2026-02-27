@@ -62,23 +62,91 @@ const registerUser = async (req, res) => {
     return res.status(400).json({ message: 'User already exists' });
   }
 
+  const now = new Date();
   const code = await InviteCode.findOne({ code: normalizedInviteCode });
-  if (!code || code.isUsed || code.expiresAt < new Date()) {
+  if (!code) {
     return res.status(400).json({ message: 'Invalid invite code' });
   }
 
-  await User.create({
-    name: normalizedName,
-    email: normalizedEmail,
-    password,
-    collegeId: normalizedCollegeId,
-    joinedAt: joinedAt ? new Date(joinedAt) : undefined,
-    isVerified: false,
-    approvalStatus: 'Pending',
-  });
+  if (code.expiresAt && new Date(code.expiresAt) <= now) {
+    return res.status(400).json({ message: 'Invite code expired' });
+  }
 
-  code.isUsed = true;
-  await code.save();
+  const maxUsesRaw = Number(code.maxUses);
+  const maxUses = Number.isInteger(maxUsesRaw) && maxUsesRaw > 0 ? maxUsesRaw : 1;
+  const currentUsesRaw = Number(code.currentUses);
+  const currentUses = Number.isInteger(currentUsesRaw) && currentUsesRaw >= 0
+    ? currentUsesRaw
+    : (code.isUsed ? maxUses : 0);
+
+  if (currentUses >= maxUses || code.isUsed) {
+    return res.status(400).json({ message: 'Invite code usage limit reached' });
+  }
+
+  const consumedCode = await InviteCode.findOneAndUpdate(
+    {
+      _id: code._id,
+      expiresAt: { $gt: now },
+      $or: [
+        { currentUses: { $lt: maxUses } },
+        { currentUses: { $exists: false } },
+      ],
+      isUsed: { $ne: true },
+    },
+    {
+      $inc: { currentUses: 1 },
+      $set: { lastUsedAt: now },
+    },
+    { new: true }
+  );
+
+  if (!consumedCode) {
+    return res.status(400).json({ message: 'Invite code usage limit reached' });
+  }
+
+  const consumedMaxUsesRaw = Number(consumedCode.maxUses);
+  const consumedMaxUses = Number.isInteger(consumedMaxUsesRaw) && consumedMaxUsesRaw > 0
+    ? consumedMaxUsesRaw
+    : 1;
+
+  if (Number(consumedCode.currentUses || 0) >= consumedMaxUses && !consumedCode.isUsed) {
+    consumedCode.isUsed = true;
+    await consumedCode.save({ validateBeforeSave: false });
+  }
+
+  try {
+    await User.create({
+      name: normalizedName,
+      email: normalizedEmail,
+      password,
+      collegeId: normalizedCollegeId,
+      joinedAt: joinedAt ? new Date(joinedAt) : undefined,
+      isVerified: false,
+      approvalStatus: 'Pending',
+    });
+  } catch (err) {
+    // Best-effort rollback for invite usage count if user creation fails.
+    try {
+      const rollbackCode = await InviteCode.findById(consumedCode._id);
+      if (rollbackCode) {
+        const rollbackMaxUses = Number.isInteger(Number(rollbackCode.maxUses)) && Number(rollbackCode.maxUses) > 0
+          ? Number(rollbackCode.maxUses)
+          : 1;
+        rollbackCode.currentUses = Math.max(0, Number(rollbackCode.currentUses || 0) - 1);
+        rollbackCode.isUsed = rollbackCode.currentUses >= rollbackMaxUses;
+        if (rollbackCode.currentUses === 0) {
+          rollbackCode.lastUsedAt = null;
+        }
+        await rollbackCode.save({ validateBeforeSave: false });
+      }
+    } catch {
+      // Ignore rollback failures.
+    }
+    if (err?.code === 11000) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+    return res.status(500).json({ message: 'Registration failed. Please try again.' });
+  }
 
   res.status(201).json({
     success: true,

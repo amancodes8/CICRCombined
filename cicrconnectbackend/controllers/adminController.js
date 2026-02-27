@@ -8,10 +8,48 @@ const { logAudit } = require('../utils/auditLogger');
 const crypto = require('crypto');
 
 const REQUIRED_ADMIN_APPROVALS = 3;
+const INVITE_CODE_TTL_MS = 24 * 60 * 60 * 1000;
+const INVITE_CODE_MAX_USES_LIMIT = 100;
+
 const resolveFrontendUrl = () => {
   const raw = String(process.env.FRONTEND_URL || '').trim();
   if (!raw) return 'https://cicrconnect.vercel.app';
   return raw.split(',').map((v) => v.trim()).filter(Boolean)[0] || 'https://cicrconnect.vercel.app';
+};
+
+const normalizeInviteCode = (value) => String(value || '').trim().toUpperCase();
+
+const normalizeInviteMaxUses = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return null;
+  if (parsed < 1 || parsed > INVITE_CODE_MAX_USES_LIMIT) return null;
+  return parsed;
+};
+
+const readInviteUsage = (record = {}) => {
+  const maxUsesRaw = Number(record.maxUses);
+  const maxUses = Number.isInteger(maxUsesRaw) && maxUsesRaw > 0
+    ? Math.min(maxUsesRaw, INVITE_CODE_MAX_USES_LIMIT)
+    : 1;
+
+  const currentUsesRaw = Number(record.currentUses);
+  const fallbackCurrentUses = record.isUsed ? maxUses : 0;
+  const currentUses = Number.isInteger(currentUsesRaw) && currentUsesRaw >= 0
+    ? Math.min(currentUsesRaw, maxUses)
+    : fallbackCurrentUses;
+
+  return {
+    maxUses,
+    currentUses,
+    remainingUses: Math.max(maxUses - currentUses, 0),
+  };
+};
+
+const isInviteExpired = (record) => {
+  const expiresAt = record?.expiresAt ? new Date(record.expiresAt) : null;
+  if (!expiresAt || Number.isNaN(expiresAt.getTime())) return false;
+  return expiresAt.getTime() <= Date.now();
 };
 
 const ensureAdminApprover = (req, res) => {
@@ -57,21 +95,56 @@ const isSelfTarget = (req, targetUser) => {
  */
 exports.generateInviteCode = async (req, res) => {
   try {
-    const codeString = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const requestedMaxUses = normalizeInviteMaxUses(req.body?.maxUses);
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'maxUses') && requestedMaxUses === null) {
+      return res.status(400).json({
+        success: false,
+        message: `maxUses must be an integer between 1 and ${INVITE_CODE_MAX_USES_LIMIT}`,
+      });
+    }
 
-    const newCode = new InviteCode({
-      code: codeString,
-      createdBy: req.user.id, // Matches your Schema
-    });
+    const maxUses = requestedMaxUses || 1;
+    const expiresAt = new Date(Date.now() + INVITE_CODE_TTL_MS);
 
-    await newCode.save();
+    let newCode = null;
+    let attempts = 0;
+    while (!newCode && attempts < 6) {
+      attempts += 1;
+      const codeString = crypto.randomBytes(4).toString('hex').toUpperCase();
+      try {
+        newCode = await InviteCode.create({
+          code: codeString,
+          createdBy: req.user.id,
+          maxUses,
+          currentUses: 0,
+          isUsed: false,
+          expiresAt,
+        });
+      } catch (err) {
+        if (err?.code !== 11000) throw err;
+      }
+    }
+
+    if (!newCode) {
+      return res.status(500).json({
+        success: false,
+        message: 'Could not generate a unique invite code. Try again.',
+      });
+    }
+
+    const usage = readInviteUsage(newCode);
 
     await logAudit({
       actor: req.user.id,
       action: 'ADMIN_INVITE_CODE_GENERATED',
       entityType: 'InviteCode',
       entityId: newCode._id,
-      after: { code: newCode.code, isUsed: newCode.isUsed },
+      after: {
+        code: newCode.code,
+        maxUses: usage.maxUses,
+        currentUses: usage.currentUses,
+        expiresAt: newCode.expiresAt,
+      },
       req,
     });
 
@@ -79,6 +152,10 @@ exports.generateInviteCode = async (req, res) => {
       success: true,
       message: 'Invite code created successfully',
       code: newCode.code,
+      maxUses: usage.maxUses,
+      currentUses: usage.currentUses,
+      remainingUses: usage.remainingUses,
+      expiresAt: newCode.expiresAt,
     });
   } catch (err) {
     console.error("❌ generateInviteCode error:", err.message);
@@ -91,8 +168,9 @@ exports.generateInviteCode = async (req, res) => {
  */
 exports.sendInviteEmail = async (req, res) => {
   const { email, inviteCode } = req.body;
+  const normalizedInviteCode = normalizeInviteCode(inviteCode);
 
-  if (!email || !inviteCode) {
+  if (!email || !normalizedInviteCode) {
     return res.status(400).json({
       success: false,
       message: 'Email and Invite Code are required',
@@ -100,21 +178,37 @@ exports.sendInviteEmail = async (req, res) => {
   }
 
   try {
-    // ✅ find unused invite code
-    const codeRecord = await InviteCode.findOne({ code: inviteCode, isUsed: false });
-
+    const codeRecord = await InviteCode.findOne({ code: normalizedInviteCode });
     if (!codeRecord) {
-      const exists = await InviteCode.findOne({ code: inviteCode });
-
       return res.status(404).json({
         success: false,
-        message: exists?.isUsed ? 'Invite code already used' : 'Invite code not found',
+        message: 'Invite code not found',
+      });
+    }
+
+    if (isInviteExpired(codeRecord)) {
+      return res.status(410).json({
+        success: false,
+        message: 'Invite code expired. Generate a new code.',
+      });
+    }
+
+    const usage = readInviteUsage(codeRecord);
+    if (usage.remainingUses <= 0) {
+      if (!codeRecord.isUsed) {
+        codeRecord.isUsed = true;
+        await codeRecord.save({ validateBeforeSave: false });
+      }
+      return res.status(410).json({
+        success: false,
+        message: 'Invite code usage limit reached. Generate a new code.',
       });
     }
 
     // ✅ Use deployed frontend URL (NOT localhost)
     const frontendUrl = resolveFrontendUrl();
     const registerLink = `${frontendUrl}/login`;
+    const expiryLabel = new Date(codeRecord.expiresAt).toLocaleString();
 
     const emailMessage = `
       <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px;">
@@ -123,13 +217,18 @@ exports.sendInviteEmail = async (req, res) => {
         <p>Use this code during registration:</p>
 
         <div style="background: #f8fafc; border: 2px dashed #cbd5e1; padding: 16px; text-align: center; margin: 20px 0;">
-          <span style="font-size: 24px; font-weight: bold; letter-spacing: 4px;">${inviteCode}</span>
+          <span style="font-size: 24px; font-weight: bold; letter-spacing: 4px;">${normalizedInviteCode}</span>
         </div>
 
         <p>Register here:</p>
         <a href="${registerLink}" style="display:inline-block;padding:10px 15px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;">
           Open CICR Portal
         </a>
+
+        <p style="margin-top:16px;font-size:13px;color:#1f2937;">
+          Usage remaining: <strong>${usage.remainingUses}</strong> of <strong>${usage.maxUses}</strong><br />
+          Expires on: <strong>${expiryLabel}</strong>
+        </p>
 
         <p style="margin-top:16px;font-size:12px;color:gray;">
           If you didn't request this invite, you can ignore this email.
@@ -150,7 +249,12 @@ exports.sendInviteEmail = async (req, res) => {
         action: 'ADMIN_INVITE_EMAIL_SENT',
         entityType: 'InviteCode',
         entityId: codeRecord._id,
-        after: { email, code: inviteCode, emailSent: true },
+        after: {
+          email,
+          code: normalizedInviteCode,
+          emailSent: true,
+          remainingUses: usage.remainingUses,
+        },
         req,
       });
 
@@ -158,6 +262,9 @@ exports.sendInviteEmail = async (req, res) => {
         success: true,
         message: `Invite sent to ${email}`,
         emailSent: true,
+        remainingUses: usage.remainingUses,
+        maxUses: usage.maxUses,
+        expiresAt: codeRecord.expiresAt,
       });
     } catch (emailErr) {
       console.error("❌ Email failed (but invite code valid):", emailErr.message);

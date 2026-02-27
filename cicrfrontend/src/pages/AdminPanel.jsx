@@ -103,6 +103,8 @@ export default function AdminPanel() {
   const [selectedUserIds, setSelectedUserIds] = useState([]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
+  const [inviteMaxUses, setInviteMaxUses] = useState(1);
+  const [inviteMeta, setInviteMeta] = useState(null);
   const [recipientEmail, setRecipientEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -413,22 +415,33 @@ export default function AdminPanel() {
   };
 
   const handleGenerateInvite = async () => {
+    const normalizedMaxUses = Math.max(1, Math.min(100, Number(inviteMaxUses) || 1));
     try {
-      const { data } = await generateInvite();
-      setInviteCode(data.code);
+      const { data } = await generateInvite({ maxUses: normalizedMaxUses });
+      setInviteCode(data?.code || '');
+      setInviteMaxUses(normalizedMaxUses);
+      setInviteMeta({
+        maxUses: Number(data?.maxUses || normalizedMaxUses),
+        currentUses: Number(data?.currentUses || 0),
+        remainingUses: Number(
+          data?.remainingUses ?? data?.maxUses ?? normalizedMaxUses
+        ),
+        expiresAt: data?.expiresAt || '',
+      });
+      setCopied(false);
     } catch (err) { 
-      alert("Error generating code"); 
+      alert(err.response?.data?.message || "Error generating code"); 
     }
   };
 
   const handleSendInvite = async () => {
+    if (!inviteCode) return alert("Generate an access code first");
     if (!recipientEmail) return alert("Please enter an email address");
     setIsSending(true);
     try {
       await sendInviteEmail({ email: recipientEmail, inviteCode });
       alert(`Success! Invite sent to ${recipientEmail}`);
       setRecipientEmail('');
-      setInviteCode(''); 
     } catch (err) {
       alert(err.response?.data?.message || "Failed to send email");
     } finally { 
@@ -596,6 +609,13 @@ export default function AdminPanel() {
   );
 
   const resetEligibleUsers = users.filter((u) => String(u.approvalStatus || '').toLowerCase() !== 'rejected');
+  const inviteExpiryLabel = useMemo(() => {
+    const raw = inviteMeta?.expiresAt;
+    if (!raw) return '';
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleString();
+  }, [inviteMeta?.expiresAt]);
 
   const filteredApplications = applications.filter((app) => {
     const matchesStatus = appFilter === 'All' || app.status === appFilter;
@@ -733,9 +753,22 @@ export default function AdminPanel() {
           subtitle="Authorization, recruitment workflow, auditability, and organization-wide communication controls."
           icon={Shield}
           actions={
-            <button onClick={handleGenerateInvite} className="btn btn-primary">
-              <UserPlus size={14} /> Generate Access Key
-            </button>
+            <div className="flex items-center gap-2">
+              <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-800 bg-[#0a0a0c]">
+                <span className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Uses</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={inviteMaxUses}
+                  onChange={(e) => setInviteMaxUses(e.target.value)}
+                  className="w-14 bg-transparent text-sm text-white outline-none"
+                />
+              </label>
+              <button onClick={handleGenerateInvite} className="btn btn-primary">
+                <UserPlus size={14} /> Generate Access Key
+              </button>
+            </div>
           }
         />
       </div>
@@ -783,6 +816,13 @@ export default function AdminPanel() {
                       {copied ? <Check size={20} className="text-green-500" /> : <Copy size={20} className="text-gray-400" />}
                     </button>
                   </div>
+                  <p className="text-xs text-gray-400">
+                    Usage limit: <span className="text-white font-semibold">{inviteMeta?.maxUses || 1}</span> • Remaining:{' '}
+                    <span className="text-cyan-200 font-semibold">{inviteMeta?.remainingUses ?? inviteMeta?.maxUses ?? 1}</span>
+                  </p>
+                  <p className="text-[11px] text-amber-200">
+                    Expires in 24 hours{inviteExpiryLabel ? ` (${inviteExpiryLabel})` : ''}
+                  </p>
                 </div>
 
                 <div className="space-y-4">

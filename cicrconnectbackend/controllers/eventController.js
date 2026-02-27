@@ -172,6 +172,9 @@ const createEvent = async (req, res) => {
         normalizedSeeds.map((row) => ({
           ...row,
           event: event._id,
+          lastEditedBy: actorId,
+          lastEditedAt: new Date(),
+          lastEditedAction: 'Initialized by admin',
           statusHistory: [
             {
               status: 'Planning',
@@ -281,10 +284,15 @@ const getEventById = async (req, res) => {
       .populate('createdBy', 'name role')
       .populate({
         path: 'projects',
-        select: 'title status progress stage deadline lead guide',
+        select:
+          'title description domain components startTime deadline status progress stage lead guide team updates statusHistory lastEditedBy lastEditedAt lastEditedAction createdAt updatedAt completedAt',
         populate: [
-          { path: 'lead', select: 'name role' },
-          { path: 'guide', select: 'name role' },
+          { path: 'lead', select: 'name role email collegeId year branch' },
+          { path: 'guide', select: 'name role email collegeId year branch' },
+          { path: 'team', select: 'name role email collegeId year branch batch phone' },
+          { path: 'lastEditedBy', select: 'name role email collegeId' },
+          { path: 'updates.createdBy', select: 'name role email collegeId' },
+          { path: 'statusHistory.changedBy', select: 'name role email collegeId' },
         ],
       });
 

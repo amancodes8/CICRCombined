@@ -64,6 +64,9 @@ const ProjectSchema = new mongoose.Schema(
     statusHistory: { type: [ProjectStatusHistorySchema], default: [] },
     updates: { type: [ProjectUpdateSchema], default: [] },
     lastStatusChangedAt: { type: Date, default: Date.now },
+    lastEditedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    lastEditedAt: { type: Date, default: null },
+    lastEditedAction: { type: String, default: 'Initialized', maxlength: 140 },
     completedAt: { type: Date, default: null },
     suggestions: [
       {

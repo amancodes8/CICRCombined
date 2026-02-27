@@ -63,7 +63,7 @@ export const fetchAuditLogs = (params = {}) => {
 };
 
 // Invitation System
-export const generateInvite = () => API.post('/admin/invite');
+export const generateInvite = (data = {}) => API.post('/admin/invite', data);
 export const sendInviteEmail = (data) => API.post('/admin/send-invite', data);
 export const generatePasswordResetCode = (id) => API.post(`/admin/users/${id}/password-reset-code`);
 
@@ -77,6 +77,7 @@ export const fetchProjectById = (id) => API.get(`/projects/${id}`);
 export const createProject = (data) => API.post('/projects', data);
 export const addProjectSuggestion = (id, text) => API.post(`/projects/${id}/suggestions`, { text });
 export const addProjectUpdate = (id, payload) => API.post(`/projects/${id}/updates`, payload);
+export const updateProjectDetails = (id, payload) => API.patch(`/projects/${id}/details`, payload);
 export const updateProjectProgress = (id, payload) => API.patch(`/projects/${id}/progress`, payload);
 export const updateProjectStatus = (id, payload) => API.patch(`/projects/${id}/status`, payload);
 export const updateProjectTeam = (id, payload) => API.patch(`/projects/${id}/team`, payload);

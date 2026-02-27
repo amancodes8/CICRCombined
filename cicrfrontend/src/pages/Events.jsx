@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock4,
+  Download,
   Layers3,
   MapPin,
   Plus,
@@ -12,7 +13,7 @@ import {
   Trash2,
   Users,
 } from 'lucide-react';
-import { createEvent, deleteEvent, fetchDirectoryMembers, fetchEvents, updateEvent } from '../api';
+import { createEvent, deleteEvent, fetchDirectoryMembers, fetchEventById, fetchEvents, updateEvent } from '../api';
 import FormField from '../components/FormField';
 import PageHeader from '../components/PageHeader';
 import { DataEmpty, DataLoading } from '../components/DataState';
@@ -66,6 +67,28 @@ const fmtTime = (value) => {
   if (Number.isNaN(d.getTime())) return 'TBD';
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
+const fmt = (value) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return 'TBD';
+  return d.toLocaleString();
+};
+
+const csvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+const downloadCsv = (filename, headers, rows) => {
+  const head = headers.map(csvValue).join(',');
+  const body = rows.map((row) => row.map(csvValue).join(',')).join('\n');
+  const csv = `${head}\n${body}`;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
 export default function Events() {
   const [searchParams] = useSearchParams();
@@ -75,6 +98,7 @@ export default function Events() {
   const [projectDrafts, setProjectDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [exportingEventId, setExportingEventId] = useState('');
   const [errors, setErrors] = useState({});
 
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
@@ -261,6 +285,133 @@ export default function Events() {
       dispatchToast('Event removed.', 'success');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Failed to delete event.', 'error');
+    }
+  };
+
+  const handleExportEvent = async (eventId) => {
+    if (!isAdmin || !eventId) return;
+    setExportingEventId(eventId);
+    try {
+      const { data } = await fetchEventById(eventId);
+      const event = data || {};
+      const projects = Array.isArray(event.projects) ? event.projects : [];
+
+      const headers = [
+        'Event Title',
+        'Event Type',
+        'Event Status',
+        'Event Location',
+        'Event Start',
+        'Event End',
+        'Project Title',
+        'Project Domain',
+        'Project Status',
+        'Project Stage',
+        'Progress %',
+        'Project Start',
+        'Project Deadline',
+        'Components',
+        'Lead',
+        'Guide',
+        'Member Name',
+        'Member Role',
+        'Member Year',
+        'Member Branch',
+        'Member Email',
+        'Last Edited By',
+        'Last Edited At',
+        'Last Edited Action',
+        'Updates Count',
+        'Last Update Note',
+        'Status Changes',
+      ];
+
+      const rows = [];
+      projects.forEach((project) => {
+        const members = Array.isArray(project.team) && project.team.length > 0 ? project.team : [null];
+        const updates = Array.isArray(project.updates) ? project.updates : [];
+        const statusHistory = Array.isArray(project.statusHistory) ? project.statusHistory : [];
+        const latestUpdate = updates[0]?.text || '';
+        const statusTrail = statusHistory
+          .slice(0, 6)
+          .map((row) => `${row.status} (${new Date(row.changedAt || row.createdAt || Date.now()).toLocaleDateString()})`)
+          .join(' | ');
+
+        members.forEach((member) => {
+          rows.push([
+            event.title || '',
+            event.type || '',
+            event.status || '',
+            event.location || '',
+            fmt(event.startTime),
+            fmt(event.endTime),
+            project.title || '',
+            project.domain || '',
+            project.status || '',
+            project.stage || '',
+            Number(project.progress || 0),
+            fmt(project.startTime),
+            fmt(project.deadline),
+            (project.components || []).join(' | '),
+            project.lead?.name || '',
+            project.guide?.name || '',
+            member?.name || '',
+            member?.role || '',
+            member?.year ?? '',
+            member?.branch || '',
+            member?.email || '',
+            project.lastEditedBy?.name || '',
+            project.lastEditedAt ? fmt(project.lastEditedAt) : '',
+            project.lastEditedAction || '',
+            updates.length,
+            latestUpdate,
+            statusTrail,
+          ]);
+        });
+      });
+
+      if (rows.length === 0) {
+        rows.push([
+          event.title || '',
+          event.type || '',
+          event.status || '',
+          event.location || '',
+          fmt(event.startTime),
+          fmt(event.endTime),
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          0,
+          '',
+          '',
+        ]);
+      }
+
+      const filename = `${String(event.title || 'event-report')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')}-details.csv`;
+
+      downloadCsv(filename, headers, rows);
+      dispatchToast('Event sheet exported successfully.', 'success');
+    } catch (err) {
+      dispatchToast(err.response?.data?.message || 'Failed to export event details.', 'error');
+    } finally {
+      setExportingEventId('');
     }
   };
 
@@ -621,6 +772,16 @@ export default function Events() {
                     className="text-[10px] uppercase tracking-widest border border-rose-500/40 text-rose-200 px-3 py-1.5 rounded-lg"
                   >
                     Cancel
+                  </button>
+                ) : null}
+                {isAdmin ? (
+                  <button
+                    onClick={() => handleExportEvent(event._id)}
+                    disabled={exportingEventId === event._id}
+                    className="text-[10px] uppercase tracking-widest border border-cyan-500/40 text-cyan-200 px-3 py-1.5 rounded-lg inline-flex items-center gap-1 disabled:opacity-50"
+                  >
+                    <Download size={12} />
+                    {exportingEventId === event._id ? 'Exporting...' : 'Export Details'}
                   </button>
                 ) : null}
                 {isAdmin ? (

@@ -207,12 +207,17 @@ export default function Projects() {
                 <span className={`text-[10px] px-3 py-1 rounded-full border uppercase tracking-widest font-black ${statusClass(project.status)}`}>
                   {project.status || 'Planning'}
                 </span>
-                <Link
-                  to={`/projects/${project._id}`}
-                  className="inline-flex items-center gap-1 text-xs uppercase tracking-widest text-cyan-100"
-                >
-                  Open <ChevronRight size={14} />
-                </Link>
+                <div className="inline-flex items-center gap-2">
+                  <Link to={`/projects/${project._id}/review`} className="text-[10px] uppercase tracking-widest text-emerald-200">
+                    Review
+                  </Link>
+                  <Link
+                    to={`/projects/${project._id}`}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-widest text-cyan-100"
+                  >
+                    Open <ChevronRight size={14} />
+                  </Link>
+                </div>
               </div>
             </motion.article>
           ))}
