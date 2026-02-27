@@ -69,6 +69,54 @@ const dispatchToast = (message, type = 'info') => {
   }
 };
 
+function AdminKpiTile({ label, value, hint, tone = 'cyan' }) {
+  const toneClass =
+    tone === 'emerald'
+      ? 'border-emerald-500/35 bg-emerald-500/10'
+      : tone === 'amber'
+      ? 'border-amber-500/35 bg-amber-500/10'
+      : tone === 'blue'
+      ? 'border-blue-500/35 bg-blue-500/10'
+      : 'border-cyan-500/35 bg-cyan-500/10';
+
+  return (
+    <article className={`rounded-2xl border px-4 py-3 ${toneClass}`}>
+      <p className="text-[10px] uppercase tracking-[0.18em] text-gray-300 font-black">{label}</p>
+      <p className="text-2xl font-black text-white mt-1">{value}</p>
+      <p className="text-[11px] text-gray-400 mt-1">{hint}</p>
+    </article>
+  );
+}
+
+function AdminSectionShell({ icon: Icon, title, subtitle, badge, actions, className = '', children }) {
+  return (
+    <section className={`rounded-[1.6rem] border border-gray-800 bg-[#090e15]/72 overflow-hidden ${className}`}>
+      <header className="px-5 md:px-6 py-4 border-b border-gray-800 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          {Icon ? (
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl border border-gray-700 text-cyan-200 bg-cyan-500/10">
+              <Icon size={17} />
+            </span>
+          ) : null}
+          <div>
+            <h3 className="text-base md:text-lg font-black text-white">{title}</h3>
+            {subtitle ? <p className="text-xs text-gray-500 mt-1">{subtitle}</p> : null}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {badge ? (
+            <span className="text-[10px] uppercase tracking-widest px-2 py-1 rounded-full border border-cyan-500/35 text-cyan-200 bg-cyan-500/10">
+              {badge}
+            </span>
+          ) : null}
+          {actions}
+        </div>
+      </header>
+      <div className="px-5 md:px-6 py-5">{children}</div>
+    </section>
+  );
+}
+
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -744,8 +792,74 @@ export default function AdminPanel() {
     }
   };
 
+  const adminTabs = [
+    { id: 'users', label: 'Users', icon: UserCog },
+    { id: 'recruitment', label: 'Recruitment', icon: ClipboardCheck },
+    { id: 'broadcast', label: 'Broadcast', icon: Megaphone },
+    { id: 'audit', label: 'Audit', icon: ScrollText },
+  ];
+
+  const approvalSummary = useMemo(() => {
+    return users.reduce(
+      (acc, user) => {
+        const approval = String(user.approvalStatus || (user.isVerified ? 'Approved' : 'Pending')).toLowerCase();
+        if (approval === 'approved') acc.approved += 1;
+        else if (approval === 'rejected') acc.rejected += 1;
+        else acc.pending += 1;
+        return acc;
+      },
+      { approved: 0, pending: 0, rejected: 0 }
+    );
+  }, [users]);
+
+  const recruitmentSummary = useMemo(() => {
+    return applications.reduce(
+      (acc, app) => {
+        const status = String(app.status || '').toLowerCase();
+        if (status === 'selected') acc.selected += 1;
+        if (status === 'interview') acc.interview += 1;
+        if (status !== 'rejected') acc.active += 1;
+        return acc;
+      },
+      { active: 0, selected: 0, interview: 0 }
+    );
+  }, [applications]);
+
+  const adminKpis = [
+    {
+      id: 'members',
+      label: 'Directory Members',
+      value: users.length,
+      hint: `${approvalSummary.approved} approved • ${approvalSummary.pending} pending`,
+      tone: 'blue',
+    },
+    {
+      id: 'approvals',
+      label: 'Pending Approvals',
+      value: pendingActions.length,
+      hint: 'Admin role/delete requests awaiting quorum',
+      tone: pendingActions.length > 0 ? 'amber' : 'cyan',
+    },
+    {
+      id: 'invite',
+      label: 'Active Invite Uses',
+      value: inviteMeta?.remainingUses ?? 0,
+      hint: inviteMeta?.expiresAt
+        ? `Expires ${new Date(inviteMeta.expiresAt).toLocaleDateString()}`
+        : 'Generate access key from header',
+      tone: inviteMeta?.remainingUses > 0 ? 'emerald' : 'cyan',
+    },
+    {
+      id: 'pipeline',
+      label: 'Recruitment Active',
+      value: recruitmentSummary.active,
+      hint: `${recruitmentSummary.interview} interview • ${recruitmentSummary.selected} selected`,
+      tone: 'cyan',
+    },
+  ];
+
   return (
-    <div className="ui-page space-y-6 md:space-y-10 max-w-7xl pb-20 px-4 sm:px-6 lg:px-8 overflow-x-hidden page-motion-d">
+    <div className="ui-page space-y-6 md:space-y-8 max-w-7xl pb-20 px-4 sm:px-6 lg:px-8 overflow-x-hidden page-motion-d">
       <div className="section-motion section-motion-delay-1">
         <PageHeader
           eyebrow="Admin Operations"
@@ -753,8 +867,8 @@ export default function AdminPanel() {
           subtitle="Authorization, recruitment workflow, auditability, and organization-wide communication controls."
           icon={Shield}
           actions={
-            <div className="flex items-center gap-2">
-              <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-800 bg-[#0a0a0c]">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-700 bg-[#0a0f17]/85">
                 <span className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Uses</span>
                 <input
                   type="number"
@@ -765,7 +879,7 @@ export default function AdminPanel() {
                   className="w-14 bg-transparent text-sm text-white outline-none"
                 />
               </label>
-              <button onClick={handleGenerateInvite} className="btn btn-primary">
+              <button onClick={handleGenerateInvite} className="btn btn-primary whitespace-nowrap">
                 <UserPlus size={14} /> Generate Access Key
               </button>
             </div>
@@ -773,28 +887,37 @@ export default function AdminPanel() {
         />
       </div>
 
-      <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-800 p-1 section-motion section-motion-delay-1">
-        {[
-          { id: 'users', label: 'Users', icon: UserCog },
-          { id: 'recruitment', label: 'Recruitment', icon: ClipboardCheck },
-          { id: 'broadcast', label: 'Broadcast', icon: Megaphone },
-          { id: 'audit', label: 'Audit', icon: ScrollText },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setAdminTab(tab.id)}
-            className={`px-4 py-2 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-[0.16em] inline-flex items-center gap-2 ${
-              adminTab === tab.id
-                ? 'text-white border border-blue-500/45 bg-blue-500/10'
-                : 'text-gray-500 hover:text-gray-200'
-            }`}
-          >
-            <tab.icon size={13} />
-            {tab.label}
-          </button>
-        ))}
+      <div className="section-motion section-motion-delay-1">
+        <div className="flex items-center gap-2 rounded-2xl border border-gray-800/90 p-1 bg-[#060a10]/80 overflow-x-auto">
+          {adminTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setAdminTab(tab.id)}
+              className={`px-4 py-2 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-[0.16em] inline-flex items-center gap-2 whitespace-nowrap transition-colors ${
+                adminTab === tab.id
+                  ? 'text-white border border-blue-500/45 bg-blue-500/10'
+                  : 'text-gray-500 hover:text-gray-200'
+              }`}
+            >
+              <tab.icon size={13} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 section-motion section-motion-delay-2">
+        {adminKpis.map((tile) => (
+          <AdminKpiTile
+            key={tile.id}
+            label={tile.label}
+            value={tile.value}
+            hint={tile.hint}
+            tone={tile.tone}
+          />
+        ))}
+      </section>
 
       {adminTab === 'users' && (
         <AnimatePresence>
@@ -803,16 +926,14 @@ export default function AdminPanel() {
               initial={{ height: 0, opacity: 0, y: -20 }}
               animate={{ height: 'auto', opacity: 1, y: 0 }}
               exit={{ height: 0, opacity: 0, y: -20 }}
-              className="border border-blue-500/30 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl overflow-hidden relative"
+              className="border border-blue-500/30 bg-[#08101a]/70 p-6 md:p-8 rounded-[1.8rem] shadow-2xl overflow-hidden relative pro-aurora section-motion section-motion-delay-2"
             >
-              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-[100px] -mr-20 -mt-20" />
-              
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-10">
                 <div className="text-center lg:text-left space-y-2">
-                  <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em]">Key Authorized</span>
+                  <span className="text-[10px] font-black text-blue-300 uppercase tracking-[0.3em]">Access Key Active</span>
                   <div className="flex items-center justify-center lg:justify-start gap-5">
-                    <h3 className="text-4xl md:text-6xl font-black font-mono tracking-[0.2em] text-white italic">{inviteCode}</h3>
-                    <button onClick={copyToClipboard} className="p-3 bg-[#0a0a0c] border border-gray-800 rounded-xl hover:border-blue-500 transition-all">
+                    <h3 className="text-4xl md:text-5xl font-black font-mono tracking-[0.2em] text-white">{inviteCode}</h3>
+                    <button onClick={copyToClipboard} className="p-3 bg-[#0a0f17] border border-gray-700 rounded-xl hover:border-blue-500 transition-all">
                       {copied ? <Check size={20} className="text-green-500" /> : <Copy size={20} className="text-gray-400" />}
                     </button>
                   </div>
@@ -826,7 +947,7 @@ export default function AdminPanel() {
                 </div>
 
                 <div className="space-y-4">
-                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest text-center lg:text-left">Dispatch encrypted code to email</p>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest text-center lg:text-left">Dispatch code securely</p>
                   <div className="flex flex-col sm:flex-row gap-3">
                     <div className="relative flex-1">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" size={20} />
@@ -835,13 +956,13 @@ export default function AdminPanel() {
                         placeholder="recipient@college.edu"
                         value={recipientEmail}
                         onChange={(e) => setRecipientEmail(e.target.value)}
-                        className="w-full bg-[#0a0a0c] border border-gray-800 p-5 pl-12 rounded-2xl outline-none focus:border-blue-500 transition-all text-white font-bold"
+                        className="ui-input pl-12 !rounded-2xl !py-4 !text-sm !font-semibold"
                       />
                     </div>
                     <button 
                       onClick={handleSendInvite}
                       disabled={isSending}
-                      className="bg-white text-black hover:bg-blue-600 hover:text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                      className="btn btn-primary !rounded-2xl !px-8 !py-4"
                     >
                       {isSending ? <Loader2 className="animate-spin" size={18} /> : <><Send size={18} /> Dispatch</>}
                     </button>
@@ -855,26 +976,17 @@ export default function AdminPanel() {
 
       {adminTab === 'users' && (
       <>
-      <section className="border border-cyan-500/25 rounded-[2rem] p-6 md:p-8 section-motion section-motion-delay-2">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl border border-cyan-500/40">
-              <KeyRound size={18} className="text-cyan-300" />
-            </div>
-            <div>
-              <h3 className="text-lg md:text-xl font-black text-white">Password Reset Code Generator</h3>
-              <p className="text-xs text-gray-400 mt-1">
-                Use when email OTP is unavailable. Generates a one-time code valid for 15 minutes.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-5 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+      <AdminSectionShell
+        icon={KeyRound}
+        title="Password Reset Code Generator"
+        subtitle="Use when email OTP is unavailable. Generates a one-time code valid for 15 minutes."
+        className="section-motion section-motion-delay-2"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
           <select
             value={selectedResetUserId}
             onChange={(e) => setSelectedResetUserId(e.target.value)}
-            className="w-full bg-[#0a0a0c] border border-gray-800 rounded-xl px-4 py-3 text-sm text-gray-200 outline-none focus:border-cyan-400/60"
+            className="ui-input [color-scheme:dark]"
           >
             <option value="">Select user for reset code</option>
             {resetEligibleUsers.map((u) => (
@@ -891,7 +1003,7 @@ export default function AdminPanel() {
               handleGenerateResetCode(selectedResetUserId, selected?.name);
             }}
             disabled={!selectedResetUserId || resetLoading}
-            className="px-5 py-3 rounded-xl border border-cyan-500/45 bg-cyan-500/10 text-cyan-100 text-xs font-black uppercase tracking-widest disabled:opacity-50 inline-flex items-center justify-center gap-2"
+            className="btn btn-secondary !px-5 !py-3"
           >
             {resetLoading ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
             Generate Reset Code
@@ -899,7 +1011,7 @@ export default function AdminPanel() {
         </div>
 
         {resetCodeData?.resetCode && (
-          <div className="mt-4 border border-gray-800 rounded-xl p-4 bg-[#0a0a0c]/60">
+          <div className="mt-4 border border-gray-700 rounded-xl p-4 bg-[#0a0f17]/60">
             <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">
               Reset code for {resetCodeData.userName}
               {resetCodeData.collegeId ? ` (${resetCodeData.collegeId})` : ''}
@@ -922,17 +1034,22 @@ export default function AdminPanel() {
             </p>
           </div>
         )}
-      </section>
+      </AdminSectionShell>
 
       {pendingActions.length > 0 && (
-        <div className="border border-amber-500/30 rounded-[2rem] p-6 md:p-8 section-motion section-motion-delay-2">
-          <h3 className="text-lg font-black text-amber-300 uppercase tracking-widest mb-4">Pending Admin Approvals</h3>
+        <AdminSectionShell
+          icon={ShieldAlert}
+          title="Pending Admin Approvals"
+          subtitle="Actions that require quorum-based approval are queued here."
+          badge={`${pendingActions.length} pending`}
+          className="section-motion section-motion-delay-2"
+        >
           <div className="space-y-3">
             {pendingActions.map((action) => (
-              <div key={action._id} className="bg-[#0a0a0c] border border-gray-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div key={action._id} className="bg-[#0a0f17]/70 border border-gray-700 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
                   <p className="text-sm font-bold text-white">
-                    {action.type === 'ADMIN_DELETE' ? 'Delete Admin Account' : `Demote Admin to ${action.payload?.newRole || 'User'}`}
+                    {action.type === 'ADMIN_DELETE' ? 'Delete admin account' : `Demote admin to ${action.payload?.newRole || 'User'}`}
                   </p>
                   <p className="text-xs text-gray-400">
                     Target: {action.targetUser?.name} ({action.targetUser?.email}) • Approvals: {action.approvals?.length || 0}/3
@@ -940,35 +1057,31 @@ export default function AdminPanel() {
                 </div>
                 <button
                   onClick={() => handleApproveAction(action._id)}
-                  className="px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-black uppercase tracking-wider"
+                  className="btn btn-secondary !text-amber-200 !border-amber-500/35 !bg-amber-500/10"
                 >
                   Approve
                 </button>
               </div>
             ))}
           </div>
-        </div>
+        </AdminSectionShell>
       )}
       </>
       )}
 
       {adminTab === 'recruitment' && (
-      <section className="border border-gray-800 rounded-[2.5rem] p-6 md:p-8 space-y-5 section-motion section-motion-delay-2">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 border border-blue-500/40 rounded-xl">
-              <ClipboardCheck size={20} className="text-blue-400" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black text-white">Recruitment Pipeline</h3>
-              <p className="text-gray-500 text-sm">Kanban workflow for Applied to Shortlisted to Interview to Selected to Joined.</p>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
+      <AdminSectionShell
+        icon={ClipboardCheck}
+        title="Recruitment Pipeline"
+        subtitle="Drag and drop candidates between lanes and run stage-wise bulk operations."
+        badge={`${filteredApplications.length} visible`}
+        className="section-motion section-motion-delay-2"
+        actions={(
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <select
               value={appFilter}
               onChange={(e) => setAppFilter(e.target.value)}
-              className="border border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-300 bg-[#0a0a0c]"
+              className="ui-input !text-xs !py-2 !px-3 [color-scheme:dark]"
             >
               <option value="All">All Statuses</option>
               {APPLICATION_STATUSES.map((status) => (
@@ -983,13 +1096,13 @@ export default function AdminPanel() {
                 value={appSearch}
                 onChange={(e) => setAppSearch(e.target.value)}
                 placeholder="Search applicants..."
-                className="border border-gray-800 rounded-xl pl-10 pr-3 py-2 text-xs text-gray-300 bg-[#0a0a0c] w-56"
+                className="ui-input !text-xs !pl-10 !py-2 !pr-3 min-w-[220px]"
               />
             </div>
           </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
+        )}
+      >
+        <div className="flex flex-wrap items-center gap-2 mb-5">
           <button
             type="button"
             onClick={toggleSelectAllApplications}
@@ -1016,7 +1129,7 @@ export default function AdminPanel() {
                     if (draggingAppId) moveApplicationToLane(draggingAppId, lane.id);
                     setDraggingAppId('');
                   }}
-                  className="border border-gray-800 rounded-[1.2rem] p-3 flex flex-col min-h-[560px]"
+                  className="border border-gray-800 rounded-2xl p-3 flex flex-col min-h-[560px] bg-[#080d14]/76"
                 >
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <div>
@@ -1027,7 +1140,7 @@ export default function AdminPanel() {
                       type="button"
                       onClick={() => handleBulkMoveApplications(lane.id)}
                       disabled={selectedApplicationIds.length === 0 || bulkRecruitmentBusy}
-                      className="text-[10px] uppercase tracking-widest border border-cyan-500/35 text-cyan-200 px-2 py-1 rounded-lg disabled:opacity-50"
+                      className="btn btn-secondary !text-[10px] !px-2.5 !py-1.5 !tracking-widest"
                     >
                       {bulkRecruitmentBusy ? 'Moving...' : 'Move Selected'}
                     </button>
@@ -1040,7 +1153,7 @@ export default function AdminPanel() {
                         draggable
                         onDragStart={() => setDraggingAppId(String(app._id))}
                         onDragEnd={() => setDraggingAppId('')}
-                        className="border border-gray-800 rounded-xl p-3 space-y-2 bg-[#090d13]/70 cursor-grab active:cursor-grabbing"
+                        className="border border-gray-800 rounded-xl p-3 space-y-2 bg-[#0a111a]/72 cursor-grab active:cursor-grabbing pro-row-glide"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <label className="inline-flex items-center gap-2">
@@ -1078,7 +1191,7 @@ export default function AdminPanel() {
                           <select
                             value={app.assignedTo?._id || ''}
                             onChange={(e) => handleAppAssign(app._id, e.target.value || null)}
-                            className="border border-gray-800 rounded-lg px-2.5 py-2 text-[10px] uppercase tracking-widest text-gray-300 bg-[#0a0a0c]"
+                            className="ui-input !rounded-lg !px-2.5 !py-2 !text-[10px] !uppercase !tracking-widest [color-scheme:dark]"
                           >
                             <option value="">Unassigned</option>
                             {adminUsers.map((u) => (
@@ -1090,7 +1203,7 @@ export default function AdminPanel() {
                           <select
                             value={app.status}
                             onChange={(e) => handleAppStatusChange(app._id, e.target.value)}
-                            className="border border-gray-800 rounded-lg px-2.5 py-2 text-[10px] uppercase tracking-widest text-gray-300 bg-[#0a0a0c]"
+                            className="ui-input !rounded-lg !px-2.5 !py-2 !text-[10px] !uppercase !tracking-widest [color-scheme:dark]"
                           >
                             {APPLICATION_STATUSES.map((status) => (
                               <option key={status} value={status}>
@@ -1103,13 +1216,13 @@ export default function AdminPanel() {
                         <div className="flex flex-wrap gap-2">
                           <button
                             onClick={() => handleAppNote(app._id)}
-                            className="text-[10px] uppercase tracking-widest border border-gray-700 text-gray-300 px-2.5 py-1 rounded-lg"
+                            className="btn btn-ghost !text-[10px] !px-2.5 !py-1.5"
                           >
                             Note
                           </button>
                           <button
                             onClick={() => handleSendAppInvite(app._id)}
-                            className="text-[10px] uppercase tracking-widest border border-emerald-500/40 text-emerald-200 px-2.5 py-1 rounded-lg"
+                            className="btn btn-secondary !text-[10px] !px-2.5 !py-1.5 !text-emerald-200 !border-emerald-500/35 !bg-emerald-500/10"
                           >
                             Invite
                           </button>
@@ -1129,7 +1242,7 @@ export default function AdminPanel() {
         )}
 
         {!appLoading && rejectedApplications.length > 0 && (
-          <div className="border border-rose-500/25 rounded-xl p-3">
+          <div className="border border-rose-500/25 rounded-xl p-3 mt-5">
             <p className="text-xs uppercase tracking-[0.16em] text-rose-300 font-black mb-2">Rejected Candidates</p>
             <div className="flex flex-wrap gap-2">
               {rejectedApplications.map((app) => (
@@ -1142,31 +1255,28 @@ export default function AdminPanel() {
         )}
 
         {!appLoading && filteredApplications.length === 0 && (
-          <div className="border border-dashed border-gray-800 rounded-xl p-6 text-sm text-gray-500">
+          <div className="border border-dashed border-gray-800 rounded-xl p-6 text-sm text-gray-500 mt-4">
             No applications found for the selected filter.
           </div>
         )}
-      </section>
+      </AdminSectionShell>
 
       )}
 
       {adminTab === 'broadcast' && (
       <section className="grid grid-cols-1 gap-5 section-motion section-motion-delay-3">
-        <article className="border border-gray-800 rounded-[1.8rem] p-6 space-y-4 max-w-4xl">
-          <div className="flex items-center gap-3">
-            <Megaphone size={18} className="text-cyan-300" />
-            <div>
-              <h3 className="text-lg font-black text-white">Admin Broadcast</h3>
-              <p className="text-xs text-gray-500">Send a system-wide notification to selected member groups.</p>
-            </div>
-          </div>
-
+        <AdminSectionShell
+          icon={Megaphone}
+          title="Admin Broadcast"
+          subtitle="Send a system-wide notification to selected member groups."
+          className="max-w-4xl"
+        >
           <form onSubmit={handleBroadcast} className="space-y-3">
             <input
               value={broadcastForm.title}
               onChange={(e) => setBroadcastForm((prev) => ({ ...prev, title: e.target.value }))}
               placeholder="Announcement title"
-              className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0a0a0c] text-sm text-white outline-none focus:border-cyan-500/60"
+              className="ui-input"
               maxLength={140}
             />
             <textarea
@@ -1174,14 +1284,14 @@ export default function AdminPanel() {
               onChange={(e) => setBroadcastForm((prev) => ({ ...prev, message: e.target.value }))}
               placeholder="Announcement message"
               rows={4}
-              className="w-full border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0a0a0c] text-sm text-white outline-none focus:border-cyan-500/60 resize-none"
+              className="ui-input resize-none"
               maxLength={1600}
             />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <select
                 value={broadcastForm.role}
                 onChange={(e) => setBroadcastForm((prev) => ({ ...prev, role: e.target.value }))}
-                className="border border-gray-800 rounded-xl px-3 py-2 bg-[#0a0a0c] text-xs text-gray-300"
+                className="ui-input !text-xs [color-scheme:dark]"
               >
                 <option value="all">All Members</option>
                 <option value="Admin">Admins</option>
@@ -1192,7 +1302,7 @@ export default function AdminPanel() {
               <select
                 value={broadcastForm.type}
                 onChange={(e) => setBroadcastForm((prev) => ({ ...prev, type: e.target.value }))}
-                className="border border-gray-800 rounded-xl px-3 py-2 bg-[#0a0a0c] text-xs text-gray-300"
+                className="ui-input !text-xs [color-scheme:dark]"
               >
                 <option value="info">Info</option>
                 <option value="success">Success</option>
@@ -1204,48 +1314,46 @@ export default function AdminPanel() {
                 value={broadcastForm.link}
                 onChange={(e) => setBroadcastForm((prev) => ({ ...prev, link: e.target.value }))}
                 placeholder="/dashboard"
-                className="border border-gray-800 rounded-xl px-3 py-2 bg-[#0a0a0c] text-xs text-gray-300 outline-none focus:border-cyan-500/60"
+                className="ui-input !text-xs"
               />
             </div>
             <button
               type="submit"
               disabled={broadcastBusy}
-              className="inline-flex items-center gap-2 border border-cyan-500/40 text-cyan-100 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-cyan-500/10 disabled:opacity-60"
+              className="btn btn-secondary !text-cyan-100 !border-cyan-500/40 !bg-cyan-500/10"
             >
               {broadcastBusy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
               Send Broadcast
             </button>
           </form>
-        </article>
+        </AdminSectionShell>
       </section>
       )}
 
       {adminTab === 'audit' && (
       <section className="grid grid-cols-1 gap-5 section-motion section-motion-delay-3">
-        <article className="border border-gray-800 rounded-[1.8rem] p-6 space-y-4 max-w-4xl">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <ScrollText size={18} className="text-amber-300" />
-              <div>
-                <h3 className="text-lg font-black text-white">Audit Trail</h3>
-                <p className="text-xs text-gray-500">Recent privileged actions across admin operations.</p>
-              </div>
-            </div>
+        <AdminSectionShell
+          icon={ScrollText}
+          title="Audit Trail"
+          subtitle="Recent privileged actions across admin operations."
+          badge={`${auditRows.length} records`}
+          className="max-w-4xl"
+          actions={(
             <button
               type="button"
               onClick={loadAuditLogs}
-              className="text-[10px] uppercase tracking-widest border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg"
+              className="btn btn-ghost !px-3 !py-1.5"
             >
               Refresh
             </button>
-          </div>
-
+          )}
+        >
           {auditLoading ? (
             <div className="text-sm text-gray-500">Loading audit log...</div>
           ) : (
             <div className="max-h-[360px] overflow-auto space-y-2 pr-1">
               {auditRows.map((row) => (
-                <div key={row._id} className="border border-gray-800 rounded-xl px-3 py-2.5">
+                <div key={row._id} className="border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0a0f17]/65">
                   <p className="text-xs text-white font-semibold">{row.action}</p>
                   <p className="text-[11px] text-gray-500 mt-1">
                     {row.actor?.name || 'System'} ({row.actor?.role || 'N/A'}) • {new Date(row.createdAt).toLocaleString()}
@@ -1262,25 +1370,38 @@ export default function AdminPanel() {
               )}
             </div>
           )}
-        </article>
+        </AdminSectionShell>
       </section>
       )}
 
       {adminTab === 'users' && (
         <>
-          <div className="ui-table-shell section-motion section-motion-delay-3">
-            <div className="p-5 md:p-6 border-b border-gray-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <UserCheck className="text-blue-500" size={22} />
-                <div>
-                  <h3 className="text-xl font-black text-white">Member Directory</h3>
-                  <p className="text-xs text-gray-500">Sortable table with approval and role controls.</p>
+          <div className="ui-table-shell section-motion section-motion-delay-3 bg-[#090e15]/75">
+            <div className="p-5 md:p-6 border-b border-gray-800 flex flex-col gap-4">
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <UserCheck className="text-blue-400" size={22} />
+                  <div>
+                    <h3 className="text-xl font-black text-white">Member Directory</h3>
+                    <p className="text-xs text-gray-500">Sortable table with approval and role controls.</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-[10px] uppercase tracking-widest px-2 py-1 rounded-full border border-gray-700 text-gray-300">
+                    Total {users.length}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-widest px-2 py-1 rounded-full border border-emerald-500/35 text-emerald-200 bg-emerald-500/10">
+                    Approved {approvalSummary.approved}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-widest px-2 py-1 rounded-full border border-amber-500/35 text-amber-200 bg-amber-500/10">
+                    Pending {approvalSummary.pending}
+                  </span>
                 </div>
               </div>
 
-              <div className="w-full xl:w-auto flex flex-col gap-2">
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <div className="relative min-w-[280px]">
+              <div className="w-full flex flex-col gap-2">
+                <div className="flex flex-col lg:flex-row gap-2">
+                  <div className="relative flex-1 min-w-[220px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
                     <input
                       type="text"
@@ -1290,26 +1411,28 @@ export default function AdminPanel() {
                       className="ui-input pl-10"
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleBulkApproveUsers}
-                    disabled={bulkBusy || selectedUserIds.length === 0}
-                    className="btn btn-secondary"
-                  >
-                    {bulkBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                    Approve Selected
-                  </button>
-                  <button type="button" onClick={handleExportUsers} className="btn btn-ghost">
-                    <Download size={13} />
-                    Export CSV
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setColumnChooserOpen((prev) => !prev)}
-                    className="btn btn-ghost"
-                  >
-                    Columns
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleBulkApproveUsers}
+                      disabled={bulkBusy || selectedUserIds.length === 0}
+                      className="btn btn-secondary"
+                    >
+                      {bulkBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                      Approve Selected
+                    </button>
+                    <button type="button" onClick={handleExportUsers} className="btn btn-ghost">
+                      <Download size={13} />
+                      Export CSV
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setColumnChooserOpen((prev) => !prev)}
+                      className="btn btn-ghost"
+                    >
+                      Columns
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -1326,7 +1449,7 @@ export default function AdminPanel() {
                       key={id}
                       type="button"
                       onClick={() => setUserQuickFilter(id)}
-                      className={`px-2.5 py-1.5 rounded-lg text-[10px] uppercase tracking-widest border ${
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] uppercase tracking-widest border transition-colors ${
                         userQuickFilter === id
                           ? 'border-cyan-500/50 text-cyan-100 bg-cyan-500/10'
                           : 'border-gray-700 text-gray-400 hover:text-gray-200'
@@ -1338,7 +1461,7 @@ export default function AdminPanel() {
                 </div>
 
                 {columnChooserOpen && (
-                  <div className="border border-gray-800 rounded-xl p-3 bg-[#0a0a0c]/70 space-y-3">
+                  <div className="border border-gray-800 rounded-xl p-3 bg-[#0a0f17]/70 space-y-3">
                     <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 font-black">Column Chooser</p>
                     <div className="flex flex-wrap gap-2">
                       {USER_TABLE_COLUMNS.map((column) => (
@@ -1402,7 +1525,7 @@ export default function AdminPanel() {
 
             <div className="overflow-x-auto max-h-[72vh]">
               <table className="w-full text-left border-collapse min-w-[860px]">
-                <thead className="ui-table-head sticky top-0 z-10">
+                <thead className="ui-table-head sticky top-0 z-10 bg-[#090d13]/95">
                   <tr>
                     <th className="p-4 w-10 text-center">
                       <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllUsers} />
@@ -1440,7 +1563,7 @@ export default function AdminPanel() {
                 </thead>
                 <tbody className="divide-y divide-gray-800/50">
                   {sortedUsers.map((u) => (
-                    <tr key={u._id} className="hover:bg-white/[0.02] transition-colors group">
+                    <tr key={u._id} className="hover:bg-white/[0.02] transition-colors group pro-row-glide">
                       <td className="p-4 text-center align-top">
                         <input
                           type="checkbox"
