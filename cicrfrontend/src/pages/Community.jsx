@@ -286,6 +286,18 @@ export default function Community() {
     return adminIssues.filter((issue) => issue.status === adminIssueFilter);
   }, [adminIssueFilter, adminIssues]);
 
+  const communitySnapshot = useMemo(() => {
+    const issueSource = isStrictAdmin ? adminIssues : myIssues;
+    const open = issueSource.filter((issue) => !['Resolved', 'Rejected'].includes(String(issue.status || 'Open'))).length;
+    const resolved = issueSource.filter((issue) => String(issue.status || '') === 'Resolved').length;
+    return {
+      posts: posts.length,
+      members: members.length,
+      openIssues: open,
+      resolvedIssues: resolved,
+    };
+  }, [adminIssues, isStrictAdmin, members.length, myIssues, posts.length]);
+
   const resetDirectoryFilters = () => {
     setSearchTerm('');
     setFilterBranch('All');
@@ -407,7 +419,7 @@ export default function Community() {
           subtitle="Professional collaboration board, verified member directory, and private issue reporting line to admin."
           icon={Globe}
         />
-        <div className="inline-flex items-center gap-2 rounded-2xl border border-cyan-500/25 bg-cyan-500/[0.04] p-1 self-start md:self-auto overflow-x-auto max-w-full">
+        <div className="inline-flex items-center gap-2 rounded-xl border border-gray-800 p-1 self-start md:self-auto overflow-x-auto max-w-full bg-black/20">
           {[
             { id: 'feed', icon: MessageSquare, label: 'Feed' },
             { id: 'directory', icon: Users, label: 'Directory' },
@@ -416,16 +428,23 @@ export default function Community() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 md:px-5 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-[0.18em] inline-flex items-center gap-2 transition-colors whitespace-nowrap ${
+              className={`px-4 md:px-5 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'text-cyan-100 border border-cyan-500/45 bg-cyan-500/10'
-                  : 'text-gray-500 hover:text-gray-200 hover:border hover:border-gray-700/70'
+                  : 'text-gray-400 hover:text-gray-200 border border-transparent hover:border-gray-700'
               }`}
             >
               <tab.icon size={14} />
               {tab.label}
             </button>
           ))}
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-4 border-y border-gray-800/70 py-3">
+          <SnapshotRail label="Posts" value={communitySnapshot.posts} tone="cyan" />
+          <SnapshotRail label="Members" value={communitySnapshot.members} tone="blue" />
+          <SnapshotRail label="Open Issues" value={communitySnapshot.openIssues} tone="amber" />
+          <SnapshotRail label="Resolved Issues" value={communitySnapshot.resolvedIssues} tone="emerald" />
         </div>
       </header>
 
@@ -442,17 +461,17 @@ export default function Community() {
             <div className="lg:col-span-8 space-y-6 md:space-y-7">
               <form
                 onSubmit={handlePostSubmit}
-                className="border border-cyan-500/25 bg-gradient-to-b from-cyan-500/[0.06] to-transparent p-5 md:p-7 rounded-[1.5rem] space-y-4 pro-hover-lift"
+                className="border-y border-gray-800/80 py-5 md:py-6 space-y-4"
               >
                 <div className="flex gap-4">
-                  <div className="hidden sm:flex w-12 h-12 rounded-2xl border border-cyan-500/40 bg-cyan-500/10 flex-shrink-0 items-center justify-center font-black text-cyan-300 text-xl">
+                  <div className="hidden sm:flex w-11 h-11 rounded-xl border border-cyan-500/35 flex-shrink-0 items-center justify-center font-semibold text-cyan-200 text-lg">
                     {userData.name?.[0] || 'M'}
                   </div>
                   <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     placeholder="Share an update, idea, requirement, or event note..."
-                    className="w-full border border-gray-700/80 rounded-2xl bg-[#0b0f16]/78 text-white placeholder:text-gray-600 text-sm md:text-base p-4 resize-none outline-none focus:border-cyan-500"
+                    className="ui-input min-h-[120px] resize-none"
                     rows={4}
                   />
                 </div>
@@ -464,7 +483,7 @@ export default function Community() {
                         key={type}
                         type="button"
                         onClick={() => setPostType(type)}
-                        className={`whitespace-nowrap px-3 py-2 rounded-xl text-[9px] md:text-[10px] font-black uppercase border transition-colors ${
+                        className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
                           postType === type
                             ? 'text-cyan-200 border-cyan-500/45 bg-cyan-500/10'
                             : 'border-gray-800 text-gray-500 hover:text-gray-300'
@@ -479,38 +498,38 @@ export default function Community() {
                     value={postTopic}
                     onChange={(e) => setPostTopic(e.target.value)}
                     placeholder="Topic (AI, Robotics, Placement...)"
-                    className="w-full sm:w-64 border border-gray-700/80 rounded-xl px-3 py-2 text-xs bg-[#0b0f16]/78 text-white outline-none focus:border-cyan-500"
+                    className="ui-input w-full sm:w-64 !text-sm"
                   />
 
-                  <button className="w-full sm:w-auto border border-cyan-500/45 bg-cyan-500/10 text-cyan-100 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-[0.16em] inline-flex items-center justify-center gap-2 hover:bg-cyan-500/20">
+                  <button className="btn btn-primary w-full sm:w-auto !px-5 !py-2.5 !text-xs inline-flex items-center justify-center gap-2">
                     <Send size={14} />
                     Post
                   </button>
                 </div>
               </form>
 
-              <div className="space-y-5 pro-stagger">
+              <div className="border-y border-gray-800/80 divide-y divide-gray-800/75">
                 {posts.map((post, idx) => (
                   <motion.article
                     key={post._id}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.04 }}
-                    className="border border-slate-700/70 bg-[#0b0f16]/72 p-5 md:p-6 rounded-[1.4rem] pro-hover-lift"
+                    className="px-1 md:px-2 py-5 hover:bg-white/[0.02] transition-colors"
                   >
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex gap-4 min-w-0">
-                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl border border-cyan-500/35 bg-cyan-500/10 flex items-center justify-center font-black text-cyan-200 shrink-0">
+                        <div className="w-10 h-10 md:w-11 md:h-11 rounded-lg border border-cyan-500/35 flex items-center justify-center font-semibold text-cyan-200 shrink-0">
                           {post.user?.name?.[0] || 'M'}
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h4 className="text-white font-bold text-sm md:text-base">{post.user?.name || 'Member'}</h4>
-                            <span className="text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">
+                            <h4 className="text-white font-semibold text-sm md:text-base">{post.user?.name || 'Member'}</h4>
+                            <span className="text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-md text-[10px] font-semibold">
                               {post.type}
                             </span>
                           </div>
-                          <p className="text-[9px] text-gray-500 font-bold uppercase mt-1 flex flex-wrap items-center gap-2">
+                          <p className="text-[11px] text-gray-500 mt-1 flex flex-wrap items-center gap-2">
                             <span className="inline-flex items-center gap-1">
                               <Hash size={10} className="text-cyan-300" />
                               {post.topic || post.type}
@@ -546,7 +565,7 @@ export default function Community() {
                     <div className="mt-4">
                       <button
                         onClick={() => handleLike(post._id)}
-                        className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl border border-gray-700 text-gray-300 hover:text-pink-300 hover:border-pink-400/35"
+                        className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:text-pink-300 hover:border-pink-400/35"
                       >
                         <Heart size={14} />
                         {post.likes?.length || 0} Reactions
@@ -556,21 +575,21 @@ export default function Community() {
                 ))}
 
                 {posts.length === 0 && (
-                  <div className="text-center py-16 border border-dashed border-gray-800 rounded-[2rem]">
+                  <div className="text-center py-16">
                     <MessageSquare className="mx-auto text-gray-600 mb-3" size={44} />
-                    <h4 className="text-lg font-black text-gray-300">No posts yet</h4>
+                    <h4 className="text-lg font-semibold text-gray-300">No posts yet</h4>
                     <p className="text-gray-500 mt-1 text-sm">Share the first update with your team.</p>
                   </div>
                 )}
               </div>
             </div>
 
-            <aside className="lg:col-span-4 border border-indigo-500/20 bg-gradient-to-b from-indigo-500/[0.08] to-transparent rounded-[2rem] p-6 md:p-7 h-fit pro-hover-lift">
-              <h3 className="font-black mb-6 flex items-center gap-3 text-white uppercase tracking-[0.18em] text-xs">
+            <aside className="lg:col-span-4 h-fit lg:border-l lg:border-gray-800/80 lg:pl-6 space-y-4">
+              <h3 className="font-semibold mb-2 flex items-center gap-2 text-white text-sm">
                 <Sparkles size={16} className="text-indigo-300" />
                 Community Standards
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-1 divide-y divide-gray-800/80 border-y border-gray-800/80">
                 {[
                   'Use clear technical context in updates.',
                   'Tag ownership and expected delivery date.',
@@ -578,7 +597,7 @@ export default function Community() {
                 ].map((item, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between rounded-xl border border-indigo-500/20 bg-indigo-500/[0.05] px-3 py-3 text-[11px] text-gray-300"
+                    className="flex items-center justify-between px-2 py-3 text-sm text-gray-300"
                   >
                     {item}
                     <ChevronRight size={14} className="text-gray-500" />
