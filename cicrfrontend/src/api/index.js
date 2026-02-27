@@ -10,6 +10,144 @@ const API = axios.create({
   },
 });
 
+const CACHE_PREFIX = 'cicr_api_cache_v1:';
+const DEFAULT_CACHE_TTL_MS = 60 * 1000;
+const DEFAULT_REVALIDATE_AFTER_MS = 15 * 1000;
+const REVALIDATE_COOLDOWN_MS = 12 * 1000;
+const revalidateLocks = new Map();
+
+const canUseStorage = () => {
+  try {
+    return typeof window !== 'undefined' && !!window.localStorage;
+  } catch {
+    return false;
+  }
+};
+
+const getCacheScope = () => {
+  try {
+    const profile = JSON.parse(localStorage.getItem('profile') || '{}');
+    const user = profile.result || profile;
+    const userId = String(user?._id || user?.id || user?.collegeId || '').trim();
+    if (userId) return `u:${userId}`;
+  } catch {
+    // ignore scope parse failures
+  }
+  const token = localStorage.getItem('token');
+  if (token) return `t:${token.slice(-16)}`;
+  return 'public';
+};
+
+const buildScopedCacheKey = (key) => `${CACHE_PREFIX}${getCacheScope()}:${key}`;
+
+const readCache = (key) => {
+  if (!canUseStorage()) return null;
+  try {
+    const raw = localStorage.getItem(buildScopedCacheKey(key));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!Number.isFinite(parsed.expiresAt) || Date.now() > parsed.expiresAt) {
+      localStorage.removeItem(buildScopedCacheKey(key));
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeCache = (key, data, ttlMs = DEFAULT_CACHE_TTL_MS) => {
+  if (!canUseStorage()) return;
+  try {
+    const now = Date.now();
+    const payload = {
+      data,
+      cachedAt: now,
+      expiresAt: now + Math.max(5_000, Number(ttlMs) || DEFAULT_CACHE_TTL_MS),
+    };
+    localStorage.setItem(buildScopedCacheKey(key), JSON.stringify(payload));
+  } catch {
+    // ignore quota/storage errors
+  }
+};
+
+const emitCacheSyncEvent = (key, data) => {
+  try {
+    window.dispatchEvent(new CustomEvent('app:cache-synced', { detail: { key, data } }));
+  } catch {
+    // no-op
+  }
+};
+
+const clearApiCache = (matcher = '') => {
+  if (!canUseStorage()) return;
+  try {
+    const prefix = `${CACHE_PREFIX}${getCacheScope()}:`;
+    const normalizedMatcher = String(matcher || '').trim();
+    const keysToDelete = [];
+
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(prefix)) continue;
+      if (normalizedMatcher && !key.includes(normalizedMatcher)) continue;
+      keysToDelete.push(key);
+    }
+
+    keysToDelete.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // ignore
+  }
+};
+
+const cachedGet = async ({
+  key,
+  request,
+  ttlMs = DEFAULT_CACHE_TTL_MS,
+  revalidateAfterMs = DEFAULT_REVALIDATE_AFTER_MS,
+}) => {
+  const cacheKey = String(key || '').trim();
+  if (!cacheKey) {
+    return request();
+  }
+
+  const cached = readCache(cacheKey);
+  if (cached) {
+    const age = Date.now() - Number(cached.cachedAt || 0);
+    const shouldRevalidate = age >= Math.max(5_000, Number(revalidateAfterMs) || DEFAULT_REVALIDATE_AFTER_MS);
+
+    if (shouldRevalidate) {
+      const lockKey = buildScopedCacheKey(cacheKey);
+      const lastAttemptAt = Number(revalidateLocks.get(lockKey) || 0);
+      if (Date.now() - lastAttemptAt > REVALIDATE_COOLDOWN_MS) {
+        revalidateLocks.set(lockKey, Date.now());
+        request()
+          .then((fresh) => {
+            writeCache(cacheKey, fresh?.data, ttlMs);
+            emitCacheSyncEvent(cacheKey, fresh?.data);
+          })
+          .catch(() => {
+            // keep old cache silently on revalidate failure
+          });
+      }
+    }
+
+    return { data: cached.data, __fromCache: true };
+  }
+
+  try {
+    const response = await request();
+    writeCache(cacheKey, response?.data, ttlMs);
+    return response;
+  } catch (error) {
+    const fallback = readCache(cacheKey);
+    if (fallback) {
+      return { data: fallback.data, __fromCache: true, __stale: true };
+    }
+    throw error;
+  }
+};
+
 let backendPrewarmed = false;
 
 export const prewarmBackend = () => {
@@ -29,6 +167,18 @@ API.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+API.interceptors.response.use(
+  (response) => {
+    const method = String(response?.config?.method || 'get').toLowerCase();
+    if (!['get', 'head', 'options'].includes(method)) {
+      // Keep server as source of truth: any mutation invalidates scoped cached reads.
+      clearApiCache();
+    }
+    return response;
+  },
+  (error) => Promise.reject(error)
+);
+
 // Auth
 export const login = (formData) => API.post('/auth/login', formData);
 export const register = (formData) => API.post('/auth/register', formData);
@@ -39,27 +189,66 @@ export const resetPasswordWithCode = (payload) => API.post('/auth/password/reset
 export const changePassword = (payload) => API.put('/auth/password/change', payload);
 
 // Fetches the logged-in user's own data
-export const getMe = () => API.get('/auth/me');
+export const getMe = () =>
+  cachedGet({
+    key: 'auth:me',
+    request: () => API.get('/auth/me'),
+    ttlMs: 30 * 1000,
+  });
 
 // Updates personal details (Year, Phone, Branch, Batch)
 export const updateProfile = (data) => API.put('/auth/profile', data);
-export const fetchDirectoryMembers = () => API.get('/users/directory');
-export const fetchMyInsights = () => API.get('/users/insights/me');
-export const fetchMemberInsights = (identifier) => API.get(`/users/insights/member/${encodeURIComponent(identifier)}`);
-export const fetchPublicProfile = (collegeId) => API.get(`/users/public/${encodeURIComponent(collegeId)}`);
+export const fetchDirectoryMembers = () =>
+  cachedGet({
+    key: 'users:directory',
+    request: () => API.get('/users/directory'),
+    ttlMs: 2 * 60 * 1000,
+  });
+export const fetchMyInsights = () =>
+  cachedGet({
+    key: 'users:insights:me',
+    request: () => API.get('/users/insights/me'),
+    ttlMs: 60 * 1000,
+  });
+export const fetchMemberInsights = (identifier) =>
+  cachedGet({
+    key: `users:insights:member:${encodeURIComponent(identifier)}`,
+    request: () => API.get(`/users/insights/member/${encodeURIComponent(identifier)}`),
+    ttlMs: 60 * 1000,
+  });
+export const fetchPublicProfile = (collegeId) =>
+  cachedGet({
+    key: `users:public:${encodeURIComponent(collegeId)}`,
+    request: () => API.get(`/users/public/${encodeURIComponent(collegeId)}`),
+    ttlMs: 2 * 60 * 1000,
+  });
 export const acknowledgeWarnings = () => API.post('/users/warnings/ack');
 
 
 // User Management
-export const fetchMembers = () => API.get('/admin/users'); 
+export const fetchMembers = () =>
+  cachedGet({
+    key: 'admin:users',
+    request: () => API.get('/admin/users'),
+    ttlMs: 45 * 1000,
+  }); 
 export const updateUserByAdmin = (id, data) => API.put(`/admin/users/${id}`, data);
 export const deleteUser = (id) => API.delete(`/admin/users/${id}`);
-export const fetchPendingAdminActions = () => API.get('/admin/actions/pending');
+export const fetchPendingAdminActions = () =>
+  cachedGet({
+    key: 'admin:actions:pending',
+    request: () => API.get('/admin/actions/pending'),
+    ttlMs: 30 * 1000,
+  });
 export const approveAdminAction = (actionId) => API.post(`/admin/actions/${actionId}/approve`);
 export const fetchAuditLogs = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/admin/audit/logs${suffix}`);
+  return cachedGet({
+    key: `admin:audit:logs:${suffix}`,
+    request: () => API.get(`/admin/audit/logs${suffix}`),
+    ttlMs: 30 * 1000,
+  });
 };
 
 // Invitation System
@@ -71,9 +260,18 @@ export const generatePasswordResetCode = (id) => API.post(`/admin/users/${id}/pa
 export const fetchProjects = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/projects${suffix}`);
+  return cachedGet({
+    key: `projects:list:${suffix}`,
+    request: () => API.get(`/projects${suffix}`),
+    ttlMs: 45 * 1000,
+  });
 };
-export const fetchProjectById = (id) => API.get(`/projects/${id}`);
+export const fetchProjectById = (id) =>
+  cachedGet({
+    key: `projects:item:${id}`,
+    request: () => API.get(`/projects/${id}`),
+    ttlMs: 30 * 1000,
+  });
 export const createProject = (data) => API.post('/projects', data);
 export const addProjectSuggestion = (id, text) => API.post(`/projects/${id}/suggestions`, { text });
 export const addProjectUpdate = (id, payload) => API.post(`/projects/${id}/updates`, payload);
@@ -84,7 +282,13 @@ export const updateProjectTeam = (id, payload) => API.patch(`/projects/${id}/tea
 export const deleteProject = (id) => API.delete(`/projects/${id}`);
 
 // community
-export const fetchPosts = () => API.get('/community/posts');
+export const fetchPosts = () =>
+  cachedGet({
+    key: 'community:posts',
+    request: () => API.get('/community/posts'),
+    ttlMs: 30 * 1000,
+    revalidateAfterMs: 8 * 1000,
+  });
 export const createPost = (data) => API.post('/community/posts', data);
 export const likePost = (id) => API.post(`/community/posts/${id}/like`);
 export const deletePost = (id) => API.delete(`/community/posts/${id}`);
@@ -110,12 +314,22 @@ export const warnPostUser = async (id, reason) => {
 
 
    //MEETINGS & EVENTS
-export const fetchMeetings = () => API.get('/meetings');
+export const fetchMeetings = () =>
+  cachedGet({
+    key: 'meetings:list',
+    request: () => API.get('/meetings'),
+    ttlMs: 45 * 1000,
+  });
 export const scheduleMeeting = (data) => API.post('/meetings', data);
 export const deleteMeeting = (id) => API.delete(`/meetings/${id}`);
 
    //INVENTORY SYSTEM
-export const fetchInventory = () => API.get('/inventory');
+export const fetchInventory = () =>
+  cachedGet({
+    key: 'inventory:list',
+    request: () => API.get('/inventory'),
+    ttlMs: 45 * 1000,
+  });
 export const addInventoryItem = (data) => API.post('/inventory/add', data);
 export const issueInventoryItem = (data) => API.post('/inventory/issue', data);
 export const adjustInventoryStock = (data) => API.post('/inventory/adjust', data);
@@ -248,16 +462,30 @@ export const createCommunicationStream = (conversationId = 'admin-stream') => {
 
 // Issue tickets
 export const createIssueTicket = (payload) => API.post('/issues', payload);
-export const fetchMyIssues = () => API.get('/issues/mine');
+export const fetchMyIssues = () =>
+  cachedGet({
+    key: 'issues:mine',
+    request: () => API.get('/issues/mine'),
+    ttlMs: 30 * 1000,
+  });
 export const fetchAdminIssues = (status = '') =>
-  API.get(`/issues${status ? `?status=${encodeURIComponent(status)}` : ''}`);
+  cachedGet({
+    key: `issues:admin:${status || 'all'}`,
+    request: () => API.get(`/issues${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+    ttlMs: 30 * 1000,
+  });
 export const updateIssueTicket = (id, payload) => API.patch(`/issues/${id}`, payload);
 
 // Notifications
 export const fetchNotifications = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/notifications${suffix}`);
+  return cachedGet({
+    key: `notifications:list:${suffix}`,
+    request: () => API.get(`/notifications${suffix}`),
+    ttlMs: 20 * 1000,
+    revalidateAfterMs: 8 * 1000,
+  });
 };
 export const markNotificationRead = (id) => API.post(`/notifications/${id}/read`);
 export const markAllNotificationsRead = () => API.post('/notifications/read-all');
@@ -267,7 +495,11 @@ export const broadcastNotification = (payload) => API.post('/notifications/broad
 export const fetchHierarchyTasks = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/hierarchy/tasks${suffix}`);
+  return cachedGet({
+    key: `hierarchy:tasks:${suffix}`,
+    request: () => API.get(`/hierarchy/tasks${suffix}`),
+    ttlMs: 30 * 1000,
+  });
 };
 export const createHierarchyTask = (payload) => API.post('/hierarchy/tasks', payload);
 export const updateHierarchyTask = (id, payload) => API.patch(`/hierarchy/tasks/${id}`, payload);
@@ -277,9 +509,18 @@ export const deleteHierarchyTask = (id) => API.delete(`/hierarchy/tasks/${id}`);
 export const fetchEvents = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/events${suffix}`);
+  return cachedGet({
+    key: `events:list:${suffix}`,
+    request: () => API.get(`/events${suffix}`),
+    ttlMs: 45 * 1000,
+  });
 };
-export const fetchEventById = (id) => API.get(`/events/${id}`);
+export const fetchEventById = (id) =>
+  cachedGet({
+    key: `events:item:${id}`,
+    request: () => API.get(`/events/${id}`),
+    ttlMs: 30 * 1000,
+  });
 export const createEvent = (payload) => API.post('/events', payload);
 export const updateEvent = (id, payload) => API.put(`/events/${id}`, payload);
 export const deleteEvent = (id) => API.delete(`/events/${id}`);
@@ -289,21 +530,44 @@ export const createApplication = (payload) => API.post('/applications', payload)
 export const fetchApplications = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/applications${suffix}`);
+  return cachedGet({
+    key: `applications:list:${suffix}`,
+    request: () => API.get(`/applications${suffix}`),
+    ttlMs: 30 * 1000,
+  });
 };
 export const updateApplication = (id, payload) => API.patch(`/applications/${id}`, payload);
 export const sendApplicationInvite = (id) => API.post(`/applications/${id}/send-invite`);
 
 // Learning Hub
-export const fetchLearningOverview = () => API.get('/learning/overview');
-export const fetchLearningConfig = () => API.get('/learning/config');
+export const fetchLearningOverview = () =>
+  cachedGet({
+    key: 'learning:overview',
+    request: () => API.get('/learning/overview'),
+    ttlMs: 60 * 1000,
+  });
+export const fetchLearningConfig = () =>
+  cachedGet({
+    key: 'learning:config',
+    request: () => API.get('/learning/config'),
+    ttlMs: 60 * 1000,
+  });
 export const updateLearningConfig = (payload) => API.put('/learning/config', payload);
 export const fetchLearningTracks = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/learning/tracks${suffix}`);
+  return cachedGet({
+    key: `learning:tracks:${suffix}`,
+    request: () => API.get(`/learning/tracks${suffix}`),
+    ttlMs: 45 * 1000,
+  });
 };
-export const fetchLearningTrackById = (id) => API.get(`/learning/tracks/${id}`);
+export const fetchLearningTrackById = (id) =>
+  cachedGet({
+    key: `learning:track:${id}`,
+    request: () => API.get(`/learning/tracks/${id}`),
+    ttlMs: 45 * 1000,
+  });
 export const createLearningTrack = (payload) => API.post('/learning/tracks', payload);
 export const updateLearningTrack = (id, payload) => API.put(`/learning/tracks/${id}`, payload);
 export const setLearningTrackPublish = (id, payload) => API.patch(`/learning/tracks/${id}/publish`, payload);
@@ -314,20 +578,38 @@ export const fetchMyLearningSubmissions = () => API.get('/learning/submissions/m
 export const fetchLearningSubmissions = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/learning/submissions${suffix}`);
+  return cachedGet({
+    key: `learning:submissions:${suffix}`,
+    request: () => API.get(`/learning/submissions${suffix}`),
+    ttlMs: 30 * 1000,
+  });
 };
 export const reviewLearningSubmission = (id, payload) =>
   API.patch(`/learning/submissions/${id}/review`, payload);
 
 // Member programs
-export const fetchProgramOverview = () => API.get('/programs/overview');
-export const fetchProgramConfig = () => API.get('/programs/config');
+export const fetchProgramOverview = () =>
+  cachedGet({
+    key: 'programs:overview',
+    request: () => API.get('/programs/overview'),
+    ttlMs: 60 * 1000,
+  });
+export const fetchProgramConfig = () =>
+  cachedGet({
+    key: 'programs:config',
+    request: () => API.get('/programs/config'),
+    ttlMs: 60 * 1000,
+  });
 export const updateProgramConfig = (payload) => API.put('/programs/config', payload);
 
 export const fetchProgramQuests = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/programs/quests${suffix}`);
+  return cachedGet({
+    key: `programs:quests:${suffix}`,
+    request: () => API.get(`/programs/quests${suffix}`),
+    ttlMs: 45 * 1000,
+  });
 };
 export const createProgramQuest = (payload) => API.post('/programs/quests', payload);
 export const updateProgramQuest = (id, payload) => API.patch(`/programs/quests/${id}`, payload);
@@ -336,7 +618,11 @@ export const fetchMyProgramQuestSubmissions = () => API.get('/programs/quests/su
 export const fetchProgramQuestSubmissions = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/programs/quests/submissions${suffix}`);
+  return cachedGet({
+    key: `programs:quest-submissions:${suffix}`,
+    request: () => API.get(`/programs/quests/submissions${suffix}`),
+    ttlMs: 30 * 1000,
+  });
 };
 export const reviewProgramQuestSubmission = (id, payload) =>
   API.patch(`/programs/quests/submissions/${id}/review`, payload);
@@ -344,20 +630,38 @@ export const reviewProgramQuestSubmission = (id, payload) =>
 export const fetchMentorRequests = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/programs/mentor-requests${suffix}`);
+  return cachedGet({
+    key: `programs:mentor-requests:${suffix}`,
+    request: () => API.get(`/programs/mentor-requests${suffix}`),
+    ttlMs: 45 * 1000,
+  });
 };
 export const createMentorRequest = (payload) => API.post('/programs/mentor-requests', payload);
 export const updateMentorRequest = (id, payload) => API.patch(`/programs/mentor-requests/${id}`, payload);
 
-export const fetchBadgeRules = () => API.get('/programs/badges/rules');
+export const fetchBadgeRules = () =>
+  cachedGet({
+    key: 'programs:badges:rules',
+    request: () => API.get('/programs/badges/rules'),
+    ttlMs: 60 * 1000,
+  });
 export const createBadgeRule = (payload) => API.post('/programs/badges/rules', payload);
 export const updateBadgeRule = (id, payload) => API.patch(`/programs/badges/rules/${id}`, payload);
-export const fetchBadgeOverview = () => API.get('/programs/badges/overview');
+export const fetchBadgeOverview = () =>
+  cachedGet({
+    key: 'programs:badges:overview',
+    request: () => API.get('/programs/badges/overview'),
+    ttlMs: 60 * 1000,
+  });
 
 export const fetchProgramIdeas = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/programs/ideas${suffix}`);
+  return cachedGet({
+    key: `programs:ideas:${suffix}`,
+    request: () => API.get(`/programs/ideas${suffix}`),
+    ttlMs: 45 * 1000,
+  });
 };
 export const createProgramIdea = (payload) => API.post('/programs/ideas', payload);
 export const updateProgramIdea = (id, payload) => API.patch(`/programs/ideas/${id}`, payload);
@@ -367,12 +671,25 @@ export const convertProgramIdea = (id, payload) => API.post(`/programs/ideas/${i
 export const fetchOfficeHourSlots = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';
-  return API.get(`/programs/office-hours/slots${suffix}`);
+  return cachedGet({
+    key: `programs:office-hour-slots:${suffix}`,
+    request: () => API.get(`/programs/office-hours/slots${suffix}`),
+    ttlMs: 45 * 1000,
+  });
 };
 export const createOfficeHourSlot = (payload) => API.post('/programs/office-hours/slots', payload);
 export const updateOfficeHourSlot = (id, payload) => API.patch(`/programs/office-hours/slots/${id}`, payload);
 export const bookOfficeHourSlot = (id, payload) => API.post(`/programs/office-hours/slots/${id}/book`, payload);
-export const fetchMyOfficeHourBookings = () => API.get('/programs/office-hours/bookings/mine');
+export const fetchMyOfficeHourBookings = () =>
+  cachedGet({
+    key: 'programs:office-hour-bookings:mine',
+    request: () => API.get('/programs/office-hours/bookings/mine'),
+    ttlMs: 30 * 1000,
+  });
 export const updateOfficeHourBooking = (id, payload) => API.patch(`/programs/office-hours/bookings/${id}`, payload);
+
+export const clearLocalApiCache = (matcher = '') => {
+  clearApiCache(matcher);
+};
 
 export default API;
