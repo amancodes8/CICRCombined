@@ -617,28 +617,19 @@ export default function Community() {
           >
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
               <div>
-                <p className="text-[10px] uppercase tracking-[0.22em] text-cyan-300 font-black">CICR Directory</p>
-                <h3 className="text-2xl md:text-3xl font-black text-white mt-1">Member Index</h3>
+                <p className="text-xs text-cyan-300 font-semibold">CICR Directory</p>
+                <h3 className="text-2xl md:text-3xl font-semibold text-white mt-1">Member Index</h3>
                 <p className="text-gray-500 text-sm mt-2">All verified members are visible here, including alumni.</p>
               </div>
-              <div className="grid grid-cols-3 gap-2 md:gap-3">
-                <div className="border border-slate-700/70 bg-[#0b0f16]/72 rounded-xl px-3 py-2">
-                  <p className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Total</p>
-                  <p className="text-lg font-black text-white">{directoryStats.total}</p>
-                </div>
-                <div className="border border-emerald-500/20 bg-emerald-500/[0.06] rounded-xl px-3 py-2">
-                  <p className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Alumni</p>
-                  <p className="text-lg font-black text-emerald-300">{directoryStats.alumni}</p>
-                </div>
-                <div className="border border-cyan-500/20 bg-cyan-500/[0.06] rounded-xl px-3 py-2">
-                  <p className="text-[9px] uppercase tracking-widest text-gray-500 font-black">Visible</p>
-                  <p className="text-lg font-black text-cyan-300">{directoryStats.visible}</p>
-                </div>
+              <div className="grid grid-cols-3 gap-4">
+                <SnapshotRail label="Total" value={directoryStats.total} tone="blue" />
+                <SnapshotRail label="Alumni" value={directoryStats.alumni} tone="emerald" />
+                <SnapshotRail label="Visible" value={directoryStats.visible} tone="cyan" />
               </div>
             </div>
 
-            <section className="border border-cyan-500/20 bg-gradient-to-b from-cyan-500/[0.05] to-transparent p-5 rounded-[1.8rem] pro-hover-lift">
-              <div className="flex items-center gap-2 text-gray-400 text-xs font-black uppercase tracking-widest mb-3">
+            <section className="border-y border-gray-800/80 py-4">
+              <div className="flex items-center gap-2 text-gray-400 text-xs font-semibold mb-3">
                 <Filter size={14} className="text-cyan-300" />
                 Directory Filters
               </div>
@@ -650,14 +641,14 @@ export default function Community() {
                     placeholder="Search by name, ID, email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full border border-gray-700/80 p-3.5 pl-12 rounded-xl bg-[#0b0f16]/80 text-white text-sm outline-none focus:border-cyan-500"
+                    className="ui-input !pl-12"
                   />
                 </div>
 
                 <select
                   value={filterBranch}
                   onChange={(e) => setFilterBranch(e.target.value)}
-                  className="border border-gray-700/80 p-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-300 bg-[#0b0f16]/80"
+                  className="ui-input !text-sm"
                 >
                   {branchOptions.map((b) => (
                     <option key={b} value={b}>
@@ -669,7 +660,7 @@ export default function Community() {
                 <select
                   value={filterYear}
                   onChange={(e) => setFilterYear(e.target.value)}
-                  className="border border-gray-700/80 p-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-300 bg-[#0b0f16]/80"
+                  className="ui-input !text-sm"
                 >
                   {yearOptions.map((y) => (
                     <option key={y} value={y}>
@@ -682,7 +673,7 @@ export default function Community() {
                   <select
                     value={filterRole}
                     onChange={(e) => setFilterRole(e.target.value)}
-                    className="flex-1 border border-gray-700/80 p-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-300 bg-[#0b0f16]/80"
+                    className="ui-input flex-1 !text-sm"
                   >
                     {roleOptions.map((role) => (
                       <option key={role} value={role}>
@@ -693,7 +684,7 @@ export default function Community() {
                   <button
                     type="button"
                     onClick={resetDirectoryFilters}
-                    className="inline-flex items-center justify-center border border-gray-700/80 rounded-xl px-3 text-gray-400 hover:text-white hover:border-cyan-500/45"
+                    className="inline-flex items-center justify-center border border-gray-700/80 rounded-lg px-3 text-gray-400 hover:text-white hover:border-cyan-500/45"
                     title="Reset filters"
                   >
                     <RotateCcw size={16} />
@@ -702,16 +693,16 @@ export default function Community() {
               </div>
             </section>
 
-            <section className="ui-table-shell overflow-hidden hidden lg:block">
+            <section className="border-y border-gray-800/80 overflow-hidden hidden lg:block">
               <div className="overflow-x-auto max-h-[68vh]">
                 <table className="w-full min-w-[920px] border-collapse">
-                  <thead className="ui-table-head sticky top-0 z-10">
+                  <thead className="sticky top-0 z-10 bg-[#0a0f17]/95 backdrop-blur-sm border-b border-gray-800/80">
                     <tr>
-                      <th className="px-4 py-3 text-left">Member</th>
-                      <th className="px-4 py-3 text-left">Academic</th>
-                      <th className="px-4 py-3 text-left">Contact</th>
-                      <th className="px-4 py-3 text-left">Role</th>
-                      <th className="px-4 py-3 text-right">Profile</th>
+                      <th className="px-4 py-3 text-left text-xs text-gray-400 font-semibold">Member</th>
+                      <th className="px-4 py-3 text-left text-xs text-gray-400 font-semibold">Academic</th>
+                      <th className="px-4 py-3 text-left text-xs text-gray-400 font-semibold">Contact</th>
+                      <th className="px-4 py-3 text-left text-xs text-gray-400 font-semibold">Role</th>
+                      <th className="px-4 py-3 text-right text-xs text-gray-400 font-semibold">Profile</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800/60">
@@ -729,12 +720,12 @@ export default function Community() {
                         <tr key={member._id} className="hover:bg-white/[0.02] transition-colors">
                           <td className="px-4 py-3.5 align-top">
                             <div className="flex items-start gap-3">
-                              <div className="w-9 h-9 rounded-lg border border-blue-500/35 flex items-center justify-center font-black text-cyan-200 text-sm shrink-0">
+                              <div className="w-9 h-9 rounded-lg border border-blue-500/35 flex items-center justify-center font-semibold text-cyan-200 text-sm shrink-0">
                                 {member.name?.[0] || 'M'}
                               </div>
                               <div className="min-w-0">
-                                <p className="text-sm font-black text-white truncate">{member.name || 'Member'}</p>
-                                <p className="mt-1 text-[11px] text-gray-500 inline-flex items-center gap-1.5 uppercase tracking-wider">
+                                <p className="text-sm font-semibold text-white truncate">{member.name || 'Member'}</p>
+                                <p className="mt-1 text-[11px] text-gray-500 inline-flex items-center gap-1.5">
                                   <Fingerprint size={11} className="text-blue-400" />
                                   {member.collegeId || 'NO-ID'}
                                 </p>
@@ -759,7 +750,7 @@ export default function Community() {
                           <td className="px-4 py-3.5 align-top">
                             <div className="inline-flex items-center gap-2">
                               <span
-                                className={`text-[10px] px-2 py-1 rounded-md font-black uppercase tracking-widest ${
+                                className={`text-[10px] px-2 py-1 rounded-md font-semibold ${
                                   isAlumni ? 'bg-emerald-500/15 text-emerald-300' : 'bg-blue-500/15 text-blue-300'
                                 }`}
                               >
@@ -772,12 +763,12 @@ export default function Community() {
                             {hasProfile ? (
                               <Link
                                 to={`/profile/${encodeURIComponent(member.collegeId)}`}
-                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-500/40 text-blue-200 text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/10"
+                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-500/40 text-blue-200 text-xs font-semibold hover:bg-blue-500/10"
                               >
                                 Open <ExternalLink size={11} />
                               </Link>
                             ) : (
-                              <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-gray-700 text-gray-500 text-[10px] font-black uppercase tracking-widest">
+                              <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-gray-700 text-gray-500 text-xs font-semibold">
                                 Unavailable
                               </span>
                             )}
@@ -804,15 +795,15 @@ export default function Community() {
                 return (
                   <article
                     key={`mobile-${member._id}`}
-                    className="rounded-2xl border border-slate-700/70 bg-[#0b0f16]/80 p-4 space-y-2.5"
+                    className="border-b border-gray-800/70 pb-4 space-y-2.5"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl border border-cyan-500/35 bg-cyan-500/10 flex items-center justify-center font-black text-cyan-200 shrink-0">
+                      <div className="w-10 h-10 rounded-xl border border-cyan-500/35 flex items-center justify-center font-semibold text-cyan-200 shrink-0">
                         {member.name?.[0] || 'M'}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-black text-white truncate">{member.name || 'Member'}</p>
-                        <p className="mt-1 text-[11px] text-gray-500 inline-flex items-center gap-1.5 uppercase tracking-wider">
+                        <p className="text-sm font-semibold text-white truncate">{member.name || 'Member'}</p>
+                        <p className="mt-1 text-[11px] text-gray-500 inline-flex items-center gap-1.5">
                           <Fingerprint size={11} className="text-cyan-300" />
                           {member.collegeId || 'NO-ID'}
                         </p>
@@ -831,7 +822,7 @@ export default function Community() {
 
                     <div className="flex items-center justify-between gap-2 pt-1">
                       <span
-                        className={`text-[10px] px-2 py-1 rounded-md font-black uppercase tracking-widest ${
+                        className={`text-[10px] px-2 py-1 rounded-md font-semibold ${
                           isAlumni ? 'bg-emerald-500/15 text-emerald-300' : 'bg-cyan-500/15 text-cyan-300'
                         }`}
                       >
@@ -840,12 +831,12 @@ export default function Community() {
                       {hasProfile ? (
                         <Link
                           to={`/profile/${encodeURIComponent(member.collegeId)}`}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-500/40 text-cyan-200 text-[10px] font-black uppercase tracking-widest hover:bg-cyan-500/10"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-500/40 text-cyan-200 text-xs font-semibold hover:bg-cyan-500/10"
                         >
                           Open <ExternalLink size={11} />
                         </Link>
                       ) : (
-                        <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-gray-700 text-gray-500 text-[10px] font-black uppercase tracking-widest">
+                        <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-gray-700 text-gray-500 text-xs font-semibold">
                           Unavailable
                         </span>
                       )}
@@ -856,9 +847,9 @@ export default function Community() {
             </section>
 
             {filteredMembers.length === 0 && (
-              <div className="text-center py-16 border border-dashed border-gray-800 rounded-[2rem]">
+              <div className="text-center py-16">
                 <Users className="mx-auto text-gray-700 mb-3" size={44} />
-                <h4 className="text-lg font-black text-gray-300">No members found</h4>
+                <h4 className="text-lg font-semibold text-gray-300">No members found</h4>
                 <p className="text-gray-500 mt-1 text-sm">Try changing filters or clearing search.</p>
                 <button onClick={resetDirectoryFilters} className="mt-4 text-blue-400 font-semibold hover:text-blue-300">
                   Reset all filters
@@ -877,24 +868,24 @@ export default function Community() {
           >
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
               <div>
-                <p className="text-[10px] uppercase tracking-[0.22em] text-rose-300 font-black">Issue Escalation</p>
-                <h3 className="text-2xl md:text-3xl font-black text-white mt-1">Raise an Admin Ticket</h3>
+                <p className="text-xs text-rose-300 font-semibold">Issue Escalation</p>
+                <h3 className="text-2xl md:text-3xl font-semibold text-white mt-1">Raise an Admin Ticket</h3>
                 <p className="text-gray-500 text-sm mt-2">
                   Issues are private and routed directly to Admin. They are not visible in public feed.
                 </p>
               </div>
-              <div className="inline-flex items-center gap-2 border border-rose-500/35 text-rose-200 rounded-xl px-3 py-2 text-xs">
+              <div className="inline-flex items-center gap-2 border border-rose-500/35 text-rose-200 rounded-lg px-3 py-2 text-xs">
                 <ShieldQuestion size={14} />
                 Admin-handled workflow
               </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-8">
               <section
                 ref={issueSectionRef}
-                className="xl:col-span-5 border border-rose-500/20 bg-gradient-to-b from-rose-500/[0.06] to-transparent rounded-[1.8rem] p-5 md:p-6 pro-hover-lift"
+                className="border-y border-gray-800/80 py-4"
               >
-                <h4 className="text-sm font-black uppercase tracking-[0.18em] text-gray-200 inline-flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-gray-200 inline-flex items-center gap-2">
                   <Bug size={14} className="text-rose-300" />
                   New Issue
                 </h4>
@@ -905,7 +896,7 @@ export default function Community() {
                     value={issueForm.title}
                     onChange={(e) => setIssueForm((prev) => ({ ...prev, title: e.target.value }))}
                     placeholder="Issue title"
-                    className="w-full border border-gray-700/80 rounded-xl px-3 py-2.5 bg-[#0b0f16]/80 text-sm text-white outline-none focus:border-rose-500/60"
+                    className="ui-input"
                     required
                     minLength={4}
                     maxLength={160}
@@ -915,7 +906,7 @@ export default function Community() {
                     <select
                       value={issueForm.category}
                       onChange={(e) => setIssueForm((prev) => ({ ...prev, category: e.target.value }))}
-                      className="border border-gray-700/80 rounded-xl px-3 py-2.5 bg-[#0b0f16]/80 text-sm text-white outline-none focus:border-rose-500/60"
+                      className="ui-input"
                     >
                       {ISSUE_CATEGORIES.map((category) => (
                         <option key={category} value={category}>
@@ -927,7 +918,7 @@ export default function Community() {
                     <select
                       value={issueForm.priority}
                       onChange={(e) => setIssueForm((prev) => ({ ...prev, priority: e.target.value }))}
-                      className="border border-gray-700/80 rounded-xl px-3 py-2.5 bg-[#0b0f16]/80 text-sm text-white outline-none focus:border-rose-500/60"
+                      className="ui-input"
                     >
                       {ISSUE_PRIORITIES.map((priority) => (
                         <option key={priority} value={priority}>
@@ -941,7 +932,7 @@ export default function Community() {
                     value={issueForm.description}
                     onChange={(e) => setIssueForm((prev) => ({ ...prev, description: e.target.value }))}
                     placeholder="Describe the issue in detail with impact and urgency."
-                    className="w-full border border-gray-700/80 rounded-xl px-3 py-2.5 bg-[#0b0f16]/80 text-sm text-white outline-none focus:border-rose-500/60 resize-none"
+                    className="ui-input resize-none"
                     rows={5}
                     required
                     minLength={10}
@@ -951,22 +942,22 @@ export default function Community() {
                   <button
                     type="submit"
                     disabled={issueBusy}
-                    className="w-full inline-flex items-center justify-center gap-2 border border-rose-500/40 text-rose-100 py-2.5 rounded-xl text-xs font-black uppercase tracking-[0.16em] hover:bg-rose-500/10 disabled:opacity-60"
+                    className="btn btn-secondary w-full !text-xs !py-2.5 !border-rose-500/40 !text-rose-100 hover:!bg-rose-500/10 disabled:opacity-60 inline-flex items-center justify-center gap-2"
                   >
                     {issueBusy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                     Submit To Admin
                   </button>
                 </form>
 
-                  <div className="mt-5 border-t border-rose-500/20 pt-4">
-                  <h5 className="text-xs uppercase tracking-widest text-gray-400 font-black">My Ticket History</h5>
+                <div className="mt-5 border-t border-gray-800/80 pt-4">
+                  <h5 className="text-xs text-gray-400 font-semibold">My Ticket History</h5>
                   <div className="mt-3 space-y-3 max-h-[360px] overflow-auto pr-1">
                     {myIssues.map((issue) => (
-                      <article key={issue._id} className="border border-gray-700/70 bg-[#0b0f16]/72 rounded-xl p-3">
+                      <article key={issue._id} className="border-b border-gray-800/70 pb-3">
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-semibold text-white leading-snug">{issue.title}</p>
                           <span
-                            className={`text-[10px] px-2 py-0.5 rounded-md font-black border uppercase tracking-widest ${statusClassName(
+                            className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border ${statusClassName(
                               issue.status
                             )}`}
                           >
@@ -974,7 +965,7 @@ export default function Community() {
                           </span>
                         </div>
                         <p className="text-xs text-gray-400 mt-2 line-clamp-3">{issue.description}</p>
-                        <div className="mt-2 text-[10px] text-gray-500 uppercase tracking-widest flex flex-wrap gap-2">
+                        <div className="mt-2 text-[10px] text-gray-500 flex flex-wrap gap-2">
                           <span>{issue.category}</span>
                           <span>•</span>
                           <span>{issue.priority}</span>
@@ -987,24 +978,20 @@ export default function Community() {
                             </>
                           ) : null}
                         </div>
-                        {issue.resolvedBy?.name ? (
-                          <p className="mt-2 text-[10px] uppercase tracking-widest text-emerald-200">
-                            Resolved by {issue.resolvedBy.name}
-                          </p>
-                        ) : null}
+                        {issue.resolvedBy?.name ? <p className="mt-2 text-[10px] text-emerald-200">Resolved by {issue.resolvedBy.name}</p> : null}
                         {issue.adminNote ? (
                           <p className="mt-2 text-xs text-amber-200 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
                             Admin note: {issue.adminNote}
                           </p>
                         ) : null}
-                        <div className="mt-3 border border-gray-700/75 rounded-lg px-2.5 py-2">
-                          <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Timeline</p>
+                        <div className="mt-3 border-l border-gray-700/75 pl-2.5 py-1">
+                          <p className="text-[10px] text-gray-500 font-semibold">Timeline</p>
                           <div className="mt-2 space-y-1.5">
                             {buildIssueTimeline(issue).map((step) => (
                               <div key={step.id} className="flex items-start gap-2 text-[10px]">
                                 <CircleDashed size={11} className="text-blue-300 mt-0.5 shrink-0" />
                                 <div className="min-w-0">
-                                  <p className="text-gray-200 uppercase tracking-wide">{step.label}</p>
+                                  <p className="text-gray-200">{step.label}</p>
                                   <p className="text-gray-500 truncate">{step.detail}</p>
                                   <p className="text-gray-600">{fmtDateTime(step.at)}</p>
                                 </div>
@@ -1016,7 +1003,7 @@ export default function Community() {
                     ))}
 
                     {myIssues.length === 0 && (
-                      <p className="text-sm text-gray-500 border border-dashed border-gray-800 rounded-xl px-3 py-4 text-center">
+                      <p className="text-sm text-gray-500 px-3 py-4 text-center">
                         No issues submitted yet.
                       </p>
                     )}
@@ -1025,16 +1012,16 @@ export default function Community() {
               </section>
 
               {isStrictAdmin && (
-                <section className="xl:col-span-7 border border-cyan-500/20 bg-gradient-to-b from-cyan-500/[0.05] to-transparent rounded-[1.8rem] p-5 md:p-6 pro-hover-lift">
+                <section className="border-y border-gray-800/80 py-4">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <h4 className="text-sm font-black uppercase tracking-[0.18em] text-gray-200 inline-flex items-center gap-2">
+                    <h4 className="text-sm font-semibold text-gray-200 inline-flex items-center gap-2">
                       <ShieldCheck size={14} className="text-cyan-300" />
                       Admin Issue Inbox
                     </h4>
                     <select
                       value={adminIssueFilter}
                       onChange={(e) => setAdminIssueFilter(e.target.value)}
-                      className="border border-gray-700/80 rounded-xl px-3 py-2 bg-[#0b0f16]/80 text-xs text-gray-300"
+                      className="ui-input !text-sm max-w-[180px]"
                     >
                       <option value="All">All Statuses</option>
                       {ISSUE_STATUSES.map((status) => (
@@ -1045,26 +1032,26 @@ export default function Community() {
                     </select>
                   </div>
 
-                  <div className="mt-4 space-y-3 max-h-[720px] overflow-auto pr-1">
+                  <div className="mt-4 divide-y divide-gray-800/70 max-h-[720px] overflow-auto pr-1">
                     {adminVisibleIssues.map((issue) => (
-                      <article key={issue._id} className="border border-gray-700/70 bg-[#0b0f16]/72 rounded-xl p-4">
+                      <article key={issue._id} className="py-4">
                         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="text-sm md:text-base font-bold text-white break-words">{issue.title}</p>
-                            <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider">
+                            <p className="text-sm md:text-base font-semibold text-white break-words">{issue.title}</p>
+                            <p className="text-xs text-gray-500 mt-1">
                               {issue.createdBy?.name || 'Unknown'} • {issue.createdBy?.collegeId || 'No-ID'}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
                             <span
-                              className={`text-[10px] px-2 py-0.5 rounded-md font-black border uppercase tracking-widest ${priorityClassName(
+                              className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border ${priorityClassName(
                                 issue.priority
                               )}`}
                             >
                               {issue.priority}
                             </span>
                             <span
-                              className={`text-[10px] px-2 py-0.5 rounded-md font-black border uppercase tracking-widest ${statusClassName(
+                              className={`text-[10px] px-2 py-0.5 rounded-md font-semibold border ${statusClassName(
                                 issue.status
                               )}`}
                             >
@@ -1075,7 +1062,7 @@ export default function Community() {
 
                         <p className="mt-3 text-sm text-gray-300 leading-relaxed">{issue.description}</p>
 
-                        <div className="mt-3 text-[10px] uppercase tracking-widest text-gray-500 flex flex-wrap gap-2">
+                        <div className="mt-3 text-[10px] text-gray-500 flex flex-wrap gap-2">
                           <span>{issue.category}</span>
                           <span>•</span>
                           <span>{fmtDateTime(issue.createdAt)}</span>
@@ -1086,11 +1073,7 @@ export default function Community() {
                             </>
                           ) : null}
                         </div>
-                        {issue.resolvedBy?.name ? (
-                          <p className="mt-2 text-[10px] uppercase tracking-widest text-emerald-200">
-                            Resolved by {issue.resolvedBy.name}
-                          </p>
-                        ) : null}
+                        {issue.resolvedBy?.name ? <p className="mt-2 text-[10px] text-emerald-200">Resolved by {issue.resolvedBy.name}</p> : null}
 
                         {issue.adminNote ? (
                           <p className="mt-2 text-xs text-amber-200 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
@@ -1098,14 +1081,14 @@ export default function Community() {
                           </p>
                         ) : null}
 
-                        <div className="mt-3 border border-gray-700/75 rounded-lg px-2.5 py-2">
-                          <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Timeline</p>
+                        <div className="mt-3 border-l border-gray-700/75 pl-2.5 py-1">
+                          <p className="text-[10px] text-gray-500 font-semibold">Timeline</p>
                           <div className="mt-2 space-y-1.5">
                             {buildIssueTimeline(issue).map((step) => (
                               <div key={step.id} className="flex items-start gap-2 text-[10px]">
                                 <CircleDashed size={11} className="text-blue-300 mt-0.5 shrink-0" />
                                 <div className="min-w-0">
-                                  <p className="text-gray-200 uppercase tracking-wide">{step.label}</p>
+                                  <p className="text-gray-200">{step.label}</p>
                                   <p className="text-gray-500 truncate">{step.detail}</p>
                                   <p className="text-gray-600">{fmtDateTime(step.at)}</p>
                                 </div>
@@ -1117,21 +1100,21 @@ export default function Community() {
                         <div className="mt-3 pt-3 border-t border-gray-800 flex flex-wrap gap-2">
                           <button
                             onClick={() => handleAdminIssueUpdate(issue, 'InReview')}
-                            className="text-[10px] px-3 py-1.5 rounded-lg border border-amber-500/35 text-amber-200 inline-flex items-center gap-1"
+                            className="text-xs px-3 py-1.5 rounded-lg border border-amber-500/35 text-amber-200 inline-flex items-center gap-1"
                           >
                             <CircleDashed size={12} />
                             In Review
                           </button>
                           <button
                             onClick={() => handleAdminIssueUpdate(issue, 'Resolved')}
-                            className="text-[10px] px-3 py-1.5 rounded-lg border border-emerald-500/35 text-emerald-200 inline-flex items-center gap-1"
+                            className="text-xs px-3 py-1.5 rounded-lg border border-emerald-500/35 text-emerald-200 inline-flex items-center gap-1"
                           >
                             <CheckCircle2 size={12} />
                             Resolve
                           </button>
                           <button
                             onClick={() => handleAdminIssueUpdate(issue, 'Rejected')}
-                            className="text-[10px] px-3 py-1.5 rounded-lg border border-rose-500/35 text-rose-200 inline-flex items-center gap-1"
+                            className="text-xs px-3 py-1.5 rounded-lg border border-rose-500/35 text-rose-200 inline-flex items-center gap-1"
                           >
                             <XCircle size={12} />
                             Reject
@@ -1141,7 +1124,7 @@ export default function Community() {
                     ))}
 
                     {adminVisibleIssues.length === 0 && (
-                      <div className="text-center py-12 border border-dashed border-gray-800 rounded-xl">
+                      <div className="text-center py-12">
                         <ShieldCheck className="mx-auto text-gray-600 mb-3" size={34} />
                         <p className="text-sm font-semibold text-gray-300">No issues in this queue.</p>
                       </div>
@@ -1161,5 +1144,23 @@ export default function Community() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function SnapshotRail({ label, value, tone = 'cyan' }) {
+  const toneClass =
+    tone === 'blue'
+      ? 'border-blue-500/40 text-blue-100'
+      : tone === 'amber'
+      ? 'border-amber-500/40 text-amber-100'
+      : tone === 'emerald'
+      ? 'border-emerald-500/40 text-emerald-100'
+      : 'border-cyan-500/40 text-cyan-100';
+
+  return (
+    <article className={`border-l-2 pl-3 ${toneClass}`}>
+      <p className="text-xs text-gray-400">{label}</p>
+      <p className="text-lg font-semibold mt-1">{value}</p>
+    </article>
   );
 }
