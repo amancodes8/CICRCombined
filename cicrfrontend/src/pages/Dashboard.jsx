@@ -161,12 +161,12 @@ function DashboardSkeleton() {
 function KpiTile({ label, value, delta, tone = 'cyan' }) {
   const toneClass =
     tone === 'emerald'
-      ? 'border-emerald-500/35 bg-emerald-500/10'
+      ? 'bg-emerald-400'
       : tone === 'amber'
-      ? 'border-amber-500/35 bg-amber-500/10'
+      ? 'bg-amber-400'
       : tone === 'blue'
-      ? 'border-blue-500/35 bg-blue-500/10'
-      : 'border-cyan-500/35 bg-cyan-500/10';
+      ? 'bg-blue-400'
+      : 'bg-cyan-400';
 
   const deltaTone = delta > 0 ? 'text-emerald-300' : delta < 0 ? 'text-rose-300' : 'text-gray-400';
   const deltaPrefix = delta > 0 ? '+' : '';
@@ -176,17 +176,20 @@ function KpiTile({ label, value, delta, tone = 'cyan' }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: 'easeOut' }}
-      className={`rounded-xl border px-4 py-3 shadow-[0_14px_34px_-26px_rgba(0,0,0,0.9)] ${toneClass}`}
+      className="px-2 py-2 border-b border-gray-800/80"
     >
-      <p className="text-[12px] text-gray-300 font-semibold">{label}</p>
+      <div className="flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full ${toneClass}`} />
+        <p className="text-sm text-gray-300 font-semibold">{label}</p>
+      </div>
       <div className="mt-1 flex items-end justify-between gap-2">
-        <p className="text-2xl md:text-[2rem] font-black tracking-tight text-white">{value}</p>
+        <p className="text-3xl md:text-[2.1rem] font-black tracking-tight text-white">{value}</p>
         <p className={`text-xs font-semibold ${deltaTone}`}>
           {deltaPrefix}
           {delta}
         </p>
       </div>
-      <p className="text-[11px] text-gray-500 mt-1">vs previous 7 days</p>
+      <p className="text-xs text-gray-500 mt-1">vs previous 7 days</p>
     </motion.article>
   );
 }
@@ -201,15 +204,15 @@ function SectionShell({
   children,
 }) {
   return (
-    <section className="border-l border-cyan-500/25 bg-transparent">
-      <header className="px-4 md:px-5 py-3 border-b border-gray-800/70 flex flex-wrap items-center justify-between gap-3">
+    <section className="py-1">
+      <header className="px-1 md:px-2 py-3 border-b border-gray-800/70 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-base md:text-lg font-bold text-white">{title}</h3>
-          <p className="text-sm text-gray-400 mt-0.5">{subtitle}</p>
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <p className="text-sm text-gray-300 mt-0.5">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {badge ? (
-            <span className="text-[11px] px-2.5 py-1 rounded-full border border-cyan-500/35 text-cyan-200 bg-cyan-500/10">
+            <span className="text-xs px-2.5 py-1 rounded-full border border-cyan-500/35 text-cyan-200 bg-cyan-500/10">
               {badge}
             </span>
           ) : null}
@@ -224,17 +227,17 @@ function SectionShell({
           </button>
         </div>
       </header>
-      {!collapsed ? <div className="px-4 md:px-5 py-3">{children}</div> : null}
+      {!collapsed ? <div className="px-1 md:px-2 py-3">{children}</div> : null}
     </section>
   );
 }
 
 function EmptyInline({ title, ctaLabel, to }) {
   return (
-    <div className="rounded-lg border border-dashed border-gray-700 p-4 text-sm text-gray-500">
+    <div className="py-3 text-sm text-gray-500">
       <p>{title}</p>
       {to ? (
-        <Link to={to} className="inline-flex mt-3 text-xs font-semibold text-cyan-200">
+        <Link to={to} className="inline-flex mt-2 text-sm font-semibold text-cyan-200">
           {ctaLabel || 'Open'}
         </Link>
       ) : null}
@@ -547,36 +550,34 @@ export default function Dashboard() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: 'easeOut' }}
       >
-        <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-[#08121d] via-[#070d15] to-[#060b12] px-4 py-4 md:px-6 md:py-5 pro-aurora">
-          <PageHeader
-            eyebrow={isAlumni ? 'Alumni Dashboard' : 'CICR Dashboard'}
-            title={isAlumni ? `Welcome Back, ${member?.name || 'Alumni Member'}` : 'Operations Dashboard'}
-            subtitle="Role-based workspace with filtered signals, operational timelines, and quick actions."
-            icon={isAlumni ? Handshake : Activity}
-            actions={
-              <>
-                <Link to="/projects" className="btn btn-primary">Projects</Link>
-                <Link to="/events" className="btn btn-secondary">Events</Link>
-                {isAdminOrHead ? <Link to="/admin" className="btn btn-secondary">Admin</Link> : null}
-              </>
-            }
-          />
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-            <span className="px-2.5 py-1 rounded-full border border-gray-700 text-gray-300">
-              {isAlumni ? 'Alumni View' : isAdminOrHead ? 'Admin View' : 'Member View'}
-            </span>
-            <span className="px-2.5 py-1 rounded-full border border-cyan-500/35 bg-cyan-500/10 text-cyan-200">
-              {filteredProjects.length} projects in scope
-            </span>
-            <span className="px-2.5 py-1 rounded-full border border-blue-500/35 bg-blue-500/10 text-blue-200">
-              {filteredMeetings.length} meetings in scope
-            </span>
-          </div>
+        <PageHeader
+          eyebrow={isAlumni ? 'Alumni Dashboard' : 'CICR Dashboard'}
+          title={isAlumni ? `Welcome Back, ${member?.name || 'Alumni Member'}` : 'Operations Dashboard'}
+          subtitle="Role-based workspace with filtered signals, operational timelines, and quick actions."
+          icon={isAlumni ? Handshake : Activity}
+          actions={
+            <>
+              <Link to="/projects" className="btn btn-primary">Projects</Link>
+              <Link to="/events" className="btn btn-secondary">Events</Link>
+              {isAdminOrHead ? <Link to="/admin" className="btn btn-secondary">Admin</Link> : null}
+            </>
+          }
+        />
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="px-2.5 py-1 rounded-full border border-gray-700 text-gray-300">
+            {isAlumni ? 'Alumni View' : isAdminOrHead ? 'Admin View' : 'Member View'}
+          </span>
+          <span className="px-2.5 py-1 rounded-full border border-cyan-500/35 bg-cyan-500/10 text-cyan-200">
+            {filteredProjects.length} projects in scope
+          </span>
+          <span className="px-2.5 py-1 rounded-full border border-blue-500/35 bg-blue-500/10 text-blue-200">
+            {filteredMeetings.length} meetings in scope
+          </span>
         </div>
       </motion.section>
 
       {loadError ? (
-        <section className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 flex items-center justify-between gap-3">
+        <section className="border-l-2 border-amber-500/50 bg-amber-500/10 px-4 py-3 flex items-center justify-between gap-3">
           <p className="text-sm text-amber-100">{loadError}</p>
           <button type="button" onClick={loadDashboard} className="btn btn-secondary !w-auto !text-xs">
             <Loader2 size={12} /> Retry
@@ -584,7 +585,7 @@ export default function Dashboard() {
         </section>
       ) : null}
 
-      <section className="sticky top-3 z-20 section-motion section-motion-delay-2">
+      <section className="sticky top-3 z-20 section-motion section-motion-delay-2 border-y border-gray-800/70 bg-[#070b10]/92 backdrop-blur py-2">
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           {kpiConfig.map((kpi) => (
             <KpiTile
@@ -598,7 +599,7 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="border-y border-gray-800/70 py-3 section-motion section-motion-delay-2">
+      <section className="border-b border-gray-800/70 py-3 section-motion section-motion-delay-2">
         <div className="grid grid-cols-1 lg:grid-cols-[auto_auto_1fr] gap-3 items-start lg:items-center">
           <div>
             <p className="text-xs text-gray-400 font-semibold mb-1.5">Time window</p>
@@ -678,17 +679,17 @@ export default function Dashboard() {
                   <div key={entry.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-3 hover:bg-white/[0.02] transition-colors">
                     <div className="min-w-0">
                       <p className="text-sm text-white font-semibold truncate">{entry.title}</p>
-                      <p className="text-xs text-gray-400 mt-1 truncate">{entry.detail}</p>
-                      <p className="text-[11px] text-gray-500 mt-1">
+                      <p className="text-sm text-gray-300 mt-1 truncate">{entry.detail}</p>
+                      <p className="text-xs text-gray-500 mt-1">
                         {entry.actor}
                         {entry.actorRole ? ` • ${entry.actorRole}` : ''}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <span className={`text-[10px] px-2 py-1 rounded-full border ${statusBadgeClass(entry.status)}`}>
+                      <span className={`text-xs px-2 py-1 rounded-full border ${statusBadgeClass(entry.status)}`}>
                         {entry.status}
                       </span>
-                      <span className="text-[11px] text-gray-500 whitespace-nowrap">
+                      <span className="text-xs text-gray-500 whitespace-nowrap">
                         {fmtDate(entry.time)} {fmtTime(entry.time)}
                       </span>
                     </div>
@@ -711,7 +712,7 @@ export default function Dashboard() {
             ) : (
               <div className="overflow-x-auto">
                 <div className="min-w-[560px]">
-                  <div className="grid grid-cols-[minmax(0,1.2fr)_0.9fr_0.7fr] gap-3 text-[11px] text-gray-500 font-semibold py-2 border-b border-gray-800">
+                  <div className="grid grid-cols-[minmax(0,1.2fr)_0.9fr_0.7fr] gap-3 text-sm text-gray-400 font-semibold py-2 border-b border-gray-800">
                     <span>Meeting</span>
                     <span>When</span>
                     <span>Type</span>
@@ -725,7 +726,7 @@ export default function Dashboard() {
                       <p className="text-xs text-gray-300">
                         {fmtDate(meeting.startTime)} {fmtTime(meeting.startTime)}
                       </p>
-                      <span className={`text-[10px] px-2 py-1 rounded-full border h-fit ${statusBadgeClass('Scheduled')}`}>
+                      <span className={`text-xs px-2 py-1 rounded-full border h-fit ${statusBadgeClass('Scheduled')}`}>
                         {meeting.meetingType || 'General'}
                       </span>
                     </div>
@@ -748,7 +749,7 @@ export default function Dashboard() {
             ) : (
               <div className="overflow-x-auto">
                 <div className="min-w-[560px]">
-                  <div className="grid grid-cols-[minmax(0,1.3fr)_0.65fr_0.65fr] gap-3 text-[11px] text-gray-500 font-semibold py-2 border-b border-gray-800">
+                  <div className="grid grid-cols-[minmax(0,1.3fr)_0.65fr_0.65fr] gap-3 text-sm text-gray-400 font-semibold py-2 border-b border-gray-800">
                     <span>Project</span>
                     <span>Stage</span>
                     <span>Status</span>
@@ -764,7 +765,7 @@ export default function Dashboard() {
                         <p className="text-xs text-gray-400 truncate">{project.event?.title || 'Standalone'}</p>
                       </div>
                       <p className="text-xs text-gray-300">{project.stage || 'Planning'}</p>
-                      <span className={`text-[10px] px-2 py-1 rounded-full border h-fit ${statusBadgeClass(project.status)}`}>
+                      <span className={`text-xs px-2 py-1 rounded-full border h-fit ${statusBadgeClass(project.status)}`}>
                         {project.status || 'Planning'}
                       </span>
                     </Link>
@@ -787,7 +788,7 @@ export default function Dashboard() {
             ) : (
               <div className="overflow-x-auto">
                 <div className="min-w-[560px]">
-                  <div className="grid grid-cols-[minmax(0,1.35fr)_0.65fr_0.55fr] gap-3 text-[11px] text-gray-500 font-semibold py-2 border-b border-gray-800">
+                  <div className="grid grid-cols-[minmax(0,1.35fr)_0.65fr_0.55fr] gap-3 text-sm text-gray-400 font-semibold py-2 border-b border-gray-800">
                     <span>Discussion</span>
                     <span>Author</span>
                     <span>When</span>
@@ -799,7 +800,7 @@ export default function Dashboard() {
                       className="grid grid-cols-[minmax(0,1.35fr)_0.65fr_0.55fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/[0.02] transition-colors"
                     >
                       <div className="min-w-0">
-                        <p className="text-[10px] text-blue-300 font-semibold">{post.type || 'Update'}</p>
+                        <p className="text-xs text-blue-300 font-semibold">{post.type || 'Update'}</p>
                         <p className="text-sm text-white truncate mt-1">{post.content || 'No message content'}</p>
                       </div>
                       <p className="text-xs text-gray-300 truncate">
@@ -821,11 +822,16 @@ export default function Dashboard() {
               <Sparkles size={15} className="text-cyan-300" />
               <h3 className="text-base font-semibold text-white">Quick Actions</h3>
             </div>
-            <p className="text-xs text-gray-400 mt-1">Fast navigation to high-value workflows.</p>
-            <div className="mt-3 grid grid-cols-1 gap-2">
+            <p className="text-sm text-gray-400 mt-1">Fast navigation to high-value workflows.</p>
+            <div className="mt-3 divide-y divide-gray-800/70">
               {quickActions.slice(0, 6).map((action) => (
-                <Link key={action.to + action.label} to={action.to} className="btn btn-secondary !justify-start !text-xs !px-3 !py-2">
-                  {action.label}
+                <Link
+                  key={action.to + action.label}
+                  to={action.to}
+                  className="flex items-center justify-between py-2.5 text-sm text-gray-200 hover:text-white transition-colors"
+                >
+                  <span>{action.label}</span>
+                  <span className="text-cyan-300">↗</span>
                 </Link>
               ))}
             </div>
@@ -833,8 +839,8 @@ export default function Dashboard() {
 
           <section className="pb-5 border-b border-gray-800/70">
             <h3 className="text-base font-semibold text-white">Profile Snapshot</h3>
-            <p className="text-xs text-gray-500 mt-1">Visible identity and operational profile details.</p>
-            <div className="mt-3 space-y-2 text-xs text-gray-300">
+            <p className="text-sm text-gray-400 mt-1">Visible identity and operational profile details.</p>
+            <div className="mt-3 space-y-2 text-sm text-gray-300">
               <p className="inline-flex items-center gap-2"><Users size={12} className="text-cyan-300" /> {member.name || 'N/A'}</p>
               <p className="inline-flex items-center gap-2"><IdCard size={12} className="text-blue-300" /> {member.collegeId || 'N/A'}</p>
               <p className="inline-flex items-center gap-2"><Mail size={12} className="text-indigo-300" /> {member.email || 'N/A'}</p>
@@ -854,7 +860,7 @@ export default function Dashboard() {
                 <BookOpenCheck size={14} className="text-cyan-300" />
                 Junior Launchpad
               </h3>
-              <p className="text-xs text-gray-400 mt-1">Actionable checklist for skill growth and mentorship workflow.</p>
+              <p className="text-sm text-gray-400 mt-1">Actionable checklist for skill growth and mentorship workflow.</p>
               <div className="grid grid-cols-1 gap-2 mt-3">
                 <MiniMetric label="Active Tracks" value={learningOverview?.stats?.activeTracks || 0} />
                 <MiniMetric label="Tasks Approved" value={learningOverview?.stats?.myApprovedTasks || 0} />
@@ -865,9 +871,9 @@ export default function Dashboard() {
                   <EmptyInline title="No pending recommendations." ctaLabel="Open Learning Hub" to="/learning" />
                 ) : (
                   juniorRecommendations.map((item) => (
-                    <article key={`${item.trackId}-${item.moduleIndex}-${item.taskIndex}`} className="rounded-md border border-gray-800/70 px-3 py-2">
-                      <p className="text-xs text-white font-semibold">{item.taskTitle}</p>
-                      <p className="text-[11px] text-gray-400 mt-1">{item.trackTitle}</p>
+                    <article key={`${item.trackId}-${item.moduleIndex}-${item.taskIndex}`} className="py-2 border-b border-gray-800/60">
+                      <p className="text-sm text-white font-semibold">{item.taskTitle}</p>
+                      <p className="text-xs text-gray-400 mt-1">{item.trackTitle}</p>
                     </article>
                   ))
                 )}
@@ -881,17 +887,17 @@ export default function Dashboard() {
                 <GraduationCap size={14} className="text-indigo-300" />
                 Alumni Overview
               </h3>
-              <div className="mt-3 space-y-2 text-xs text-gray-300">
+              <div className="mt-3 space-y-2 text-sm text-gray-300">
                 <p className="inline-flex items-center gap-2"><Building2 size={12} className="text-cyan-300" /> {alumniProfile?.currentOrganization || 'Organization not added'}</p>
                 <p className="inline-flex items-center gap-2"><Activity size={12} className="text-emerald-300" /> {alumniProfile?.currentDesignation || 'Designation not added'}</p>
                 <p className="inline-flex items-center gap-2"><MapPin size={12} className="text-amber-300" /> {alumniProfile?.location || 'Location not added'}</p>
               </div>
-              <div className="mt-3 space-y-2">
+              <div className="mt-3 space-y-2 text-sm text-gray-300">
                 {alumniTenures.length === 0 ? (
-                  <p className="text-xs text-gray-500">No CICR tenure history added yet.</p>
+                  <p className="text-sm text-gray-500">No CICR tenure history added yet.</p>
                 ) : (
                   alumniTenures.slice(0, 4).map((tenure, idx) => (
-                    <div key={`${tenure.position}-${idx}`} className="text-xs border border-gray-800/70 rounded-md px-2 py-1.5 text-gray-300">
+                    <div key={`${tenure.position}-${idx}`} className="py-1.5 border-b border-gray-800/60">
                       {tenure.position} • {tenure.fromYear}-{tenure.toYear}
                     </div>
                   ))
@@ -934,8 +940,8 @@ export default function Dashboard() {
 function MiniMetric({ label, value }) {
   return (
     <article className="flex items-center justify-between border-b border-gray-800/70 py-2">
-      <p className="text-[11px] text-gray-400 font-medium">{label}</p>
-      <p className="text-sm font-semibold text-white">{value}</p>
+      <p className="text-sm text-gray-400 font-medium">{label}</p>
+      <p className="text-base font-semibold text-white">{value}</p>
     </article>
   );
 }
