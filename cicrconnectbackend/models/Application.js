@@ -58,9 +58,13 @@ ApplicationSchema.index({ status: 1, createdAt: -1 });
 ApplicationSchema.index({ emailHash: 1, createdAt: -1 });
 
 ApplicationSchema.statics.findOneByEmail = function(email) {
-  const emailHash = this.computeBlindIndex(email, normalizeEmail);
-  if (!emailHash) return null;
-  return this.findOne({ emailHash });
+  const normalizedEmail = normalizeEmail(email);
+  const emailHash = this.computeBlindIndex(normalizedEmail, normalizeEmail);
+  const or = [];
+  if (emailHash) or.push({ emailHash });
+  if (normalizedEmail) or.push({ email: normalizedEmail });
+  if (!or.length) return this.findOne({ _id: null });
+  return this.findOne({ $or: or });
 };
 
 applyModelEncryption(ApplicationSchema, {

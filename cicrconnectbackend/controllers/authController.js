@@ -61,7 +61,12 @@ const registerUser = async (req, res) => {
   const emailHash = User.computeBlindIndex(normalizedEmail, normalizeEmail);
   const collegeIdHash = User.computeBlindIndex(normalizedCollegeId, normalizeCollegeId);
   const userExists = await User.findOne({
-    $or: [{ emailHash }, { collegeIdHash }],
+    $or: [
+      ...(emailHash ? [{ emailHash }] : []),
+      ...(collegeIdHash ? [{ collegeIdHash }] : []),
+      { email: normalizedEmail },
+      { collegeId: normalizedCollegeId },
+    ],
   });
   if (userExists) {
     return res.status(400).json({ message: 'User already exists' });
@@ -213,9 +218,18 @@ const resetPasswordWithCode = async (req, res) => {
 
   const collegeIdHash = User.computeBlindIndex(normalizedCollegeId, normalizeCollegeId);
   const user = await User.findOne({
-    collegeIdHash,
-    passwordResetOtp: hashedCode,
-    passwordResetOtpExpires: { $gt: Date.now() },
+    $and: [
+      {
+        $or: [
+          ...(collegeIdHash ? [{ collegeIdHash }] : []),
+          { collegeId: normalizedCollegeId },
+        ],
+      },
+      {
+        passwordResetOtp: hashedCode,
+        passwordResetOtpExpires: { $gt: Date.now() },
+      },
+    ],
   });
 
   if (!user) {
@@ -311,11 +325,23 @@ const resetPasswordWithOtp = async (req, res) => {
 
   const hashedOtp = crypto.createHash('sha256').update(String(otp)).digest('hex');
 
+  const emailHash = User.computeBlindIndex(normalizedEmail, normalizeEmail);
+  const collegeIdHash = User.computeBlindIndex(normalizedCollegeId, normalizeCollegeId);
   const user = await User.findOne({
-    emailHash: User.computeBlindIndex(normalizedEmail, normalizeEmail),
-    collegeIdHash: User.computeBlindIndex(normalizedCollegeId, normalizeCollegeId),
-    passwordResetOtp: hashedOtp,
-    passwordResetOtpExpires: { $gt: Date.now() },
+    $and: [
+      {
+        $or: [
+          ...(emailHash && collegeIdHash ? [{ emailHash, collegeIdHash }] : []),
+          ...(emailHash ? [{ emailHash, collegeId: normalizedCollegeId }] : []),
+          ...(collegeIdHash ? [{ email: normalizedEmail, collegeIdHash }] : []),
+          { email: normalizedEmail, collegeId: normalizedCollegeId },
+        ],
+      },
+      {
+        passwordResetOtp: hashedOtp,
+        passwordResetOtpExpires: { $gt: Date.now() },
+      },
+    ],
   });
 
   if (!user) {

@@ -137,32 +137,54 @@ UserSchema.methods.createVerificationToken = function() {
 };
 
 UserSchema.statics.findOneByEmail = function(email) {
-    const emailHash = this.computeBlindIndex(email, normalizeEmail);
-    if (!emailHash) return this.findOne({ _id: null });
-    return this.findOne({ emailHash });
+    const normalizedEmail = normalizeEmail(email);
+    const emailHash = this.computeBlindIndex(normalizedEmail, normalizeEmail);
+    const or = [];
+    if (emailHash) or.push({ emailHash });
+    if (normalizedEmail) or.push({ email: normalizedEmail });
+    if (!or.length) return this.findOne({ _id: null });
+    return this.findOne({ $or: or });
 };
 
 UserSchema.statics.findOneByCollegeId = function(collegeId) {
-    const collegeIdHash = this.computeBlindIndex(collegeId, normalizeCollegeId);
-    if (!collegeIdHash) return this.findOne({ _id: null });
-    return this.findOne({ collegeIdHash });
+    const normalizedCollegeId = normalizeCollegeId(collegeId);
+    const collegeIdHash = this.computeBlindIndex(normalizedCollegeId, normalizeCollegeId);
+    const or = [];
+    if (collegeIdHash) or.push({ collegeIdHash });
+    if (normalizedCollegeId) or.push({ collegeId: normalizedCollegeId });
+    if (!or.length) return this.findOne({ _id: null });
+    return this.findOne({ $or: or });
 };
 
 UserSchema.statics.findOneByEmailAndCollegeId = function(email, collegeId) {
-    const emailHash = this.computeBlindIndex(email, normalizeEmail);
-    const collegeIdHash = this.computeBlindIndex(collegeId, normalizeCollegeId);
-    if (!emailHash || !collegeIdHash) return this.findOne({ _id: null });
-    return this.findOne({ emailHash, collegeIdHash });
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedCollegeId = normalizeCollegeId(collegeId);
+    const emailHash = this.computeBlindIndex(normalizedEmail, normalizeEmail);
+    const collegeIdHash = this.computeBlindIndex(normalizedCollegeId, normalizeCollegeId);
+
+    const or = [];
+    if (emailHash && collegeIdHash) or.push({ emailHash, collegeIdHash });
+    if (normalizedEmail && normalizedCollegeId) or.push({ email: normalizedEmail, collegeId: normalizedCollegeId });
+    if (emailHash && normalizedCollegeId) or.push({ emailHash, collegeId: normalizedCollegeId });
+    if (normalizedEmail && collegeIdHash) or.push({ email: normalizedEmail, collegeIdHash });
+
+    if (!or.length) return this.findOne({ _id: null });
+    return this.findOne({ $or: or });
 };
 
 UserSchema.statics.findByCollegeIds = function(collegeIds = []) {
-    const hashes = Array.isArray(collegeIds)
-        ? collegeIds
-            .map((id) => this.computeBlindIndex(id, normalizeCollegeId))
-            .filter(Boolean)
+    const ids = Array.isArray(collegeIds)
+        ? collegeIds.map((id) => normalizeCollegeId(id)).filter(Boolean)
         : [];
-    if (hashes.length === 0) return this.find({ _id: { $in: [] } });
-    return this.find({ collegeIdHash: { $in: hashes } });
+    const hashes = ids
+        .map((id) => this.computeBlindIndex(id, normalizeCollegeId))
+        .filter(Boolean);
+    if (hashes.length === 0 && ids.length === 0) return this.find({ _id: { $in: [] } });
+
+    const or = [];
+    if (hashes.length > 0) or.push({ collegeIdHash: { $in: hashes } });
+    if (ids.length > 0) or.push({ collegeId: { $in: ids } });
+    return this.find({ $or: or });
 };
 
 applyModelEncryption(UserSchema, {
