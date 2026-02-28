@@ -323,7 +323,14 @@ export default function Auth() {
             </AnimatePresence>
 
             {(!isForgot || forgotMethod === 'emailOtp') && (
-              <InputGroup icon={Mail} name="email" type="email" placeholder="Email Address" value={formData.email} onChange={handleChange} />
+              <InputGroup
+                icon={Mail}
+                name="email"
+                type="text"
+                placeholder={isLogin ? "Email or College ID" : "Email Address"}
+                value={formData.email}
+                onChange={handleChange}
+              />
             )}
             {isForgot && (
               <>

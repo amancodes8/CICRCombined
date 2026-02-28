@@ -166,9 +166,20 @@ const registerUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
   const { email, password } = req.body;
-  const normalizedEmail = normalizeEmail(email);
+  const identifier = String(email || '').trim();
+  const normalizedEmail = normalizeEmail(identifier);
+  const normalizedCollegeId = normalizeCollegeId(identifier);
 
-  const user = await User.findOneByEmail(normalizedEmail);
+  let user = null;
+  if (identifier.includes('@')) {
+    user = await User.findOneByEmail(normalizedEmail);
+  } else {
+    user = await User.findOneByCollegeId(normalizedCollegeId);
+  }
+  if (!user) {
+    // Compatibility fallback: try both paths in case identifier format is ambiguous.
+    user = (await User.findOneByEmail(normalizedEmail)) || (await User.findOneByCollegeId(normalizedCollegeId));
+  }
   if (!user || !(await user.matchPassword(password))) {
     return res.status(401).json({ code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' });
   }
@@ -219,21 +230,13 @@ const resetPasswordWithCode = async (req, res) => {
 
   const hashedCode = crypto.createHash('sha256').update(String(resetCode)).digest('hex');
 
-  const collegeIdHash = User.computeBlindIndex(normalizedCollegeId, normalizeCollegeId);
-  const user = await User.findOne({
-    $and: [
-      {
-        $or: [
-          ...(collegeIdHash ? [{ collegeIdHash }] : []),
-          { collegeId: normalizedCollegeId },
-        ],
-      },
-      {
-        passwordResetOtp: hashedCode,
-        passwordResetOtpExpires: { $gt: Date.now() },
-      },
-    ],
-  });
+  const candidates = await User.find({
+    passwordResetOtp: hashedCode,
+    passwordResetOtpExpires: { $gt: Date.now() },
+  }).limit(20);
+  const user = candidates.find(
+    (row) => normalizeCollegeId(row.collegeId) === normalizedCollegeId
+  );
 
   if (!user) {
     return res.status(400).json({ message: 'Invalid or expired reset code' });
@@ -328,24 +331,15 @@ const resetPasswordWithOtp = async (req, res) => {
 
   const hashedOtp = crypto.createHash('sha256').update(String(otp)).digest('hex');
 
-  const emailHash = User.computeBlindIndex(normalizedEmail, normalizeEmail);
-  const collegeIdHash = User.computeBlindIndex(normalizedCollegeId, normalizeCollegeId);
-  const user = await User.findOne({
-    $and: [
-      {
-        $or: [
-          ...(emailHash && collegeIdHash ? [{ emailHash, collegeIdHash }] : []),
-          ...(emailHash ? [{ emailHash, collegeId: normalizedCollegeId }] : []),
-          ...(collegeIdHash ? [{ email: normalizedEmail, collegeIdHash }] : []),
-          { email: normalizedEmail, collegeId: normalizedCollegeId },
-        ],
-      },
-      {
-        passwordResetOtp: hashedOtp,
-        passwordResetOtpExpires: { $gt: Date.now() },
-      },
-    ],
-  });
+  const candidates = await User.find({
+    passwordResetOtp: hashedOtp,
+    passwordResetOtpExpires: { $gt: Date.now() },
+  }).limit(20);
+  const user = candidates.find(
+    (row) =>
+      normalizeEmail(row.email) === normalizedEmail &&
+      normalizeCollegeId(row.collegeId) === normalizedCollegeId
+  );
 
   if (!user) {
     return res.status(400).json({ message: 'Invalid or expired OTP' });
