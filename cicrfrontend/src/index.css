@@ -831,6 +831,139 @@ a {
   background: rgba(7, 9, 13, 0.85);
 }
 
+/* ========== SIDEBAR SCROLL ========== */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.sidebar-scroll:hover {
+  scrollbar-color: rgba(59, 130, 246, 0.25) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.25);
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.45);
+}
+
+/* Scroll fade masks for top/bottom */
+.sidebar-scroll-container {
+  position: relative;
+}
+
+.sidebar-scroll-container::before,
+.sidebar-scroll-container::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 28px;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-scroll-container::before {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(7, 9, 13, 0.95), transparent);
+}
+
+.sidebar-scroll-container::after {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(7, 9, 13, 0.95), transparent);
+}
+
+.sidebar-scroll-container.fade-top::before {
+  opacity: 1;
+}
+
+.sidebar-scroll-container.fade-bottom::after {
+  opacity: 1;
+}
+
+/* ========== SIDEBAR NAV ITEM HOVER GLOW ========== */
+.nav-item-hover {
+  position: relative;
+  transition: background 0.25s ease, transform 0.2s ease;
+}
+
+.nav-item-hover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  background: radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.12), transparent 70%);
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.nav-item-hover:hover::before {
+  opacity: 1;
+}
+
+/* ========== ACTIVE NAV INDICATOR ========== */
+.nav-active-indicator {
+  position: relative;
+}
+
+.nav-active-indicator::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, #3b82f6, #818cf8);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+}
+
+/* ========== SIDEBAR PROFILE CARD ========== */
+.sidebar-profile-card {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.25s ease;
+}
+
+.sidebar-profile-card:hover {
+  border-color: rgba(96, 165, 250, 0.3);
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-scroll {
+    scroll-behavior: auto;
+  }
+  .nav-item-hover::before {
+    transition: none;
+  }
+  .sidebar-profile-card:hover {
+    transform: none;
+  }
+}
+
 /* ========== ICON LOGO GRADIENT ========== */
 .gradient-blue-purple {
   background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
