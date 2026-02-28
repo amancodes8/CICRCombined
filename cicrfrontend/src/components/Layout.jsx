@@ -603,8 +603,8 @@ export default function Layout() {
                             whileHover={{ x: 4 }}
                             className={`flex items-center justify-between p-2.5 rounded-xl transition-colors ${
                               isRouteActive(link.path)
-                                ? 'bg-blue-600 text-white shadow-lg'
-                                : 'text-gray-400 hover:bg-gray-800/80 hover:text-gray-100'
+                                ? 'nav-active-glow text-white'
+                                : 'text-gray-400 hover:bg-white/5 hover:text-gray-100'
                             }`}
                           >
                             <div className="flex items-center gap-2.5">
@@ -627,10 +627,10 @@ export default function Layout() {
       </nav>
 
       {/* Footer Profile Section (This acts as the link to /profile) */}
-      <div className="mt-auto pt-6 border-t border-gray-800 space-y-4">
-        <div className="group px-2 py-2 rounded-xl border border-gray-800/70">
+      <div className="mt-auto pt-6 border-t border-white/5 space-y-4">
+        <div className="group px-3 py-3 rounded-xl border border-white/8 bg-white/3 backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-600/10 border border-blue-500/20 rounded-lg flex items-center justify-center text-blue-500 font-black overflow-hidden">
+            <div className="w-9 h-9 bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-lg flex items-center justify-center text-blue-400 font-black overflow-hidden">
               {user.avatarUrl && !sidebarAvatarFailed ? (
                 <img
                   src={user.avatarUrl}
@@ -657,14 +657,14 @@ export default function Layout() {
   );
 
   return (
-    <div className="flex min-h-screen bg-[#0a0a0c] text-white">
+    <div className="flex min-h-screen mesh-bg text-white">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 border-r border-gray-800 p-6 flex-col fixed h-full bg-[#0a0a0c] z-20">
+      <aside className="hidden lg:flex w-64 border-r border-gray-800/50 p-6 flex-col fixed h-full z-20" style={{background: 'linear-gradient(180deg, rgba(7,9,13,0.98) 0%, rgba(10,12,18,0.95) 100%)', backdropFilter: 'blur(20px)'}}>
         <SidebarContent />
       </aside>
 
       {/* Mobile Top Nav */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#0a0a0c]/80 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-6 z-30">
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-30" style={{background: 'rgba(7,9,13,0.85)'}}>
         <div className="flex items-center gap-2.5">
           {logoMode !== 'fallback' ? (
             <img
@@ -726,7 +726,9 @@ export default function Layout() {
             />
             <motion.aside 
               initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
-              className="fixed top-0 left-0 bottom-0 w-72 bg-[#0a0a0c] p-6 z-50 flex flex-col border-r border-gray-800 lg:hidden"
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 left-0 bottom-0 w-72 p-6 z-50 flex flex-col border-r border-white/5 lg:hidden"
+              style={{background: 'linear-gradient(180deg, rgba(7,9,13,0.99) 0%, rgba(10,12,18,0.97) 100%)', backdropFilter: 'blur(20px)'}}
             >
               <SidebarContent />
             </motion.aside>
@@ -737,7 +739,8 @@ export default function Layout() {
       {/* Main Content Area */}
       <main className="flex-1 lg:ml-64 p-4 md:p-8 pt-24 lg:pt-8 min-h-screen relative overflow-x-hidden">
         {/* Aesthetic Background Glow */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] rounded-full -z-10 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-600/8 blur-[160px] rounded-full -z-10 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-600/5 blur-[140px] rounded-full -z-10 pointer-events-none" />
 
         {(() => {
           const missing = [];
