@@ -14,6 +14,76 @@ const {
   validateTenures,
 } = require('../utils/alumniProfile');
 
+const AUTH_RECOVERY_SELECT =
+  'name email collegeId password role warningCount hasUnreadWarning approvalStatus isVerified +emailHash +collegeIdHash';
+
+const findUserByIdentifierRecovery = async ({ normalizedEmail, normalizedCollegeId }) => {
+  const cursor = User.find({}).select(AUTH_RECOVERY_SELECT).cursor();
+  for await (const row of cursor) {
+    const rowEmail = normalizeEmail(row.get('email'));
+    const rowCollegeId = normalizeCollegeId(row.get('collegeId'));
+    if (normalizedEmail && rowEmail && rowEmail === normalizedEmail) {
+      return row;
+    }
+    if (normalizedCollegeId && rowCollegeId && rowCollegeId === normalizedCollegeId) {
+      return row;
+    }
+  }
+  return null;
+};
+
+const findUserByEmailAndCollegeIdRecovery = async ({ normalizedEmail, normalizedCollegeId }) => {
+  const cursor = User.find({}).select(AUTH_RECOVERY_SELECT).cursor();
+  for await (const row of cursor) {
+    const rowEmail = normalizeEmail(row.get('email'));
+    const rowCollegeId = normalizeCollegeId(row.get('collegeId'));
+    if (
+      normalizedEmail &&
+      normalizedCollegeId &&
+      rowEmail === normalizedEmail &&
+      rowCollegeId === normalizedCollegeId
+    ) {
+      return row;
+    }
+  }
+  return null;
+};
+
+const repairIdentityHashesIfNeeded = async (user) => {
+  if (!user) return;
+  const email = normalizeEmail(user.get('email'));
+  const collegeId = normalizeCollegeId(user.get('collegeId'));
+
+  const emailHashes =
+    typeof User.computeBlindIndexVariants === 'function'
+      ? User.computeBlindIndexVariants(email, normalizeEmail)
+      : [User.computeBlindIndex(email, normalizeEmail)].filter(Boolean);
+  const collegeIdHashes =
+    typeof User.computeBlindIndexVariants === 'function'
+      ? User.computeBlindIndexVariants(collegeId, normalizeCollegeId)
+      : [User.computeBlindIndex(collegeId, normalizeCollegeId)].filter(Boolean);
+
+  const expectedEmailHash = emailHashes[0] || undefined;
+  const expectedCollegeIdHash = collegeIdHashes[0] || undefined;
+
+  let changed = false;
+  if ((user.emailHash || undefined) !== expectedEmailHash) {
+    user.emailHash = expectedEmailHash;
+    changed = true;
+  }
+  if ((user.collegeIdHash || undefined) !== expectedCollegeIdHash) {
+    user.collegeIdHash = expectedCollegeIdHash;
+    changed = true;
+  }
+  if (!changed) return;
+
+  try {
+    await user.save({ validateBeforeSave: false });
+  } catch {
+    // Do not block login/reset flow if self-heal fails.
+  }
+};
+
 const normalizeHandle = (value) => {
   if (!value) return '';
   const raw = String(value).trim();
@@ -184,6 +254,13 @@ const loginUser = async (req, res) => {
     // Compatibility fallback: try both paths in case identifier format is ambiguous.
     user = (await User.findOneByEmail(normalizedEmail)) || (await User.findOneByCollegeId(normalizedCollegeId));
   }
+  if (!user) {
+    // Recovery fallback for old/misaligned encrypted hash records.
+    user = await findUserByIdentifierRecovery({ normalizedEmail, normalizedCollegeId });
+  }
+  if (user) {
+    await repairIdentityHashesIfNeeded(user);
+  }
   if (!user || !(await user.matchPassword(password))) {
     return res.status(401).json({ code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' });
   }
@@ -296,19 +373,27 @@ const sendPasswordResetOtp = async (req, res) => {
   }
 
   const user = await User.findOneByEmailAndCollegeId(normalizedEmail, normalizedCollegeId);
-  if (!user) {
+  const resolvedUser =
+    user ||
+    (await findUserByEmailAndCollegeIdRecovery({
+      normalizedEmail,
+      normalizedCollegeId,
+    }));
+
+  if (!resolvedUser) {
     return res.status(404).json({ success: false, message: 'User not found with provided email and college ID' });
   }
 
   const otp = `${Math.floor(100000 + Math.random() * 900000)}`;
   const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
 
-  user.passwordResetOtp = hashedOtp;
-  user.passwordResetOtpExpires = Date.now() + 10 * 60 * 1000;
-  await user.save({ validateBeforeSave: false });
+  resolvedUser.passwordResetOtp = hashedOtp;
+  resolvedUser.passwordResetOtpExpires = Date.now() + 10 * 60 * 1000;
+  await repairIdentityHashesIfNeeded(resolvedUser);
+  await resolvedUser.save({ validateBeforeSave: false });
 
   await sendEmail({
-    email: user.email,
+    email: resolvedUser.email,
     subject: 'CICR Password Reset OTP',
     message: `
       <p>Your password reset OTP is:</p>
