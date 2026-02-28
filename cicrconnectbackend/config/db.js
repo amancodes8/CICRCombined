@@ -1,14 +1,36 @@
 const mongoose = require('mongoose');
+const logger = require('../utils/logger');
+
+const connectionStates = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting',
+};
 
 const connectDB = async () => {
     try {
         await mongoose.connect(process.env.MONGO_URI);
-        console.log('MongoDB Connected...');
+        logger.info('mongodb_connected');
     } catch (err) {
-        console.error(err.message);
+        logger.error('mongodb_connection_failed', { error: err.message });
         // Exit process with failure
         process.exit(1);
     }
 };
 
-module.exports = connectDB;
+const getDbHealth = () => {
+    const stateCode = mongoose.connection.readyState;
+    const state = connectionStates[stateCode] || 'unknown';
+    return {
+        state,
+        stateCode,
+        host: mongoose.connection.host || null,
+        name: mongoose.connection.name || null,
+    };
+};
+
+module.exports = {
+    connectDB,
+    getDbHealth,
+};

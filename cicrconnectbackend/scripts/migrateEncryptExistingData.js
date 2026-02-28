@@ -1,6 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const connectDB = require('../config/db');
+const { connectDB } = require('../config/db');
 const User = require('../models/User');
 const Post = require('../models/Post');
 const CommunicationMessage = require('../models/CommunicationMessage');
@@ -10,6 +10,7 @@ const Meeting = require('../models/Meeting');
 const Inventory = require('../models/Inventory');
 const Event = require('../models/Event');
 const { isEncryptionEnabled } = require('../utils/fieldCrypto');
+const DRY_RUN = String(process.env.DRY_RUN || '').trim().toLowerCase() === 'true';
 
 const migrateModel = async (Model, name) => {
   let scanned = 0;
@@ -24,7 +25,9 @@ const migrateModel = async (Model, name) => {
     }
 
     if (!doc.isModified()) continue;
-    await doc.save({ validateBeforeSave: false });
+    if (!DRY_RUN) {
+      await doc.save({ validateBeforeSave: false });
+    }
     updated += 1;
 
     if (updated % 100 === 0) {
@@ -34,7 +37,7 @@ const migrateModel = async (Model, name) => {
   }
 
   // eslint-disable-next-line no-console
-  console.log(`[migration] ${name}: scanned ${scanned}, updated ${updated}`);
+  console.log(`[migration] ${name}: scanned ${scanned}, ${DRY_RUN ? 'would update' : 'updated'} ${updated}`);
 };
 
 const run = async () => {
@@ -55,11 +58,13 @@ const run = async () => {
   await migrateModel(Inventory, 'Inventory');
   await migrateModel(Event, 'Event');
 
-  await User.syncIndexes();
-  await Application.syncIndexes();
+  if (!DRY_RUN) {
+    await User.syncIndexes();
+    await Application.syncIndexes();
+  }
 
   // eslint-disable-next-line no-console
-  console.log('[migration] Encryption migration completed successfully.');
+  console.log(`[migration] Encryption migration ${DRY_RUN ? 'dry-run' : 'execution'} completed successfully.`);
 };
 
 run()

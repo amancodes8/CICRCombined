@@ -13,6 +13,8 @@ const {
   normalizeAlumniProfile,
   validateTenures,
 } = require('../utils/alumniProfile');
+const { env } = require('../config/env');
+const logger = require('../utils/logger');
 
 const AUTH_RECOVERY_SELECT =
   'name email collegeId password role warningCount hasUnreadWarning approvalStatus isVerified +emailHash +collegeIdHash';
@@ -261,9 +263,44 @@ const loginUser = async (req, res) => {
   if (user) {
     await repairIdentityHashesIfNeeded(user);
   }
-  if (!user || !(await user.matchPassword(password))) {
+
+  const nowMs = Date.now();
+  if (user?.lockUntil && new Date(user.lockUntil).getTime() > nowMs) {
+    const retryAfterSec = Math.max(1, Math.ceil((new Date(user.lockUntil).getTime() - nowMs) / 1000));
+    return res.status(423).json({
+      code: 'ACCOUNT_TEMP_LOCKED',
+      message: 'Account temporarily locked due to repeated failed logins.',
+      retryAfterSec,
+    });
+  }
+
+  const isPasswordCorrect = user ? await user.matchPassword(password) : false;
+  if (!user || !isPasswordCorrect) {
+    if (user) {
+      const nextAttempts = Number(user.failedLoginAttempts || 0) + 1;
+      const shouldLock = nextAttempts >= env.auth.maxFailedAttempts;
+      user.failedLoginAttempts = shouldLock ? 0 : nextAttempts;
+      user.lockUntil = shouldLock
+        ? new Date(Date.now() + env.auth.lockMinutes * 60 * 1000)
+        : null;
+      try {
+        await user.save({ validateBeforeSave: false });
+      } catch (error) {
+        logger.warn('auth_failed_attempt_persist_error', {
+          requestId: req.requestId,
+          userId: user._id ? String(user._id) : null,
+          error: error.message,
+        });
+      }
+    }
     return res.status(401).json({ code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' });
   }
+
+  user.failedLoginAttempts = 0;
+  user.lockUntil = null;
+  user.lastLoginAt = new Date();
+  user.lastLoginIp = String(req.ip || '').trim();
+  await user.save({ validateBeforeSave: false });
 
   const approval = String(user.approvalStatus || '').trim().toLowerCase();
 

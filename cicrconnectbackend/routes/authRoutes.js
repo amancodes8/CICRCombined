@@ -35,8 +35,19 @@ router.post(
   '/login',
   authLimiter,
   [
-    body('email').trim().notEmpty().withMessage('Email or College ID is required'),
-    body('password').notEmpty().withMessage('Password is required'),
+    body('email')
+      .isString()
+      .withMessage('Email or College ID is required')
+      .trim()
+      .notEmpty()
+      .withMessage('Email or College ID is required')
+      .isLength({ max: 160 })
+      .withMessage('Identifier is too long'),
+    body('password')
+      .isString()
+      .withMessage('Password is required')
+      .isLength({ min: 6, max: 160 })
+      .withMessage('Password is invalid'),
   ],
   validateRequest,
   loginUser

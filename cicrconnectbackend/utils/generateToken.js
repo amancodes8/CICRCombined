@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { env } = require('../config/env');
 
 /**
  * Generates a JSON Web Token for a given user ID.
@@ -8,8 +9,10 @@ const jwt = require('jsonwebtoken');
 const generateToken = (id) => {
     // This function signs the user's unique ID with your secret key from the .env file.
     // The token is set to expire in 30 days, after which the user will need to log in again.
-    return jwt.sign({ id }, process.env.JWT_SECRET, {
-        expiresIn: '30d',
+    return jwt.sign({ id }, env.jwt.secret, {
+        expiresIn: env.jwt.expiresIn,
+        issuer: env.jwt.issuer,
+        audience: env.jwt.audience,
     });
 };
 

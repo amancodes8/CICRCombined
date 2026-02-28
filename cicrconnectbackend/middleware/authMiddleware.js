@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { env } = require('../config/env');
+const logger = require('../utils/logger');
 
 /**
  * @desc Protect routes - ensures user is logged in with valid JWT
@@ -15,7 +17,10 @@ const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'Not authorized, invalid token' });
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, env.jwt.secret, {
+        issuer: env.jwt.issuer,
+        audience: env.jwt.audience,
+      });
       req.user = await User.findById(decoded.id).select('-password');
       
       if (!req.user) {
@@ -36,7 +41,11 @@ const protect = async (req, res, next) => {
 
       next();
     } catch (error) {
-      console.error("JWT Error:", error.message);
+      logger.warn('jwt_verify_failed', {
+        requestId: req.requestId,
+        error: error.message,
+        path: req.originalUrl,
+      });
       res.status(401).json({ message: 'Session expired or invalid' });
     }
   } else {

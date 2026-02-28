@@ -5,7 +5,7 @@ services:
     rootDir: cicrconnectbackend
     buildCommand: npm install
     startCommand: npm start
-    healthCheckPath: /api/health
+    healthCheckPath: /api/ready
     autoDeploy: true
 
   - type: web

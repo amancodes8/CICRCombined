@@ -9,12 +9,17 @@ jobs:
   ping-health:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping backend health endpoint
+      - name: Ping backend health and readiness endpoints
         env:
           CONFIGURED_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
+          CONFIGURED_READY_URL: ${{ secrets.BACKEND_READY_URL }}
           FALLBACK_HEALTH_URL: https://cicrcombined.onrender.com/api/health
+          FALLBACK_READY_URL: https://cicrcombined.onrender.com/api/ready
         run: |
           set -euo pipefail
-          TARGET_URL="${CONFIGURED_HEALTH_URL:-$FALLBACK_HEALTH_URL}"
-          echo "Pinging: ${TARGET_URL}"
-          curl --fail --silent --show-error --max-time 25 --retry 2 --retry-delay 3 "${TARGET_URL}" >/dev/null
+          HEALTH_URL="${CONFIGURED_HEALTH_URL:-$FALLBACK_HEALTH_URL}"
+          READY_URL="${CONFIGURED_READY_URL:-$FALLBACK_READY_URL}"
+          echo "Pinging health: ${HEALTH_URL}"
+          curl --fail --silent --show-error --max-time 25 --retry 2 --retry-delay 3 "${HEALTH_URL}" >/dev/null
+          echo "Pinging ready: ${READY_URL}"
+          curl --fail --silent --show-error --max-time 25 --retry 2 --retry-delay 3 "${READY_URL}" >/dev/null

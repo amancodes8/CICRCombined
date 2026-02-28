@@ -101,6 +101,10 @@ const UserSchema = new mongoose.Schema({
     verificationTokenExpires: Date,
     passwordResetOtp: String,
     passwordResetOtpExpires: Date,
+    failedLoginAttempts: { type: Number, default: 0, min: 0 },
+    lockUntil: { type: Date, default: null },
+    lastLoginAt: { type: Date, default: null },
+    lastLoginIp: { type: String, default: '' },
 
 }, { timestamps: true });
 
@@ -231,6 +235,7 @@ applyModelEncryption(UserSchema, {
         'alumniProfile.mentorshipAreas',
         'alumniProfile.notableProjects',
         'warnings.reason',
+        'lastLoginIp',
     ],
     hashes: [
         { source: 'email', target: 'emailHash', normalize: normalizeEmail },
