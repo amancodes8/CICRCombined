@@ -1,6 +1,6 @@
 # CICR Connect
 
-A full-stack web application for managing CICR (Community & Institutional Collaboration Resources) operations — including projects, events, meetings, members, inventory, learning resources, and more.
+A full-stack web application for managing CICR operations — including projects, events, meetings, members, inventory, learning resources, and more.
 
 ## Tech Stack
 
