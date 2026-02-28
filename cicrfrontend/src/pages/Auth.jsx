@@ -249,7 +249,7 @@ export default function Auth() {
   };
 
   return (
-    <div ref={containerRef} className="min-h-screen flex items-center justify-center bg-[#050505] p-6 relative overflow-hidden font-sans page-motion-c">
+    <div ref={containerRef} className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden font-sans page-motion-c auth-bg">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/55 to-black/75" />
 
@@ -259,11 +259,12 @@ export default function Auth() {
         animate={{ opacity: 1, scale: 1 }}
         className="relative w-full max-w-md z-10 section-motion section-motion-delay-1"
       >
-        <div className="relative bg-transparent p-10 rounded-[2.5rem] shadow-[0_30px_90px_rgba(0,0,0,0.6)] backdrop-blur-none">
+        <div className="relative p-10 rounded-[2.5rem] shadow-[0_30px_90px_rgba(0,0,0,0.8)] glass-strong">
           <header className="text-center mb-10">
             <motion.div 
-              initial={{ scale: 0 }} animate={{ scale: 1 }}
-              className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-600/40"
+              initial={{ scale: 0, rotate: -10 }} animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', damping: 15, stiffness: 200 }}
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 gradient-blue-purple-icon"
             >
               <Fingerprint className="text-white" size={32} />
             </motion.div>
@@ -402,7 +403,7 @@ export default function Auth() {
               whileTap={{ scale: 0.98 }}
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex justify-center items-center gap-2 shadow-xl shadow-blue-600/20 mt-8"
+              className="w-full text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex justify-center items-center gap-2 mt-8 gradient-blue-purple"
             >
               {loading ? (
                 <Loader2 className="animate-spin" />
@@ -463,7 +464,7 @@ function InputGroup({ icon: Icon, ...props }) {
       <input 
         required
         {...props}
-        className="w-full bg-[#08080a] border border-white/5 p-4 pl-12 rounded-2xl text-white text-sm outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all placeholder:text-gray-700"
+        className="w-full border border-white/8 p-4 pl-12 rounded-2xl text-white text-sm outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-600/10 transition-all placeholder:text-gray-600 glass"
       />
     </div>
   );

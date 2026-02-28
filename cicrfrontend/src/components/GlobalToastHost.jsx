@@ -12,18 +12,24 @@ const inferToastType = (message) => {
 const toastPalette = {
   error: {
     icon: AlertCircle,
-    wrapper: 'border-red-500/30 bg-red-500/10 text-red-200',
-    iconColor: 'text-red-300',
+    wrapper: 'border-red-500/25 text-red-200',
+    iconColor: 'text-red-400',
+    bg: 'rgba(127,29,29,0.55)',
+    glow: '0 0 20px rgba(239,68,68,0.15)',
   },
   success: {
     icon: CheckCircle2,
-    wrapper: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
-    iconColor: 'text-emerald-300',
+    wrapper: 'border-emerald-500/25 text-emerald-100',
+    iconColor: 'text-emerald-400',
+    bg: 'rgba(6,78,59,0.55)',
+    glow: '0 0 20px rgba(16,185,129,0.15)',
   },
   info: {
     icon: Info,
-    wrapper: 'border-cyan-400/30 bg-cyan-500/10 text-cyan-100',
-    iconColor: 'text-cyan-300',
+    wrapper: 'border-cyan-400/25 text-cyan-100',
+    iconColor: 'text-cyan-400',
+    bg: 'rgba(8,51,68,0.55)',
+    glow: '0 0 20px rgba(34,211,238,0.15)',
   },
 };
 
@@ -68,11 +74,12 @@ export default function GlobalToastHost() {
           return (
             <motion.div
               key={toast.id}
-              initial={{ opacity: 0, y: -10, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.97 }}
-              transition={{ duration: 0.2 }}
-              className={`pointer-events-auto rounded-xl border backdrop-blur-md px-3 py-2.5 shadow-xl ${palette.wrapper}`}
+              initial={{ opacity: 0, x: 40, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 40, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              className={`pointer-events-auto rounded-2xl border backdrop-blur-xl px-4 py-3 ${palette.wrapper}`}
+              style={{ background: palette.bg, boxShadow: `0 8px 32px rgba(0,0,0,0.4), ${palette.glow}` }}
             >
               <div className="flex items-start gap-2.5">
                 <Icon size={16} className={`mt-0.5 shrink-0 ${palette.iconColor}`} />

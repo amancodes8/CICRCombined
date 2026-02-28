@@ -618,3 +618,226 @@ a {
     transform: none;
   }
 }
+
+/* ========== GLASSMORPHISM UTILITIES ========== */
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* ========== GRADIENT TEXT UTILITIES ========== */
+.gradient-text-blue {
+  background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #38bdf8 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.gradient-text-cyan {
+  background: linear-gradient(135deg, #22d3ee 0%, #818cf8 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* ========== GLOW EFFECTS ========== */
+.glow-blue {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.35), 0 0 40px rgba(59, 130, 246, 0.15);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.3), 0 0 40px rgba(34, 211, 238, 0.1);
+}
+
+.glow-purple {
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), 0 0 40px rgba(168, 85, 247, 0.1);
+}
+
+/* ========== ANIMATED GRADIENT BORDER ========== */
+@keyframes borderRotate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.gradient-border {
+  position: relative;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(59,130,246,0.6), rgba(168,85,247,0.6), rgba(34,211,238,0.6));
+  background-size: 200% 200%;
+  animation: borderRotate 4s ease infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ========== SHIMMER ANIMATION ========== */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+/* ========== PULSE GLOW ========== */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(59, 130, 246, 0.3); }
+  50% { box-shadow: 0 0 24px rgba(59, 130, 246, 0.6), 0 0 48px rgba(59, 130, 246, 0.2); }
+}
+
+.pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+/* ========== MESH GRADIENT BACKGROUND ========== */
+.mesh-bg {
+  background: 
+    radial-gradient(ellipse at 0% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 0%, rgba(168, 85, 247, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 100%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
+    #07090d;
+}
+
+/* ========== CARD HOVER EFFECTS ========== */
+.card-hover {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              box-shadow 0.3s ease,
+              border-color 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 30px rgba(59, 130, 246, 0.1);
+  border-color: rgba(96, 165, 250, 0.4);
+}
+
+/* ========== FLOATING ANIMATION ========== */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+.float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* ========== SIDEBAR NAV ACTIVE GLOW ========== */
+.nav-active-glow {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(99, 102, 241, 0.15));
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* ========== STAT CARD ========== */
+.stat-card {
+  background: linear-gradient(145deg, rgba(12, 18, 30, 0.9), rgba(8, 12, 20, 0.8));
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 1.25rem;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.stat-card:hover {
+  border-color: rgba(96, 165, 250, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px rgba(59, 130, 246, 0.08);
+  transform: translateY(-2px);
+}
+
+/* ========== SCROLLBAR STYLING ========== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 14, 19, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5);
+}
+
+/* ========== REDUCED MOTION ========== */
+@media (prefers-reduced-motion: reduce) {
+  .gradient-border::before,
+  .shimmer::after,
+  .pulse-glow,
+  .float {
+    animation: none;
+  }
+  .card-hover:hover,
+  .stat-card:hover {
+    transform: none;
+  }
+}
+
+/* ========== AUTH PAGE ========== */
+.auth-bg {
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(168, 85, 247, 0.1) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 100%, rgba(34, 211, 238, 0.06) 0%, transparent 50%),
+    #050507;
+}
+
+/* ========== SIDEBAR ========== */
+.sidebar-bg {
+  background: linear-gradient(180deg, rgba(7, 9, 13, 0.98) 0%, rgba(10, 12, 18, 0.95) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.mobile-nav-bg {
+  background: rgba(7, 9, 13, 0.85);
+}
+
+/* ========== ICON LOGO GRADIENT ========== */
+.gradient-blue-purple {
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  box-shadow: 0 8px 32px rgba(37, 99, 235, 0.4);
+}
+
+.gradient-blue-purple-icon {
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  box-shadow: 0 8px 32px rgba(37, 99, 235, 0.5), 0 0 60px rgba(124, 58, 237, 0.2);
+}

@@ -126,10 +126,15 @@ export default App;
 
 function RouteLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#07090d]">
-      <div className="inline-flex items-center gap-3 text-xs uppercase tracking-[0.24em] text-blue-300 font-black">
-        <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-        Loading Workspace
+    <div className="min-h-screen flex items-center justify-center mesh-bg">
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative w-10 h-10">
+          <span className="absolute inset-0 rounded-full border-2 border-blue-500/30 animate-ping" />
+          <span className="absolute inset-1 rounded-full border-2 border-t-blue-400 border-r-purple-400 border-b-transparent border-l-transparent animate-spin" />
+        </div>
+        <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-blue-300 font-black">
+          Loading Workspace
+        </div>
       </div>
     </div>
   );
