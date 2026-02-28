@@ -488,6 +488,35 @@ export default function Layout() {
     return rows;
   }, [location.pathname]);
 
+  const navScrollRef = useRef(null);
+  const [scrollFade, setScrollFade] = useState({ top: false, bottom: false });
+
+  const handleNavScroll = useCallback(() => {
+    const el = navScrollRef.current;
+    if (!el) return;
+    setScrollFade({
+      top: el.scrollTop > 8,
+      bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 8,
+    });
+  }, []);
+
+  useEffect(() => {
+    const el = navScrollRef.current;
+    if (!el) return;
+    handleNavScroll();
+    el.addEventListener('scroll', handleNavScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleNavScroll);
+  }, [handleNavScroll]);
+
+  const navItemVariants = {
+    hidden: { opacity: 0, x: -12 },
+    visible: (i) => ({
+      opacity: 1,
+      x: 0,
+      transition: { delay: i * 0.04, duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+    }),
+  };
+
   const SidebarContent = () => (
     <>
       {/* Brand Logo */}
@@ -525,31 +554,46 @@ export default function Layout() {
         </Link>
       </motion.div>
 
-      <div className="relative mb-4 px-2">
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.12 }}
+        className="relative mb-4 px-2"
+      >
         <button
           type="button"
           onClick={openNotifications}
-          className="w-full inline-flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-800 text-gray-300 hover:border-blue-500/40 hover:text-white transition-colors"
+          className="w-full inline-flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-800 text-gray-300 hover:border-blue-500/40 hover:text-white transition-all duration-200 hover:bg-white/[0.02]"
         >
           <span className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.14em] font-black">
             <Bell size={14} className="text-blue-400" />
             Notifications
           </span>
           {unreadCount > 0 ? (
-            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-blue-500/20 text-[10px] text-blue-200 font-black">
+            <motion.span
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+              className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-blue-500/20 text-[10px] text-blue-200 font-black"
+            >
               {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
+            </motion.span>
           ) : (
             <span className="text-[10px] text-gray-500 uppercase tracking-widest">Clear</span>
           )}
         </button>
-      </div>
+      </motion.div>
 
-      <div className="mb-4 px-2">
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.18 }}
+        className="mb-4 px-2"
+      >
         <button
           type="button"
           onClick={openCommandPalette}
-          className="w-full inline-flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-800 text-gray-300 hover:border-blue-500/40 hover:text-white transition-colors"
+          className="w-full inline-flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-800 text-gray-300 hover:border-blue-500/40 hover:text-white transition-all duration-200 hover:bg-white/[0.02]"
         >
           <span className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.14em] font-black">
             <Search size={14} className="text-cyan-300" />
@@ -557,102 +601,141 @@ export default function Layout() {
           </span>
           <span className="text-[10px] uppercase tracking-widest text-gray-500">Ctrl/⌘ K</span>
         </button>
-      </div>
+      </motion.div>
       
       {/* Main Navigation */}
-      <nav className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2.5">
-        {navGroups.map((group) => {
-          if (!group.items.length) return null;
-          const open = !!openNavGroups[group.id];
-          const groupHasActive = group.items.some((item) => isRouteActive(item.path));
+      <div className={`sidebar-scroll-container flex-1 min-h-0${scrollFade.top ? ' fade-top' : ''}${scrollFade.bottom ? ' fade-bottom' : ''}`}>
+        <nav
+          ref={navScrollRef}
+          className="sidebar-scroll h-full overflow-y-auto pr-1 space-y-2.5"
+        >
+          {navGroups.map((group, groupIdx) => {
+            if (!group.items.length) return null;
+            const open = !!openNavGroups[group.id];
+            const groupHasActive = group.items.some((item) => isRouteActive(item.path));
 
-          return (
-            <section key={group.id} className="border border-gray-800/70 rounded-2xl overflow-hidden">
-              <button
-                type="button"
-                onClick={() =>
-                  setOpenNavGroups((prev) => ({
-                    ...prev,
-                    [group.id]: !prev[group.id],
-                  }))
-                }
-                className={`w-full px-3 py-2.5 inline-flex items-center justify-between transition-colors ${
-                  groupHasActive ? 'bg-blue-500/10 text-blue-100' : 'text-gray-300 hover:text-white hover:bg-gray-900/70'
-                }`}
+            return (
+              <motion.section
+                key={group.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, delay: 0.08 * groupIdx, ease: [0.22, 1, 0.36, 1] }}
+                className="border border-gray-800/70 rounded-2xl overflow-hidden"
               >
-                <span className="text-[10px] uppercase tracking-[0.16em] font-black">{group.label}</span>
-                <ChevronDown
-                  size={14}
-                  className={`transition-transform duration-300 ${open ? 'rotate-180 text-blue-300' : 'rotate-0 text-gray-500'}`}
-                />
-              </button>
-
-              <AnimatePresence initial={false}>
-                {open && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                    className="border-t border-gray-800/70"
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenNavGroups((prev) => ({
+                      ...prev,
+                      [group.id]: !prev[group.id],
+                    }))
+                  }
+                  className={`w-full px-3 py-2.5 inline-flex items-center justify-between transition-colors ${
+                    groupHasActive ? 'bg-blue-500/10 text-blue-100' : 'text-gray-300 hover:text-white hover:bg-gray-900/70'
+                  }`}
+                >
+                  <span className="text-[10px] uppercase tracking-[0.16em] font-black">{group.label}</span>
+                  <motion.span
+                    animate={{ rotate: open ? 180 : 0 }}
+                    transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                   >
-                    <div className="p-2 space-y-1.5">
-                      {group.items.map((link) => (
-                        <NavLink key={link.path} to={link.path} onClick={closeNavigationPanels}>
-                          <motion.div
-                            whileHover={{ x: 4 }}
-                            className={`flex items-center justify-between p-2.5 rounded-xl transition-colors ${
-                              isRouteActive(link.path)
-                                ? 'nav-active-glow text-white'
-                                : 'text-gray-400 hover:bg-white/5 hover:text-gray-100'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <link.icon size={18} />
-                              <span className="text-sm font-medium">{link.label}</span>
-                            </div>
-                            {link.path === '/communication' && hasUnreadChat && (
-                              <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" title="Unread messages" />
-                            )}
-                          </motion.div>
-                        </NavLink>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </section>
-          );
-        })}
-      </nav>
+                    <ChevronDown
+                      size={14}
+                      className={open ? 'text-blue-300' : 'text-gray-500'}
+                    />
+                  </motion.span>
+                </button>
 
-      {/* Footer Profile Section (This acts as the link to /profile) */}
-      <div className="mt-auto pt-6 border-t border-white/5 space-y-4">
-        <div className="group px-3 py-3 rounded-xl border border-white/8 bg-white/3 backdrop-blur-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-lg flex items-center justify-center text-blue-400 font-black overflow-hidden">
-              {user.avatarUrl && !sidebarAvatarFailed ? (
-                <img
-                  src={user.avatarUrl}
-                  alt={user.name || 'Member'}
-                  className="h-full w-full object-cover"
-                  onError={() => setSidebarAvatarFailed(true)}
-                />
-              ) : (
-                <span>{user.name?.[0] || 'M'}</span>
-              )}
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-sm font-bold truncate text-gray-100 flex items-center gap-2">
-                {user.name || 'Member'}
-                {user.hasUnreadWarning && <span className="inline-block w-2 h-2 bg-red-500 rounded-full" />}
-              </p>
-              <p className="text-[10px] text-blue-500 font-bold uppercase tracking-widest">{user.role || 'User'}</p>
+                <AnimatePresence initial={false}>
+                  {open && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                      className="border-t border-gray-800/70 overflow-hidden"
+                    >
+                      <div className="p-2 space-y-1.5">
+                        {group.items.map((link, linkIdx) => {
+                          const active = isRouteActive(link.path);
+                          return (
+                            <NavLink key={link.path} to={link.path} onClick={closeNavigationPanels}>
+                              <motion.div
+                                custom={linkIdx}
+                                variants={navItemVariants}
+                                initial="hidden"
+                                animate="visible"
+                                whileHover={{ x: 4, transition: { duration: 0.15 } }}
+                                className={`nav-item-hover flex items-center justify-between p-2.5 rounded-xl ${
+                                  active
+                                    ? 'nav-active-glow nav-active-indicator text-white'
+                                    : 'text-gray-400 hover:text-gray-100'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <motion.span
+                                    animate={active ? { scale: [1, 1.15, 1] } : {}}
+                                    transition={{ duration: 0.4 }}
+                                  >
+                                    <link.icon size={18} />
+                                  </motion.span>
+                                  <span className="text-sm font-medium">{link.label}</span>
+                                </div>
+                                {link.path === '/communication' && hasUnreadChat && (
+                                  <motion.span
+                                    animate={{ scale: [1, 1.2, 1] }}
+                                    transition={{ duration: 1.5, repeat: Infinity }}
+                                    className="inline-block w-2.5 h-2.5 rounded-full bg-red-500"
+                                    title="Unread messages"
+                                  />
+                                )}
+                              </motion.div>
+                            </NavLink>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.section>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Footer Profile Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.25 }}
+        className="mt-auto pt-6 border-t border-white/5 space-y-4"
+      >
+        <Link to="/profile" onClick={closeNavigationPanels}>
+          <div className="sidebar-profile-card group px-3 py-3 rounded-xl border border-white/8 bg-white/3 backdrop-blur-sm cursor-pointer">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-lg flex items-center justify-center text-blue-400 font-black overflow-hidden">
+                {user.avatarUrl && !sidebarAvatarFailed ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.name || 'Member'}
+                    className="h-full w-full object-cover"
+                    onError={() => setSidebarAvatarFailed(true)}
+                  />
+                ) : (
+                  <span>{user.name?.[0] || 'M'}</span>
+                )}
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-sm font-bold truncate text-gray-100 flex items-center gap-2">
+                  {user.name || 'Member'}
+                  {user.hasUnreadWarning && <span className="inline-block w-2 h-2 bg-red-500 rounded-full" />}
+                </p>
+                <p className="text-[10px] text-blue-500 font-bold uppercase tracking-widest">{user.role || 'User'}</p>
+              </div>
             </div>
           </div>
-        </div>
-
-      </div>
+        </Link>
+      </motion.div>
     </>
   );
 
@@ -696,9 +779,14 @@ export default function Layout() {
           >
             <Bell size={20} />
             {unreadCount > 0 ? (
-              <span className="absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full bg-blue-500/30 text-[9px] text-blue-100 font-black inline-flex items-center justify-center">
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                className="absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full bg-blue-500/30 text-[9px] text-blue-100 font-black inline-flex items-center justify-center"
+              >
                 {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
+              </motion.span>
             ) : null}
           </button>
           <button
@@ -709,8 +797,15 @@ export default function Layout() {
           >
             <Search size={20} />
           </button>
-          <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-gray-400 hover:text-white" aria-label="Toggle menu">
-            {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
+          <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 text-gray-400 hover:text-white transition-colors" aria-label="Toggle menu">
+            <motion.span
+              key={isMobileOpen ? 'close' : 'menu'}
+              initial={{ rotate: -90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              transition={{ duration: 0.2 }}
+            >
+              {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
+            </motion.span>
           </button>
         </div>
       </div>
@@ -721,13 +816,16 @@ export default function Layout() {
           <>
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
               onClick={() => setIsMobileOpen(false)}
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
             />
             <motion.aside 
-              initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 bottom-0 w-72 p-6 z-50 flex flex-col border-r border-white/5 lg:hidden sidebar-bg"
+              initial={{ x: '-100%', opacity: 0.5 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '-100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 260, mass: 0.8 }}
+              className="fixed top-0 left-0 bottom-0 w-72 p-6 z-50 flex flex-col border-r border-white/5 lg:hidden sidebar-bg overflow-hidden"
             >
               <SidebarContent />
             </motion.aside>
