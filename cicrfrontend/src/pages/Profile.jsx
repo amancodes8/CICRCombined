@@ -282,6 +282,16 @@ export default function Profile() {
     ]
   );
 
+  const checklistDone = useMemo(
+    () => profileChecklist.filter((item) => item.done).length,
+    [profileChecklist]
+  );
+
+  const profileUpdatedLabel = useMemo(
+    () => fmtDate(user.updatedAt || user.createdAt),
+    [user.createdAt, user.updatedAt]
+  );
+
   const socialItems = useMemo(
     () => [
       { key: 'linkedin', label: 'LinkedIn', icon: LinkIcon, raw: user.social?.linkedin || '' },
@@ -601,7 +611,12 @@ export default function Profile() {
 
   return (
     <div className="max-w-6xl mx-auto pb-10 md:pb-16 space-y-8 px-1 sm:px-0 page-motion-c">
-      <motion.section id="about" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="pt-2 section-motion section-motion-delay-1">
+      <motion.section
+        id="about"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="pt-2 section-motion section-motion-delay-1"
+      >
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
           <div className="flex items-start gap-3 sm:gap-4 min-w-0">
             <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-500 flex items-center justify-center text-2xl md:text-3xl font-black text-white shrink-0 shadow-lg shadow-cyan-500/20 overflow-hidden">
@@ -650,34 +665,54 @@ export default function Profile() {
           </div>
         </div>
 
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/35 bg-cyan-500/10 px-2.5 py-1 text-[11px] text-cyan-200">
+            <CheckCircle2 size={12} /> {completionScore}% complete
+          </span>
+          <span className="inline-flex items-center rounded-full border border-gray-700/80 px-2.5 py-1 text-[11px] text-gray-300">
+            Checklist {checklistDone}/{profileChecklist.length}
+          </span>
+          <span className="inline-flex items-center rounded-full border border-gray-700/80 px-2.5 py-1 text-[11px] text-gray-400">
+            Last updated {profileUpdatedLabel}
+          </span>
+        </div>
+
         <p className="mt-5 text-sm md:text-base text-gray-300 leading-relaxed max-w-4xl">
           {user.bio || 'Add a professional bio to highlight your CICR journey, role interests, and technical strengths.'}
         </p>
         <p className="mt-2 text-sm text-cyan-200 break-all">{publicProfileUrl || 'Public profile URL unavailable'}</p>
       </motion.section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-5 section-motion section-motion-delay-2">
-        <article className="xl:col-span-7 ui-surface-soft p-4 md:p-5">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 font-black">Section Jump Links</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {[
-              { id: 'about', label: 'About' },
-              { id: 'snapshot', label: 'Snapshot' },
-              ...(isAlumni ? [{ id: 'alumni', label: 'Alumni Portal' }] : []),
-              { id: 'skills', label: 'Skills' },
-              { id: 'achievements', label: 'Achievements' },
-              { id: 'security', label: 'Security' },
-            ].map((item) => (
-              <a key={item.id} href={`#${item.id}`} className="btn btn-ghost !w-auto !px-3 !py-1.5">
-                {item.label}
-              </a>
-            ))}
-          </div>
-        </article>
+      <section className="section-motion section-motion-delay-2 border-y border-gray-800/75 py-4">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 font-black">Section Jump Links</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {[
+            { id: 'about', label: 'About' },
+            { id: 'snapshot', label: 'Snapshot' },
+            ...(isAlumni ? [{ id: 'alumni', label: 'Alumni Portal' }] : []),
+            { id: 'skills', label: 'Skills' },
+            { id: 'achievements', label: 'Achievements' },
+            { id: 'security', label: 'Security' },
+          ].map((item) => (
+            <a key={item.id} href={`#${item.id}`} className="btn btn-ghost !w-auto !px-3 !py-1.5">
+              {item.label}
+            </a>
+          ))}
+        </div>
 
-        <article className="xl:col-span-5 ui-surface-soft p-4 md:p-5">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 font-black">Completion Checklist</p>
-          <div className="mt-3 space-y-2">
+        <div className="mt-4">
+          <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${completionScore}%` }}
+              transition={{ duration: 0.7, ease: 'easeOut' }}
+              className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
+            />
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            {checklistDone} of {profileChecklist.length} profile checkpoints completed.
+          </p>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
             {profileChecklist.map((item) => (
               <div key={item.id} className="flex items-center justify-between text-sm">
                 <span className={item.done ? 'text-gray-200' : 'text-gray-500'}>{item.label}</span>
@@ -687,7 +722,7 @@ export default function Profile() {
               </div>
             ))}
           </div>
-        </article>
+        </div>
       </section>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 section-motion section-motion-delay-2 pro-stagger">
@@ -697,7 +732,10 @@ export default function Profile() {
         <MetricCard label="Years in CICR" value={yearsInCicr(user.joinedAt)} helper={`Joined ${fmtDate(user.joinedAt)}`} />
       </section>
 
-      <section id="snapshot" className="grid grid-cols-1 xl:grid-cols-2 gap-8 section-motion section-motion-delay-2">
+      <section
+        id="snapshot"
+        className="grid grid-cols-1 xl:grid-cols-2 gap-8 section-motion section-motion-delay-2 border-y border-gray-800/70 py-6"
+      >
         <article>
           <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
             <Briefcase size={17} className="text-cyan-300" />
@@ -744,7 +782,10 @@ export default function Profile() {
       </section>
 
       {isAlumni && (
-        <section id="alumni" className="grid grid-cols-1 xl:grid-cols-12 gap-8 section-motion section-motion-delay-3">
+        <section
+          id="alumni"
+          className="grid grid-cols-1 xl:grid-cols-12 gap-8 section-motion section-motion-delay-3 border-y border-gray-800/70 py-6"
+        >
           <article className="xl:col-span-7">
             <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
               <Briefcase size={17} className="text-cyan-300" />
@@ -753,7 +794,7 @@ export default function Profile() {
             <div className="mt-3 space-y-2.5">
               {alumniTenures.length === 0 && <p className="text-sm text-gray-500">No tenure history added yet.</p>}
               {alumniTenures.map((tenure, idx) => (
-                <article key={`${tenure.position}-${idx}`} className="rounded-xl border border-gray-700/75 bg-[#0a0f16]/65 p-3">
+                <article key={`${tenure.position}-${idx}`} className="border-l-2 border-cyan-500/30 pl-3 py-1.5">
                   <p className="text-sm font-bold text-cyan-100">{tenure.position}</p>
                   <p className="text-xs text-gray-400 mt-1">
                     {tenure.fromYear || 'N/A'} - {tenure.toYear || 'N/A'}
@@ -788,13 +829,13 @@ export default function Profile() {
         </section>
       )}
 
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-8 section-motion section-motion-delay-3">
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-8 section-motion section-motion-delay-3 border-y border-gray-800/70 py-6">
         <article id="skills">
           <h2 className="profile-section-flow text-xl font-black inline-flex items-center gap-2">
             <Briefcase size={17} className="text-cyan-300" />
             Skills
           </h2>
-          <ul className="mt-3 space-y-1.5 text-sm">
+          <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-4 text-sm">
             {skills.length === 0 && <li className="text-gray-500">No skills added yet.</li>}
             {skills.map((skill) => (
               <li key={skill} className="text-cyan-100 inline-flex items-center gap-2">
@@ -810,7 +851,7 @@ export default function Profile() {
             <Award size={17} className="text-cyan-300" />
             Achievements
           </h2>
-          <ul className="mt-3 space-y-1.5 text-sm text-gray-200">
+          <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-4 text-sm text-gray-200">
             {achievements.length === 0 && <li className="text-gray-500">No achievements added yet.</li>}
             {achievements.map((item, idx) => (
               <li key={`${item}-${idx}`} className="inline-flex items-start gap-2">

@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CornerUpLeft, Loader2, MessageCircle, Send, Trash2, UserRound, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Circle,
+  CornerUpLeft,
+  Loader2,
+  MessageCircle,
+  Send,
+  Trash2,
+  UserRound,
+  X,
+} from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   createCommunicationMessage,
   createCommunicationStream,
@@ -10,45 +19,83 @@ import {
 } from '../api';
 import PageHeader from '../components/PageHeader';
 
-const fmtDayDateTime = (d) =>
-  new Date(d).toLocaleString([], { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const COMMUNICATION_CONVERSATION_ID = 'admin-stream';
+const getCommunicationSeenKey = (conversationId = COMMUNICATION_CONVERSATION_ID) =>
+  `communication_last_seen_at_${conversationId}`;
+
+const dayKey = (value) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return 'unknown';
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+};
+
+const timeLabel = (value) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '--:--';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const dayLabel = (value) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return 'Unknown date';
+
+  const now = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+
+  const isSame = (a, b) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+  if (isSame(d, now)) return 'Today';
+  if (isSame(d, yesterday)) return 'Yesterday';
+  return d.toLocaleDateString([], { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 const decorateMentions = (text) =>
-  text.split(/(@[a-zA-Z0-9._-]{3,40})/g).map((part, idx) =>
-    part.startsWith('@') ? (
-      <span key={idx} className="text-blue-400 font-semibold">{part}</span>
-    ) : (
-      <span key={idx}>{part}</span>
-    )
-  );
+  String(text || '')
+    .split(/(@[a-zA-Z0-9._-]{3,40})/g)
+    .map((part, idx) =>
+      part.startsWith('@') ? (
+        <span key={idx} className="text-blue-300 font-semibold">
+          {part}
+        </span>
+      ) : (
+        <span key={idx}>{part}</span>
+      )
+    );
 
 const userColor = (seed) => {
   const raw = String(seed || 'member');
   let hash = 0;
   for (let i = 0; i < raw.length; i += 1) hash = raw.charCodeAt(i) + ((hash << 5) - hash);
   const hue = Math.abs(hash) % 360;
-  return `hsl(${hue} 80% 65%)`;
+  return `hsl(${hue} 76% 68%)`;
 };
 
 const isGroupedMessage = (current, previous) => {
   if (!current || !previous) return false;
   if (String(current?.sender?._id || '') !== String(previous?.sender?._id || '')) return false;
   if (Boolean(current?.sender?.isAI) !== Boolean(previous?.sender?.isAI)) return false;
+  if (dayKey(current.createdAt) !== dayKey(previous.createdAt)) return false;
+
   const currentTs = new Date(current.createdAt).getTime();
   const previousTs = new Date(previous.createdAt).getTime();
   if (!Number.isFinite(currentTs) || !Number.isFinite(previousTs)) return false;
   return currentTs - previousTs <= 5 * 60 * 1000;
 };
 
-const COMMUNICATION_CONVERSATION_ID = 'admin-stream';
-const getCommunicationSeenKey = (conversationId = COMMUNICATION_CONVERSATION_ID) =>
-  `communication_last_seen_at_${conversationId}`;
-
 const markCommunicationRead = (timestamp = Date.now(), conversationId = COMMUNICATION_CONVERSATION_ID) => {
   localStorage.setItem(getCommunicationSeenKey(conversationId), String(timestamp));
-  // Keep legacy key for compatibility with existing clients.
   localStorage.setItem('communication_last_seen_at', String(timestamp));
   window.dispatchEvent(new Event('communication-read-updated'));
+};
+
+const dispatchToast = (message, type = 'info') => {
+  try {
+    window.dispatchEvent(new CustomEvent('app:toast', { detail: { message, type } }));
+  } catch {
+    window.alert(message);
+  }
 };
 
 export default function Communication() {
@@ -64,10 +111,11 @@ export default function Communication() {
   const [serverError, setServerError] = useState('');
   const [replyTarget, setReplyTarget] = useState(null);
   const [actionError, setActionError] = useState('');
+
   const endRef = useRef(null);
-  const swipeStartXRef = useRef({});
   const scrollContainerRef = useRef(null);
   const prependScrollSnapshotRef = useRef(null);
+  const swipeStartXRef = useRef({});
 
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const user = profile.result || profile;
@@ -81,6 +129,19 @@ export default function Communication() {
     [messages]
   );
 
+  const streamStats = useMemo(() => {
+    const uniqueUsers = new Set(
+      sortedMessages
+        .map((row) => String(row?.sender?._id || ''))
+        .filter(Boolean)
+    );
+
+    return {
+      totalMessages: sortedMessages.length,
+      participants: uniqueUsers.size,
+    };
+  }, [sortedMessages]);
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -88,10 +149,12 @@ export default function Communication() {
           limit: 80,
           conversationId: COMMUNICATION_CONVERSATION_ID,
         });
+
         const normalized = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
         setMessages(normalized);
         setHasMore(Boolean(data?.hasMore));
         setNextCursor(String(data?.nextCursor || ''));
+
         const latest = normalized[normalized.length - 1];
         markCommunicationRead(
           latest?.createdAt ? new Date(latest.createdAt).getTime() : Date.now(),
@@ -101,7 +164,7 @@ export default function Communication() {
       } catch (err) {
         const status = err?.response?.status;
         if (status === 404) {
-          setServerError('Communication API is not available on backend yet. Restart/deploy backend with latest routes.');
+          setServerError('Communication API is not available on backend yet. Deploy latest backend routes.');
         } else {
           setServerError(err?.response?.data?.message || 'Failed to load communication stream.');
         }
@@ -109,6 +172,7 @@ export default function Communication() {
         setLoading(false);
       }
     };
+
     load();
   }, []);
 
@@ -121,6 +185,7 @@ export default function Communication() {
       container.scrollTop += nextHeight - previousHeight;
       return;
     }
+
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [sortedMessages.length]);
 
@@ -136,10 +201,12 @@ export default function Communication() {
 
   useEffect(() => {
     const es = createCommunicationStream(COMMUNICATION_CONVERSATION_ID);
+
     const handler = (evt) => {
       try {
         const payload = JSON.parse(evt.data);
         if (payload?.conversationId && payload.conversationId !== COMMUNICATION_CONVERSATION_ID) return;
+
         setMessages((prev) => {
           if (prev.some((m) => m._id === payload._id)) return prev;
           markCommunicationRead(
@@ -149,22 +216,25 @@ export default function Communication() {
           return [...prev, payload];
         });
       } catch {
-        // ignore parse errors
+        // ignore malformed payload
       }
     };
+
     const deleteHandler = (evt) => {
       try {
         const payload = JSON.parse(evt.data);
         setMessages((prev) => prev.filter((m) => m._id !== payload._id));
       } catch {
-        // ignore parse errors
+        // ignore malformed payload
       }
     };
+
     es.addEventListener('new-message', handler);
     es.addEventListener('delete-message', deleteHandler);
     es.onerror = () => {
-      // Keep UI stable; SSE reconnect is automatic.
+      // SSE reconnect is automatic.
     };
+
     return () => es.close();
   }, []);
 
@@ -175,6 +245,7 @@ export default function Communication() {
       setMentionOptions([]);
       return;
     }
+
     const timer = setTimeout(async () => {
       try {
         const { data } = await fetchMentionCandidates(query);
@@ -183,6 +254,7 @@ export default function Communication() {
         setMentionOptions([]);
       }
     }, 180);
+
     return () => clearTimeout(timer);
   }, [text]);
 
@@ -201,6 +273,7 @@ export default function Communication() {
         before: nextCursor,
         conversationId: COMMUNICATION_CONVERSATION_ID,
       });
+
       const rows = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
       setMessages((prev) => {
         const existing = new Set(prev.map((row) => String(row._id)));
@@ -225,8 +298,10 @@ export default function Communication() {
   const send = async (e) => {
     e.preventDefault();
     if (!canSend) return;
+
     const body = text.trim();
     if (!body) return;
+
     setSending(true);
     try {
       const { data } = await createCommunicationMessage({
@@ -234,11 +309,13 @@ export default function Communication() {
         replyToId: replyTarget?._id,
         conversationId: COMMUNICATION_CONVERSATION_ID,
       });
+
       setMessages((prev) => (prev.some((m) => m._id === data._id) ? prev : [...prev, data]));
       markCommunicationRead(
         data?.createdAt ? new Date(data.createdAt).getTime() : Date.now(),
         COMMUNICATION_CONVERSATION_ID
       );
+
       setText('');
       setReplyTarget(null);
       setMentionOptions([]);
@@ -255,9 +332,9 @@ export default function Communication() {
     try {
       await deleteCommunicationMessage(id);
       setMessages((prev) => prev.filter((m) => m._id !== id));
+      dispatchToast('Message deleted.', 'success');
     } catch (err) {
       if (err?.response?.status === 404) {
-        // If already removed/expired, sync UI instead of blocking user with a hard error.
         setMessages((prev) => prev.filter((m) => m._id !== id));
       } else {
         setActionError(err.response?.data?.message || 'Unable to delete message');
@@ -274,8 +351,7 @@ export default function Communication() {
   const onBubbleTouchEnd = (msg, e) => {
     const start = swipeStartXRef.current[msg._id] || 0;
     const end = e.changedTouches?.[0]?.clientX || 0;
-    const delta = end - start;
-    if (delta > 55) {
+    if (end - start > 55) {
       setReplyTarget(msg);
     }
   };
@@ -293,139 +369,191 @@ export default function Communication() {
         <PageHeader
           eyebrow="Collab Stream"
           title="Admin Conversation Hub"
-          subtitle="Live team chat for CICR admin operations. Message retention follows server policy."
+          subtitle="Operational team chat with live sync, mentions, and moderation controls."
           icon={MessageCircle}
+          badge={
+            <>
+              <Circle size={8} className="text-emerald-300 fill-emerald-300" /> Live Stream
+            </>
+          }
         />
       </section>
 
-      <section className="flex flex-col h-[calc(100vh-190px)] md:h-[calc(100vh-180px)] min-h-[460px] section-motion section-motion-delay-2">
-        <h2 className="text-sm md:text-base font-black text-white inline-flex items-center gap-2 px-1">
-          <MessageCircle size={16} className="text-amber-400" /> Conversation
-        </h2>
-        {serverError && (
-          <div className="mt-3 bg-red-500/10 border border-red-500/30 text-red-300 text-xs md:text-sm rounded-xl p-3">
+      <section className="grid grid-cols-2 gap-3 section-motion section-motion-delay-2">
+        <Metric label="Messages" value={streamStats.totalMessages} hint="Conversation volume" />
+        <Metric label="Participants" value={streamStats.participants} hint="Active contributors" tone="blue" />
+      </section>
+
+      <section className="mt-4 flex flex-col h-[calc(100vh-250px)] md:h-[calc(100vh-235px)] min-h-[480px] section-motion section-motion-delay-2 border border-gray-800/80 rounded-2xl overflow-hidden">
+        <header className="px-4 py-3 border-b border-gray-800/80 flex items-center justify-between gap-3">
+          <h2 className="text-sm md:text-base font-semibold text-white inline-flex items-center gap-2">
+            <MessageCircle size={16} className="text-cyan-300" /> Conversation
+          </h2>
+          <p className="text-xs text-gray-500">Swipe right on mobile to reply</p>
+        </header>
+
+        {serverError ? (
+          <div className="mx-4 mt-3 rounded-xl border border-red-500/35 bg-red-500/10 px-3 py-2 text-xs text-red-200">
             {serverError}
           </div>
-        )}
+        ) : null}
+
         {loading ? (
           <div className="h-32 flex items-center justify-center flex-1">
             <Loader2 className="animate-spin text-blue-500" />
           </div>
         ) : (
-          <div ref={scrollContainerRef} className="mt-3 flex-1 min-h-0 overflow-y-auto pr-0.5 space-y-2.5 md:space-y-3">
-            {hasMore && (
-              <div className="flex justify-center">
+          <div
+            ref={scrollContainerRef}
+            className="mt-2 flex-1 min-h-0 overflow-y-auto px-2 md:px-3 space-y-1.5"
+          >
+            {hasMore ? (
+              <div className="flex justify-center py-2">
                 <button
                   type="button"
                   onClick={loadOlderMessages}
                   disabled={loadingMore}
-                  className="text-xs text-blue-300 hover:text-blue-200 disabled:opacity-60 inline-flex items-center gap-1.5 border border-blue-500/30 rounded-full px-3 py-1"
+                  className="btn btn-ghost !w-auto !px-3 !py-1.5"
                 >
                   {loadingMore ? <Loader2 size={12} className="animate-spin" /> : null}
                   {loadingMore ? 'Loading older...' : 'Load older messages'}
                 </button>
               </div>
-            )}
-            {sortedMessages.length === 0 && <p className="text-sm text-gray-500">No messages yet.</p>}
+            ) : null}
+
+            {sortedMessages.length === 0 ? (
+              <p className="text-sm text-gray-500 px-1 py-4">No messages yet.</p>
+            ) : null}
+
             <AnimatePresence initial={false}>
-              {sortedMessages.map((m, index) => {
-                const prev = sortedMessages[index - 1];
-                const grouped = isGroupedMessage(m, prev);
+              {sortedMessages.map((message, index) => {
+                const previous = sortedMessages[index - 1];
+                const grouped = isGroupedMessage(message, previous);
+                const own = String(message.sender?._id) === String(currentUserId);
+                const showDayDivider = dayKey(message.createdAt) !== dayKey(previous?.createdAt);
+                const canDelete =
+                  canModerate ||
+                  own ||
+                  (message.sender?.isAI &&
+                    String(message.replyTo?.senderCollegeId || '') === String(user?.collegeId || ''));
+
                 return (
-                <motion.div
-                  key={m._id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`flex ${String(m.sender?._id) === String(currentUserId) ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-3'}`}
-                >
-                  <motion.div
-                    whileHover={{ y: -1 }}
-                    onTouchStart={(e) => onBubbleTouchStart(m._id, e)}
-                    onTouchEnd={(e) => onBubbleTouchEnd(m, e)}
-                    className={`max-w-[94%] sm:max-w-[88%] md:max-w-[72%] rounded-2xl px-3 py-2.5 md:p-4 border shadow-sm ${
-                      String(m.sender?._id) === String(currentUserId)
-                        ? 'bg-blue-600/14 border-blue-500/25'
-                        : m.sender?.isAI
-                        ? 'bg-emerald-600/10 border-emerald-500/25'
-                        : 'bg-[#111217] border-gray-700/70'
-                    }`}
-                  >
-                    {!grouped ? (
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5 sm:gap-2 md:gap-3">
-                      <p className="text-xs md:text-sm text-gray-100 inline-flex items-center gap-1 min-w-0">
-                        <UserRound size={13} className={`${m.sender?.isAI ? 'text-emerald-400' : 'text-blue-400'} shrink-0 mt-[1px]`} />
-                        <span className="font-semibold break-all" style={{ color: userColor(m.sender?.collegeId || m.sender?.name) }}>
-                          {m.sender?.name || 'Member'}
+                  <div key={message._id}>
+                    {showDayDivider ? (
+                      <div className="py-3 flex items-center justify-center">
+                        <span className="text-[11px] uppercase tracking-[0.14em] text-gray-500 border border-gray-800/70 rounded-full px-3 py-1">
+                          {dayLabel(message.createdAt)}
                         </span>
-                        <span className="text-gray-500 break-all truncate">@{m.sender?.collegeId || 'N/A'}</span>
-                      </p>
-                      <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setReplyTarget(m)}
-                          className="inline-flex items-center justify-center w-6 h-6 rounded-md text-gray-500 hover:text-blue-300 hover:bg-blue-500/10 transition-colors"
-                          title="Reply to message"
-                          aria-label="Reply to message"
-                        >
-                          <CornerUpLeft size={13} />
-                        </button>
-                        <p className="text-[10px] md:text-xs text-gray-500">{fmtDayDateTime(m.createdAt)}</p>
-                        {(canModerate ||
-                          String(m.sender?._id) === String(currentUserId) ||
-                          (m.sender?.isAI && String(m.replyTo?.senderCollegeId || '') === String(user?.collegeId || ''))) && (
-                          <button
-                            type="button"
-                            onClick={() => removeMessage(m._id)}
-                            disabled={deletingId === m._id}
-                            className="text-gray-500 hover:text-red-400 disabled:opacity-50"
-                            title="Delete message"
-                          >
-                            {deletingId === m._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                          </button>
-                        )}
                       </div>
-                    </div>
-                    ) : (
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <p className="text-[10px] text-gray-500">{fmtDayDateTime(m.createdAt)}</p>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setReplyTarget(m)}
-                            className="inline-flex items-center justify-center w-6 h-6 rounded-md text-gray-500 hover:text-blue-300 hover:bg-blue-500/10 transition-colors"
-                            title="Reply to message"
-                            aria-label="Reply to message"
-                          >
-                            <CornerUpLeft size={13} />
-                          </button>
-                          {(canModerate ||
-                            String(m.sender?._id) === String(currentUserId) ||
-                            (m.sender?.isAI && String(m.replyTo?.senderCollegeId || '') === String(user?.collegeId || ''))) && (
+                    ) : null}
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className={`flex ${own ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-2.5'}`}
+                    >
+                      <motion.article
+                        whileHover={{ y: -1 }}
+                        onTouchStart={(e) => onBubbleTouchStart(message._id, e)}
+                        onTouchEnd={(e) => onBubbleTouchEnd(message, e)}
+                        className={`group max-w-[94%] sm:max-w-[88%] md:max-w-[74%] rounded-2xl px-3 py-2.5 border ${
+                          own
+                            ? 'bg-blue-600/14 border-blue-500/25'
+                            : message.sender?.isAI
+                            ? 'bg-emerald-600/10 border-emerald-500/25'
+                            : 'bg-[#0f1218] border-gray-700/75'
+                        }`}
+                      >
+                        {!grouped ? (
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs text-gray-100 inline-flex items-center gap-1.5 min-w-0">
+                              <UserRound
+                                size={13}
+                                className={`${message.sender?.isAI ? 'text-emerald-400' : 'text-blue-400'} shrink-0 mt-[1px]`}
+                              />
+                              <span
+                                className="font-semibold break-all"
+                                style={{ color: userColor(message.sender?.collegeId || message.sender?.name) }}
+                              >
+                                {message.sender?.name || 'Member'}
+                              </span>
+                              <span className="text-gray-500 truncate">@{message.sender?.collegeId || 'N/A'}</span>
+                            </p>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setReplyTarget(message)}
+                                className="opacity-90 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-gray-500 hover:text-blue-300"
+                                title="Reply"
+                              >
+                                <CornerUpLeft size={13} />
+                              </button>
+
+                              {canDelete ? (
+                                <button
+                                  type="button"
+                                  onClick={() => removeMessage(message._id)}
+                                  disabled={deletingId === message._id}
+                                  className="opacity-90 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-gray-500 hover:text-red-400 disabled:opacity-40"
+                                  title="Delete"
+                                >
+                                  {deletingId === message._id ? (
+                                    <Loader2 size={13} className="animate-spin" />
+                                  ) : (
+                                    <Trash2 size={13} />
+                                  )}
+                                </button>
+                              ) : null}
+
+                              <p className="text-[10px] text-gray-500">{timeLabel(message.createdAt)}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-1.5 mb-1">
                             <button
                               type="button"
-                              onClick={() => removeMessage(m._id)}
-                              disabled={deletingId === m._id}
-                              className="text-gray-500 hover:text-red-400 disabled:opacity-50"
-                              title="Delete message"
+                              onClick={() => setReplyTarget(message)}
+                              className="text-gray-500 hover:text-blue-300"
+                              title="Reply"
                             >
-                              {deletingId === m._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                              <CornerUpLeft size={12} />
                             </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {m.replyTo?.text && (
-                      <div className="mt-2 rounded-xl border border-gray-700/70 bg-black/25 px-2.5 py-1.5">
-                        <p className="text-[10px] text-blue-300 font-semibold">
-                          Reply to {m.replyTo.senderName} @{m.replyTo.senderCollegeId}
+                            {canDelete ? (
+                              <button
+                                type="button"
+                                onClick={() => removeMessage(message._id)}
+                                disabled={deletingId === message._id}
+                                className="text-gray-500 hover:text-red-400 disabled:opacity-40"
+                                title="Delete"
+                              >
+                                {deletingId === message._id ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <Trash2 size={12} />
+                                )}
+                              </button>
+                            ) : null}
+                            <p className="text-[10px] text-gray-500">{timeLabel(message.createdAt)}</p>
+                          </div>
+                        )}
+
+                        {message.replyTo?.text ? (
+                          <div className="mt-1.5 rounded-xl border border-gray-700/70 bg-black/25 px-2.5 py-1.5">
+                            <p className="text-[10px] text-blue-300 font-semibold">
+                              Reply to {message.replyTo.senderName} @{message.replyTo.senderCollegeId}
+                            </p>
+                            <p className="text-xs text-gray-400 line-clamp-2">{message.replyTo.text}</p>
+                          </div>
+                        ) : null}
+
+                        <p className="text-sm md:text-[15px] text-gray-200 mt-1.5 break-words leading-relaxed">
+                          {decorateMentions(message.text)}
                         </p>
-                        <p className="text-xs text-gray-400 line-clamp-2">{m.replyTo.text}</p>
-                      </div>
-                    )}
-                    <p className="text-sm md:text-[15px] text-gray-200 mt-1.5 md:mt-2 break-words">{decorateMentions(m.text)}</p>
-                  </motion.div>
-                </motion.div>
+                      </motion.article>
+                    </motion.div>
+                  </div>
                 );
               })}
             </AnimatePresence>
@@ -433,9 +561,9 @@ export default function Communication() {
           </div>
         )}
 
-        <div className="mt-2.5 md:mt-3 pt-2.5 border-t border-gray-800 sticky bottom-0 bg-[#0a0a0c]">
+        <footer className="border-t border-gray-800/80 bg-[#070b11] px-3 py-3 md:px-4 md:py-3">
           <form onSubmit={send} className="space-y-2">
-            {replyTarget && (
+            {replyTarget ? (
               <div className="bg-blue-600/10 border border-blue-500/30 rounded-xl px-3 py-2 flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[11px] text-blue-300 font-semibold">
@@ -453,47 +581,74 @@ export default function Communication() {
                   <X size={14} />
                 </button>
               </div>
-            )}
-            {actionError && (
+            ) : null}
+
+            {actionError ? (
               <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs rounded-xl px-3 py-2">
                 {actionError}
               </div>
-            )}
-            {mentionOptions.length > 0 && (
-              <div className="bg-[#0a0a0c] border border-gray-800 rounded-xl p-2 max-h-32 md:max-h-36 overflow-auto">
-                {mentionOptions.map((u) => (
+            ) : null}
+
+            {mentionOptions.length > 0 ? (
+              <div className="border border-gray-800/80 rounded-xl p-1.5 max-h-36 overflow-auto bg-[#0b1016]">
+                {mentionOptions.map((candidate) => (
                   <button
-                    key={u._id}
+                    key={candidate._id}
                     type="button"
-                    onClick={() => replaceCurrentMention(u.collegeId)}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-800 text-xs md:text-sm"
+                    onClick={() => replaceCurrentMention(candidate.collegeId)}
+                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-gray-800/70 text-xs md:text-sm"
                   >
-                    <span className="text-white">{u.name}</span>
-                    <span className="text-gray-500 ml-2">@{u.collegeId}</span>
+                    <span className="text-white">{candidate.name}</span>
+                    <span className="text-gray-500 ml-2">@{candidate.collegeId}</span>
                   </button>
                 ))}
               </div>
-            )}
+            ) : null}
+
             <div className="flex items-end gap-2">
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={onInputKeyDown}
                 rows={1}
-                placeholder={canSend ? 'Type a message... use @collegeId to tag' : 'Sign in to send messages'}
+                placeholder={canSend ? 'Type a message... use @collegeId to mention' : 'Sign in to send messages'}
                 disabled={!canSend || sending}
-                className="flex-1 resize-none bg-[#0f1015] border border-gray-700/80 rounded-2xl px-3 py-2.5 md:p-3 text-sm md:text-base text-white outline-none focus:border-blue-500 disabled:opacity-60 min-h-[42px] max-h-28 md:max-h-32 overflow-y-auto"
+                className="flex-1 resize-none bg-[#0f141b] border border-gray-700/80 rounded-2xl px-3 py-2.5 text-sm md:text-base text-white outline-none focus:border-blue-500 disabled:opacity-60 min-h-[42px] max-h-32 overflow-y-auto"
               />
+
               <button
                 disabled={!canSend || sending}
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-3.5 md:px-4 py-2.5 md:py-3 rounded-xl text-sm font-bold shrink-0 shadow-lg shadow-blue-600/25"
+                className="btn btn-primary !w-auto !px-4 !py-2.5"
+                title="Send"
               >
                 {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               </button>
             </div>
+
+            <div className="flex items-center justify-between gap-2 text-[11px] text-gray-500 px-1">
+              <p>Enter to send, Shift+Enter for newline.</p>
+              <p className={text.length > 1800 ? 'text-amber-300' : ''}>{text.length}/2000</p>
+            </div>
           </form>
-        </div>
+        </footer>
       </section>
     </div>
+  );
+}
+
+function Metric({ label, value, hint, tone = 'slate' }) {
+  const toneClass =
+    tone === 'blue'
+      ? 'border-blue-500/30'
+      : tone === 'emerald'
+      ? 'border-emerald-500/30'
+      : 'border-gray-700/70';
+
+  return (
+    <article className={`px-3 py-3 border-y ${toneClass}`}>
+      <p className="text-[11px] uppercase tracking-[0.14em] text-gray-500 font-semibold">{label}</p>
+      <p className="mt-1 text-2xl font-black text-white">{value}</p>
+      <p className="mt-1 text-xs text-gray-500">{hint}</p>
+    </article>
   );
 }
