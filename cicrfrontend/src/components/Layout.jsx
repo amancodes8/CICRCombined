@@ -81,13 +81,17 @@ export default function Layout() {
     [location.hash, location.pathname, location.search]
   );
 
+  const pageKey = useMemo(
+    () => normalizeRouteKey(location.pathname),
+    [location.pathname]
+  );
+
   useEffect(() => {
     routerPathRef.current = routeKey;
   }, [routeKey]);
 
   // Defensive sync: if the browser URL and router state drift apart, recover automatically.
   useEffect(() => {
-    let recoveryTimer = 0;
     const readBrowserPath = () =>
       normalizeRouteKey(`${window.location.pathname}${window.location.search}${window.location.hash}`);
 
@@ -103,22 +107,12 @@ export default function Layout() {
       if (mismatchCounterRef.current >= 2) {
         mismatchCounterRef.current = 0;
         navigate(browserPath, { replace: true });
-        // If router state is still stale after navigate, force a hard recovery.
-        window.clearTimeout(recoveryTimer);
-        recoveryTimer = window.setTimeout(() => {
-          const latestBrowserPath = readBrowserPath();
-          const latestRouterPath = routerPathRef.current;
-          if (latestBrowserPath !== latestRouterPath) {
-            window.location.replace(latestBrowserPath);
-          }
-        }, 220);
       }
     };
 
     const poll = window.setInterval(syncIfNeeded, 500);
     return () => {
       window.clearInterval(poll);
-      window.clearTimeout(recoveryTimer);
     };
   }, [navigate]);
 
@@ -903,7 +897,7 @@ export default function Layout() {
         
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
-            key={routeKey}
+            key={pageKey}
             initial={{ opacity: 0, y: 14, filter: 'blur(6px)' }}
             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
