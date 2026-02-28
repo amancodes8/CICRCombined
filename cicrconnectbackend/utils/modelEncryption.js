@@ -2,6 +2,7 @@ const {
   encryptString,
   decryptString,
   computeBlindIndex,
+  computeBlindIndexVariants,
   isEncryptedValue,
 } = require('./fieldCrypto');
 
@@ -28,6 +29,14 @@ const decryptDeep = (value) => {
   return decryptString(value);
 };
 
+const resolveHashSourceValue = (value) => {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string' && isEncryptedValue(value)) {
+    return decryptString(value);
+  }
+  return value;
+};
+
 const encryptPathOnDoc = (doc, path, force = false) => {
   const raw = getRawValue(doc, path);
   if (raw === null || raw === undefined || raw === '') return;
@@ -40,9 +49,9 @@ const encryptPathOnDoc = (doc, path, force = false) => {
 };
 
 const updateHashOnDoc = (doc, hashConfig, force = false) => {
-  const sourceRaw = getRawValue(doc, hashConfig.source);
+  const sourceRaw = doc.get(hashConfig.source, null, { getters: true, virtuals: false });
   if (!force && !doc.isNew && !doc.isModified(hashConfig.source)) return;
-  const blindIndex = computeBlindIndex(sourceRaw, hashConfig.normalize);
+  const blindIndex = computeBlindIndex(resolveHashSourceValue(sourceRaw), hashConfig.normalize);
   setValue(doc, hashConfig.target, blindIndex || undefined);
 };
 
@@ -65,17 +74,17 @@ const transformUpdatePayload = (update, encryptedPaths, hashConfigs) => {
   if (!update || Array.isArray(update)) return update;
   const next = { ...update };
 
+  for (const hashConfig of hashConfigs) {
+    const sourceValue = getUpdateValue(next, hashConfig.source);
+    if (sourceValue === undefined) continue;
+    const blindIndex = computeBlindIndex(resolveHashSourceValue(sourceValue), hashConfig.normalize);
+    setUpdateValue(next, hashConfig.target, blindIndex || undefined);
+  }
+
   for (const path of encryptedPaths) {
     const current = getUpdateValue(next, path);
     if (current === undefined || current === null || current === '') continue;
     setUpdateValue(next, path, encryptDeep(current));
-  }
-
-  for (const hashConfig of hashConfigs) {
-    const sourceValue = getUpdateValue(next, hashConfig.source);
-    if (sourceValue === undefined) continue;
-    const blindIndex = computeBlindIndex(sourceValue, hashConfig.normalize);
-    setUpdateValue(next, hashConfig.target, blindIndex || undefined);
   }
 
   return next;
@@ -95,11 +104,11 @@ const applyModelEncryption = (schema, config = {}) => {
   schema.set('toObject', { getters: true, virtuals: false });
 
   schema.pre('save', function onSave(next) {
-    for (const path of encryptedPaths) {
-      encryptPathOnDoc(this, path);
-    }
     for (const hashConfig of hashConfigs) {
       updateHashOnDoc(this, hashConfig);
+    }
+    for (const path of encryptedPaths) {
+      encryptPathOnDoc(this, path);
     }
     next();
   });
@@ -118,14 +127,6 @@ const applyModelEncryption = (schema, config = {}) => {
   schema.pre('updateMany', updateMiddleware);
 
   schema.methods.encryptLegacyConfiguredFields = function encryptLegacyConfiguredFields() {
-    for (const path of encryptedPaths) {
-      const before = getRawValue(this, path);
-      encryptPathOnDoc(this, path, true);
-      const after = getRawValue(this, path);
-      if (JSON.stringify(before) !== JSON.stringify(after)) {
-        this.markModified(path);
-      }
-    }
     for (const hashConfig of hashConfigs) {
       const before = getRawValue(this, hashConfig.target);
       updateHashOnDoc(this, hashConfig, true);
@@ -134,11 +135,21 @@ const applyModelEncryption = (schema, config = {}) => {
         this.markModified(hashConfig.target);
       }
     }
+    for (const path of encryptedPaths) {
+      const before = getRawValue(this, path);
+      encryptPathOnDoc(this, path, true);
+      const after = getRawValue(this, path);
+      if (JSON.stringify(before) !== JSON.stringify(after)) {
+        this.markModified(path);
+      }
+    }
   };
 
   schema.statics.encryptForStorage = (value) => encryptString(value);
   schema.statics.decryptFromStorage = (value) => decryptString(value);
   schema.statics.computeBlindIndex = (value, normalize) => computeBlindIndex(value, normalize);
+  schema.statics.computeBlindIndexVariants = (value, normalize) =>
+    computeBlindIndexVariants(value, normalize);
 };
 
 module.exports = { applyModelEncryption };

@@ -58,12 +58,16 @@ const registerUser = async (req, res) => {
     return res.status(400).json({ message: 'All fields required' });
   }
 
-  const emailHash = User.computeBlindIndex(normalizedEmail, normalizeEmail);
-  const collegeIdHash = User.computeBlindIndex(normalizedCollegeId, normalizeCollegeId);
+  const emailHashes = typeof User.computeBlindIndexVariants === 'function'
+    ? User.computeBlindIndexVariants(normalizedEmail, normalizeEmail)
+    : [User.computeBlindIndex(normalizedEmail, normalizeEmail)].filter(Boolean);
+  const collegeIdHashes = typeof User.computeBlindIndexVariants === 'function'
+    ? User.computeBlindIndexVariants(normalizedCollegeId, normalizeCollegeId)
+    : [User.computeBlindIndex(normalizedCollegeId, normalizeCollegeId)].filter(Boolean);
   const userExists = await User.findOne({
     $or: [
-      ...(emailHash ? [{ emailHash }] : []),
-      ...(collegeIdHash ? [{ collegeIdHash }] : []),
+      ...(emailHashes.length ? [{ emailHash: { $in: emailHashes } }] : []),
+      ...(collegeIdHashes.length ? [{ collegeIdHash: { $in: collegeIdHashes } }] : []),
       { email: normalizedEmail },
       { collegeId: normalizedCollegeId },
     ],

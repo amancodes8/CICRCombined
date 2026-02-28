@@ -39,9 +39,16 @@ const createApplication = async (req, res) => {
     const parsedYear = Number(req.body.year);
     const year = Number.isFinite(parsedYear) ? parsedYear : null;
 
+    const emailHashes = typeof Application.computeBlindIndexVariants === 'function'
+      ? Application.computeBlindIndexVariants(email, normalizeEmail)
+      : [Application.computeBlindIndex(email, normalizeEmail)].filter(Boolean);
+
     const existing = await Application.findOne({
-      emailHash: Application.computeBlindIndex(email, normalizeEmail),
       status: { $ne: 'Rejected' },
+      $or: [
+        ...(emailHashes.length ? [{ emailHash: { $in: emailHashes } }] : []),
+        ...(email ? [{ email }] : []),
+      ],
     }).sort({ createdAt: -1 });
 
     if (existing) {

@@ -138,9 +138,11 @@ UserSchema.methods.createVerificationToken = function() {
 
 UserSchema.statics.findOneByEmail = function(email) {
     const normalizedEmail = normalizeEmail(email);
-    const emailHash = this.computeBlindIndex(normalizedEmail, normalizeEmail);
+    const emailHashes = typeof this.computeBlindIndexVariants === 'function'
+        ? this.computeBlindIndexVariants(normalizedEmail, normalizeEmail)
+        : [this.computeBlindIndex(normalizedEmail, normalizeEmail)].filter(Boolean);
     const or = [];
-    if (emailHash) or.push({ emailHash });
+    if (emailHashes.length) or.push({ emailHash: { $in: emailHashes } });
     if (normalizedEmail) or.push({ email: normalizedEmail });
     if (!or.length) return this.findOne({ _id: null });
     return this.findOne({ $or: or });
@@ -148,9 +150,11 @@ UserSchema.statics.findOneByEmail = function(email) {
 
 UserSchema.statics.findOneByCollegeId = function(collegeId) {
     const normalizedCollegeId = normalizeCollegeId(collegeId);
-    const collegeIdHash = this.computeBlindIndex(normalizedCollegeId, normalizeCollegeId);
+    const collegeIdHashes = typeof this.computeBlindIndexVariants === 'function'
+        ? this.computeBlindIndexVariants(normalizedCollegeId, normalizeCollegeId)
+        : [this.computeBlindIndex(normalizedCollegeId, normalizeCollegeId)].filter(Boolean);
     const or = [];
-    if (collegeIdHash) or.push({ collegeIdHash });
+    if (collegeIdHashes.length) or.push({ collegeIdHash: { $in: collegeIdHashes } });
     if (normalizedCollegeId) or.push({ collegeId: normalizedCollegeId });
     if (!or.length) return this.findOne({ _id: null });
     return this.findOne({ $or: or });
@@ -159,14 +163,24 @@ UserSchema.statics.findOneByCollegeId = function(collegeId) {
 UserSchema.statics.findOneByEmailAndCollegeId = function(email, collegeId) {
     const normalizedEmail = normalizeEmail(email);
     const normalizedCollegeId = normalizeCollegeId(collegeId);
-    const emailHash = this.computeBlindIndex(normalizedEmail, normalizeEmail);
-    const collegeIdHash = this.computeBlindIndex(normalizedCollegeId, normalizeCollegeId);
+    const emailHashes = typeof this.computeBlindIndexVariants === 'function'
+        ? this.computeBlindIndexVariants(normalizedEmail, normalizeEmail)
+        : [this.computeBlindIndex(normalizedEmail, normalizeEmail)].filter(Boolean);
+    const collegeIdHashes = typeof this.computeBlindIndexVariants === 'function'
+        ? this.computeBlindIndexVariants(normalizedCollegeId, normalizeCollegeId)
+        : [this.computeBlindIndex(normalizedCollegeId, normalizeCollegeId)].filter(Boolean);
 
     const or = [];
-    if (emailHash && collegeIdHash) or.push({ emailHash, collegeIdHash });
+    if (emailHashes.length && collegeIdHashes.length) {
+        or.push({ emailHash: { $in: emailHashes }, collegeIdHash: { $in: collegeIdHashes } });
+    }
     if (normalizedEmail && normalizedCollegeId) or.push({ email: normalizedEmail, collegeId: normalizedCollegeId });
-    if (emailHash && normalizedCollegeId) or.push({ emailHash, collegeId: normalizedCollegeId });
-    if (normalizedEmail && collegeIdHash) or.push({ email: normalizedEmail, collegeIdHash });
+    if (emailHashes.length && normalizedCollegeId) {
+        or.push({ emailHash: { $in: emailHashes }, collegeId: normalizedCollegeId });
+    }
+    if (normalizedEmail && collegeIdHashes.length) {
+        or.push({ email: normalizedEmail, collegeIdHash: { $in: collegeIdHashes } });
+    }
 
     if (!or.length) return this.findOne({ _id: null });
     return this.findOne({ $or: or });
@@ -176,9 +190,15 @@ UserSchema.statics.findByCollegeIds = function(collegeIds = []) {
     const ids = Array.isArray(collegeIds)
         ? collegeIds.map((id) => normalizeCollegeId(id)).filter(Boolean)
         : [];
-    const hashes = ids
-        .map((id) => this.computeBlindIndex(id, normalizeCollegeId))
-        .filter(Boolean);
+    const hashes = Array.from(
+        new Set(
+            ids.flatMap((id) => (
+                typeof this.computeBlindIndexVariants === 'function'
+                    ? this.computeBlindIndexVariants(id, normalizeCollegeId)
+                    : [this.computeBlindIndex(id, normalizeCollegeId)].filter(Boolean)
+            ))
+        )
+    );
     if (hashes.length === 0 && ids.length === 0) return this.find({ _id: { $in: [] } });
 
     const or = [];

@@ -59,9 +59,11 @@ ApplicationSchema.index({ emailHash: 1, createdAt: -1 });
 
 ApplicationSchema.statics.findOneByEmail = function(email) {
   const normalizedEmail = normalizeEmail(email);
-  const emailHash = this.computeBlindIndex(normalizedEmail, normalizeEmail);
+  const emailHashes = typeof this.computeBlindIndexVariants === 'function'
+    ? this.computeBlindIndexVariants(normalizedEmail, normalizeEmail)
+    : [this.computeBlindIndex(normalizedEmail, normalizeEmail)].filter(Boolean);
   const or = [];
-  if (emailHash) or.push({ emailHash });
+  if (emailHashes.length) or.push({ emailHash: { $in: emailHashes } });
   if (normalizedEmail) or.push({ email: normalizedEmail });
   if (!or.length) return this.findOne({ _id: null });
   return this.findOne({ $or: or });
