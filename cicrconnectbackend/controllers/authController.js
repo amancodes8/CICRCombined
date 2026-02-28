@@ -4,14 +4,15 @@ const generateToken = require('../utils/generateToken');
 const sendEmail = require('../utils/sendEmail');
 const crypto = require('crypto');
 const {
+  normalizeEmail,
+  normalizeCollegeId,
+} = require('../utils/fieldCrypto');
+const {
   YEAR_MIN,
   YEAR_MAX,
   normalizeAlumniProfile,
   validateTenures,
 } = require('../utils/alumniProfile');
-
-const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
-const normalizeCollegeId = (value) => String(value || '').trim().toUpperCase();
 
 const normalizeHandle = (value) => {
   if (!value) return '';
@@ -57,7 +58,11 @@ const registerUser = async (req, res) => {
     return res.status(400).json({ message: 'All fields required' });
   }
 
-  const userExists = await User.findOne({ $or: [{ email: normalizedEmail }, { collegeId: normalizedCollegeId }] });
+  const emailHash = User.computeBlindIndex(normalizedEmail, normalizeEmail);
+  const collegeIdHash = User.computeBlindIndex(normalizedCollegeId, normalizeCollegeId);
+  const userExists = await User.findOne({
+    $or: [{ emailHash }, { collegeIdHash }],
+  });
   if (userExists) {
     return res.status(400).json({ message: 'User already exists' });
   }
@@ -158,7 +163,7 @@ const loginUser = async (req, res) => {
   const { email, password } = req.body;
   const normalizedEmail = normalizeEmail(email);
 
-  const user = await User.findOne({ email: normalizedEmail });
+  const user = await User.findOneByEmail(normalizedEmail);
   if (!user || !(await user.matchPassword(password))) {
     return res.status(401).json({ message: 'Invalid credentials' });
   }
@@ -206,8 +211,9 @@ const resetPasswordWithCode = async (req, res) => {
 
   const hashedCode = crypto.createHash('sha256').update(String(resetCode)).digest('hex');
 
+  const collegeIdHash = User.computeBlindIndex(normalizedCollegeId, normalizeCollegeId);
   const user = await User.findOne({
-    collegeId: normalizedCollegeId,
+    collegeIdHash,
     passwordResetOtp: hashedCode,
     passwordResetOtpExpires: { $gt: Date.now() },
   });
@@ -265,7 +271,7 @@ const sendPasswordResetOtp = async (req, res) => {
     return res.status(400).json({ message: 'Email and college ID are required' });
   }
 
-  const user = await User.findOne({ email: normalizedEmail, collegeId: normalizedCollegeId });
+  const user = await User.findOneByEmailAndCollegeId(normalizedEmail, normalizedCollegeId);
   if (!user) {
     return res.status(404).json({ success: false, message: 'User not found with provided email and college ID' });
   }
@@ -306,8 +312,8 @@ const resetPasswordWithOtp = async (req, res) => {
   const hashedOtp = crypto.createHash('sha256').update(String(otp)).digest('hex');
 
   const user = await User.findOne({
-    email: normalizedEmail,
-    collegeId: normalizedCollegeId,
+    emailHash: User.computeBlindIndex(normalizedEmail, normalizeEmail),
+    collegeIdHash: User.computeBlindIndex(normalizedCollegeId, normalizeCollegeId),
     passwordResetOtp: hashedOtp,
     passwordResetOtpExpires: { $gt: Date.now() },
   });

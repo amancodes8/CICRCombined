@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { applyModelEncryption } = require('../utils/modelEncryption');
 
 const inventorySchema = new mongoose.Schema({
   itemName: { type: String, required: true },
@@ -13,5 +14,9 @@ const inventorySchema = new mongoose.Schema({
     issueDate: { type: Date, default: Date.now }
   }]
 }, { timestamps: true });
+
+applyModelEncryption(inventorySchema, {
+  encryptedPaths: ['itemName', 'category', 'location', 'issuedTo.project'],
+});
 
 module.exports = mongoose.model('Inventory', inventorySchema);

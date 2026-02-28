@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { applyModelEncryption } = require('../utils/modelEncryption');
 
 const CommunicationMessageSchema = new mongoose.Schema(
   {
@@ -52,5 +53,17 @@ CommunicationMessageSchema.index(
   { expireAfterSeconds: Math.round(60 * 60 * 24 * retentionDays) }
 );
 CommunicationMessageSchema.index({ conversationId: 1, createdAt: -1 });
+
+applyModelEncryption(CommunicationMessageSchema, {
+  encryptedPaths: [
+    'text',
+    'senderMeta.name',
+    'senderMeta.collegeId',
+    'senderMeta.role',
+    'replyTo.text',
+    'replyTo.senderName',
+    'replyTo.senderCollegeId',
+  ],
+});
 
 module.exports = mongoose.model('CommunicationMessage', CommunicationMessageSchema);

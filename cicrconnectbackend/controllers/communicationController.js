@@ -4,6 +4,7 @@ const Project = require('../models/Project');
 const mongoose = require('mongoose');
 const { geminiGenerate } = require('../utils/geminiClient');
 const { createNotifications } = require('../utils/notificationService');
+const { normalizeCollegeId } = require('../utils/fieldCrypto');
 
 const sseClients = new Map();
 const userLastMessageAt = new Map();
@@ -11,7 +12,6 @@ const AI_MENTION_TOKEN = '@cicrai';
 const DEFAULT_CONVERSATION_ID = 'admin-stream';
 const DOMAIN_SCOPE_HINT =
   'You must answer only CICR-related topics and technology domains: robotics, programming, software, hardware, AI/ML, cybersecurity, IoT, embedded, electronics, networking, product building, and project workflows. If question is outside this scope or nonsense, refuse briefly and ask a relevant CICR/tech question instead.';
-const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const CONVERSATION_ID_REGEX = /^[a-zA-Z0-9:_-]{2,80}$/;
 const sanitizeConversationId = (value) => {
   const normalized = String(value || '').trim();
@@ -123,7 +123,7 @@ const parseMentionCollegeIds = (text) => {
   const ids = new Set();
   const matches = String(text).match(/@([a-zA-Z0-9._-]{3,40})/g) || [];
   for (const token of matches) {
-    ids.add(token.slice(1));
+    ids.add(normalizeCollegeId(token.slice(1)));
   }
   return Array.from(ids);
 };
@@ -151,8 +151,7 @@ const queueAiReply = async (message) => {
     const recent = await CommunicationMessage.find(buildConversationFilter(conversationId))
       .sort({ createdAt: -1 })
       .limit(12)
-      .populate('sender', 'name collegeId role')
-      .lean();
+      .populate('sender', 'name collegeId role');
     const projects = await Project.find({})
       .sort({ updatedAt: -1 })
       .limit(10)
@@ -252,8 +251,7 @@ const listMessages = async (req, res) => {
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1)
     .populate('sender', 'name collegeId role')
-    .populate('mentions', 'name collegeId')
-    .lean();
+    .populate('mentions', 'name collegeId');
 
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
@@ -321,7 +319,7 @@ const createMessage = async (req, res) => {
 
   const mentionCollegeIds = parseMentionCollegeIds(text);
   const mentionUsers = mentionCollegeIds.length
-    ? await User.find({ collegeId: { $in: mentionCollegeIds } }).select('_id role')
+    ? await User.findByCollegeIds(mentionCollegeIds).select('_id role')
     : [];
 
   let replyTo = undefined;
@@ -330,8 +328,7 @@ const createMessage = async (req, res) => {
       _id: req.body.replyToId,
       ...buildConversationFilter(conversationId),
     })
-      .populate('sender', 'name collegeId')
-      .lean();
+      .populate('sender', 'name collegeId');
     if (parent) {
       replyTo = {
         messageId: parent._id,
@@ -385,29 +382,36 @@ const createMessage = async (req, res) => {
 };
 
 const listMentionCandidates = async (req, res) => {
-  const q = String(req.query.q || '').trim();
-  const safeQuery = escapeRegex(q);
-  const filter = q
-    ? {
-        $or: [
-          { collegeId: { $regex: safeQuery, $options: 'i' } },
-          { name: { $regex: safeQuery, $options: 'i' } },
-        ],
-      }
-    : {};
-
-  const users = await User.find(filter)
+  const q = String(req.query.q || '').trim().toLowerCase();
+  const users = await User.find({
+    $or: [{ approvalStatus: 'Approved' }, { isVerified: true }],
+  })
     .select('name collegeId role')
-    .sort({ name: 1 })
-    .limit(20)
-    .lean();
+    .sort({ createdAt: -1 })
+    .limit(600);
+
+  const filteredUsers = users
+    .filter((row) => {
+      if (!q) return true;
+      const name = String(row.name || '').toLowerCase();
+      const collegeId = String(row.collegeId || '').toLowerCase();
+      return name.includes(q) || collegeId.includes(q);
+    })
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+    .slice(0, 20)
+    .map((row) => ({
+      _id: row._id,
+      name: row.name,
+      collegeId: row.collegeId,
+      role: row.role,
+    }));
 
   const aiCandidate =
     !q || 'cicrai'.includes(q.toLowerCase())
       ? [{ _id: 'cicrai-bot', name: 'CICR AI', collegeId: 'cicrai', role: 'Assistant' }]
       : [];
 
-  res.json([...aiCandidate, ...users]);
+  res.json([...aiCandidate, ...filteredUsers]);
 };
 
 const deleteMessage = async (req, res) => {

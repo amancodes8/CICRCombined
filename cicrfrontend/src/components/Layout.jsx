@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Users, FolderKanban, 
   Calendar, ShieldCheck, FileText, UserSquare2,
-  Package, Menu, X, Radio, Sparkles, Bell, GitBranchPlus, Search, PlusCircle, Bug, CalendarPlus, BookOpenCheck, PanelsTopLeft, ChevronDown
+  Package, Menu, X, Radio, Sparkles, Bell, GitBranchPlus, Search, PlusCircle, Bug, CalendarPlus, BookOpenCheck, PanelsTopLeft, ChevronDown, BadgeCheck, TriangleAlert
 } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -738,6 +738,37 @@ export default function Layout() {
       <main className="flex-1 lg:ml-64 p-4 md:p-8 pt-24 lg:pt-8 min-h-screen relative overflow-x-hidden">
         {/* Aesthetic Background Glow */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] rounded-full -z-10 pointer-events-none" />
+
+        {(() => {
+          const missing = [];
+          const isAlumni = String(user?.role || '').toLowerCase() === 'alumni';
+          if (!String(user?.branch || '').trim()) missing.push('Branch');
+          if (!String(user?.batch || '').trim()) missing.push('Batch');
+          if (isAlumni) {
+            if (!Number.isFinite(Number(user?.alumniProfile?.graduationYear))) {
+              missing.push('Graduation Year');
+            }
+          } else if (!Number.isFinite(Number(user?.year)) || Number(user?.year) <= 0) {
+            missing.push('Year');
+          }
+          if (!String(user?.phone || '').trim()) missing.push('Phone');
+          const complete = missing.length === 0;
+
+          return (
+            <div
+              className={`mb-4 md:mb-5 rounded-xl border px-3 py-2.5 text-xs md:text-sm inline-flex items-center gap-2 ${
+                complete
+                  ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-200'
+                  : 'border-amber-500/35 bg-amber-500/10 text-amber-200'
+              }`}
+            >
+              {complete ? <BadgeCheck size={14} /> : <TriangleAlert size={14} />}
+              {complete
+                ? 'Profile essentials complete.'
+                : `Complete your profile: add ${missing.join(', ')}.`}
+            </div>
+          );
+        })()}
 
         <div className="mb-4 md:mb-6 flex items-center justify-between gap-3">
           <nav className="inline-flex items-center flex-wrap gap-2 text-[10px] md:text-xs uppercase tracking-widest text-gray-500">

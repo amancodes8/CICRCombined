@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto'); // Built-in Node module for token generation
+const { applyModelEncryption } = require('../utils/modelEncryption');
+const {
+    normalizeEmail,
+    normalizeCollegeId,
+    normalizePhone,
+} = require('../utils/fieldCrypto');
 
 const AlumniTenureSchema = new mongoose.Schema(
     {
@@ -32,19 +38,21 @@ const AlumniProfileSchema = new mongoose.Schema(
 
 const UserSchema = new mongoose.Schema({
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true },
+    emailHash: { type: String, unique: true, index: true, sparse: true, select: false },
     collegeId: {
         type: String,
         required: [true, 'Please add a college ID'],
-        unique: true,
         trim: true,
     },
+    collegeIdHash: { type: String, unique: true, index: true, sparse: true, select: false },
     joinedAt: {
         type: Date,
         default: Date.now,
     },
     password: { type: String, required: true },
     phone: { type: String },
+    phoneHash: { type: String, index: true, sparse: true, select: false },
     year: { type: Number },
     branch: { type: String },
     batch: { type: String },
@@ -127,5 +135,66 @@ UserSchema.methods.createVerificationToken = function() {
 
     return token; // Return the unhashed token to send via email
 };
+
+UserSchema.statics.findOneByEmail = function(email) {
+    const emailHash = this.computeBlindIndex(email, normalizeEmail);
+    if (!emailHash) return this.findOne({ _id: null });
+    return this.findOne({ emailHash });
+};
+
+UserSchema.statics.findOneByCollegeId = function(collegeId) {
+    const collegeIdHash = this.computeBlindIndex(collegeId, normalizeCollegeId);
+    if (!collegeIdHash) return this.findOne({ _id: null });
+    return this.findOne({ collegeIdHash });
+};
+
+UserSchema.statics.findOneByEmailAndCollegeId = function(email, collegeId) {
+    const emailHash = this.computeBlindIndex(email, normalizeEmail);
+    const collegeIdHash = this.computeBlindIndex(collegeId, normalizeCollegeId);
+    if (!emailHash || !collegeIdHash) return this.findOne({ _id: null });
+    return this.findOne({ emailHash, collegeIdHash });
+};
+
+UserSchema.statics.findByCollegeIds = function(collegeIds = []) {
+    const hashes = Array.isArray(collegeIds)
+        ? collegeIds
+            .map((id) => this.computeBlindIndex(id, normalizeCollegeId))
+            .filter(Boolean)
+        : [];
+    if (hashes.length === 0) return this.find({ _id: { $in: [] } });
+    return this.find({ collegeIdHash: { $in: hashes } });
+};
+
+applyModelEncryption(UserSchema, {
+    encryptedPaths: [
+        'name',
+        'email',
+        'collegeId',
+        'phone',
+        'branch',
+        'batch',
+        'projectIdeas',
+        'bio',
+        'avatarUrl',
+        'achievements',
+        'skills',
+        'social.linkedin',
+        'social.github',
+        'social.portfolio',
+        'social.instagram',
+        'social.facebook',
+        'alumniProfile.currentOrganization',
+        'alumniProfile.currentDesignation',
+        'alumniProfile.location',
+        'alumniProfile.mentorshipAreas',
+        'alumniProfile.notableProjects',
+        'warnings.reason',
+    ],
+    hashes: [
+        { source: 'email', target: 'emailHash', normalize: normalizeEmail },
+        { source: 'collegeId', target: 'collegeIdHash', normalize: normalizeCollegeId },
+        { source: 'phone', target: 'phoneHash', normalize: normalizePhone },
+    ],
+});
 
 module.exports = mongoose.model('User', UserSchema);

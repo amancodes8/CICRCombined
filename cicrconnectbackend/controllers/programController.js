@@ -379,7 +379,7 @@ const listProgramOverview = async (req, res) => {
 
       const sorted = [...board.values()].sort((a, b) => b.points - a.points).slice(0, 12);
       const userIds = sorted.map((row) => row.memberId);
-      const members = await User.find({ _id: { $in: userIds } }).select('name collegeId year role').lean();
+      const members = await User.find({ _id: { $in: userIds } }).select('name collegeId year role');
       const memberMap = new Map(members.map((row) => [String(row._id), row]));
 
       leaderboard = sorted

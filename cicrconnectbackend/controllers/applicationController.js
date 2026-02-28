@@ -6,11 +6,11 @@ const User = require('../models/User');
 const sendEmail = require('../utils/sendEmail');
 const { createNotifications } = require('../utils/notificationService');
 const { logAudit } = require('../utils/auditLogger');
+const { normalizeEmail } = require('../utils/fieldCrypto');
 
 const STATUS_OPTIONS = ['New', 'InReview', 'Interview', 'Accepted', 'Selected', 'Rejected'];
 
 const sanitize = (value) => String(value || '').trim();
-const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const resolveFrontendUrl = () => {
   const raw = sanitize(process.env.FRONTEND_URL);
   if (!raw) return 'https://cicrconnect.vercel.app';
@@ -33,14 +33,14 @@ const createApplication = async (req, res) => {
       return res.json({ success: true, message: 'Application received.' });
     }
 
-    const email = sanitize(req.body.email).toLowerCase();
+    const email = normalizeEmail(req.body.email);
     const phone = sanitize(req.body.phone);
     const fullName = sanitize(req.body.fullName);
     const parsedYear = Number(req.body.year);
     const year = Number.isFinite(parsedYear) ? parsedYear : null;
 
     const existing = await Application.findOne({
-      email,
+      emailHash: Application.computeBlindIndex(email, normalizeEmail),
       status: { $ne: 'Rejected' },
     }).sort({ createdAt: -1 });
 
@@ -133,18 +133,30 @@ const getApplications = async (req, res) => {
     if (status) {
       query.status = status;
     }
-    if (req.query.q) {
-      const regex = new RegExp(escapeRegex(req.query.q), 'i');
-      query.$or = [{ fullName: regex }, { email: regex }, { phone: regex }, { branch: regex }];
-    }
 
-    const applications = await Application.find(query)
+    let applications = await Application.find(query)
       .populate('assignedTo', 'name role')
       .populate('event', 'title type startTime')
       .populate('notes.author', 'name role')
       .populate('history.changedBy', 'name role')
       .populate('inviteSentBy', 'name role')
       .sort({ createdAt: -1 });
+
+    if (req.query.q) {
+      const needle = String(req.query.q || '').trim().toLowerCase();
+      applications = applications.filter((row) => {
+        const searchable = [
+          row.fullName,
+          row.email,
+          row.phone,
+          row.branch,
+          row.college,
+        ]
+          .map((value) => String(value || '').toLowerCase())
+          .join(' ');
+        return searchable.includes(needle);
+      });
+    }
 
     res.json(applications);
   } catch (err) {

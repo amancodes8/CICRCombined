@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { applyModelEncryption } = require('../utils/modelEncryption');
 
 const IssueTicketSchema = new mongoose.Schema(
   {
@@ -29,5 +30,9 @@ const IssueTicketSchema = new mongoose.Schema(
 
 IssueTicketSchema.index({ status: 1, createdAt: -1 });
 IssueTicketSchema.index({ createdBy: 1, createdAt: -1 });
+
+applyModelEncryption(IssueTicketSchema, {
+  encryptedPaths: ['title', 'description', 'adminNote'],
+});
 
 module.exports = mongoose.model('IssueTicket', IssueTicketSchema);

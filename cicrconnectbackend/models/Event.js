@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { applyModelEncryption } = require('../utils/modelEncryption');
 
 const EventSchema = new mongoose.Schema(
   {
@@ -28,5 +29,9 @@ const EventSchema = new mongoose.Schema(
 
 EventSchema.index({ status: 1, startTime: 1 });
 EventSchema.index({ allowApplications: 1, applicationDeadline: 1 });
+
+applyModelEncryption(EventSchema, {
+  encryptedPaths: ['title', 'description', 'location'],
+});
 
 module.exports = mongoose.model('Event', EventSchema);

@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const { buildUserInsights } = require('../utils/userInsights');
+const { normalizeEmail, normalizeCollegeId } = require('../utils/fieldCrypto');
 const {
     YEAR_MIN,
     YEAR_MAX,
@@ -127,9 +128,9 @@ const resolveUserByIdentifier = async (identifier) => {
         return User.findById(identifier).select('-password');
     }
     if (identifier.includes('@')) {
-        return User.findOne({ email: identifier }).select('-password');
+        return User.findOneByEmail(normalizeEmail(identifier)).select('-password');
     }
-    return User.findOne({ collegeId: identifier }).select('-password');
+    return User.findOneByCollegeId(normalizeCollegeId(identifier)).select('-password');
 };
 
 const getMyInsights = async (req, res) => {
@@ -155,8 +156,7 @@ const getDirectoryMembers = async (_req, res) => {
         $or: [{ approvalStatus: 'Approved' }, { isVerified: true }],
     })
         .select('name email collegeId role branch year batch joinedAt')
-        .sort({ name: 1 })
-        .lean();
+        .sort({ createdAt: -1 });
 
     const directory = users.map((u) => ({
         _id: u._id,
@@ -169,17 +169,18 @@ const getDirectoryMembers = async (_req, res) => {
         batch: u.batch || '',
         joinedAt: u.joinedAt || null,
     }));
+    directory.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 
     res.json(directory);
 };
 
 const getPublicProfileByCollegeId = async (req, res) => {
-    const collegeId = String(req.params.collegeId || '').trim();
+    const collegeId = normalizeCollegeId(req.params.collegeId);
     if (!collegeId) {
         return res.status(400).json({ message: 'College ID is required' });
     }
 
-    const user = await User.findOne({ collegeId }).select(
+    const user = await User.findOneByCollegeId(collegeId).select(
         'name collegeId role branch year batch joinedAt bio avatarUrl achievements skills social alumniProfile createdAt'
     );
 

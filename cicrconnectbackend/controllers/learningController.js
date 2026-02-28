@@ -884,7 +884,7 @@ const getOverview = async (req, res) => {
       ]);
 
       const memberIds = aggregate.map((row) => row._id);
-      const members = await User.find({ _id: { $in: memberIds } }).select('name collegeId year role').lean();
+      const members = await User.find({ _id: { $in: memberIds } }).select('name collegeId year role');
       const memberMap = new Map(members.map((row) => [toIdString(row._id), row]));
 
       leaderboard = aggregate

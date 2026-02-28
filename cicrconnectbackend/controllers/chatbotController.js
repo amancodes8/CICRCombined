@@ -5,6 +5,7 @@ const Post = require('../models/Post');
 const mongoose = require('mongoose');
 const { buildUserInsights } = require('../utils/userInsights');
 const { geminiGenerate } = require('../utils/geminiClient');
+const { normalizeEmail, normalizeCollegeId } = require('../utils/fieldCrypto');
 
 const SCOPE_KEYWORDS = [
     'cicr', 'robot', 'robotics', 'tech', 'technology', 'it', 'software', 'hardware', 'coding', 'code',
@@ -72,12 +73,12 @@ const resolveUserIdentifierFromQuestion = (question) => {
 const findMember = async (identifier) => {
     if (!identifier) return null;
     if (identifier.includes('@')) {
-        return User.findOne({ email: identifier }).select('-password');
+        return User.findOneByEmail(normalizeEmail(identifier)).select('-password');
     }
     if (mongoose.Types.ObjectId.isValid(identifier)) {
         return User.findById(identifier).select('-password');
     }
-    return User.findOne({ collegeId: identifier }).select('-password');
+    return User.findOneByCollegeId(normalizeCollegeId(identifier)).select('-password');
 };
 
 const getSocietySnapshot = async () => {

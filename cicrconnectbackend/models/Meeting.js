@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { applyModelEncryption } = require('../utils/modelEncryption');
 
 const MeetingSchema = new mongoose.Schema({
     title: { type: String, required: true },
@@ -24,5 +25,9 @@ const MeetingSchema = new mongoose.Schema({
         required: true
     },
 }, { timestamps: true });
+
+applyModelEncryption(MeetingSchema, {
+    encryptedPaths: ['title', 'details.topic', 'details.location', 'details.agenda'],
+});
 
 module.exports = mongoose.model('Meeting', MeetingSchema);

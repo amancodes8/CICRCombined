@@ -1,10 +1,14 @@
 const mongoose = require('mongoose');
+const { applyModelEncryption } = require('../utils/modelEncryption');
+const { normalizeEmail, normalizePhone } = require('../utils/fieldCrypto');
 
 const ApplicationSchema = new mongoose.Schema(
   {
     fullName: { type: String, required: true, trim: true, maxlength: 120 },
     email: { type: String, required: true, trim: true, lowercase: true, maxlength: 160 },
+    emailHash: { type: String, index: true, sparse: true, select: false },
     phone: { type: String, required: true, trim: true, maxlength: 24 },
+    phoneHash: { type: String, index: true, sparse: true, select: false },
     year: { type: Number, min: 1, max: 6 },
     branch: { type: String, default: '', trim: true, maxlength: 80 },
     college: { type: String, default: '', trim: true, maxlength: 120 },
@@ -51,6 +55,39 @@ const ApplicationSchema = new mongoose.Schema(
 );
 
 ApplicationSchema.index({ status: 1, createdAt: -1 });
-ApplicationSchema.index({ email: 1, createdAt: -1 });
+ApplicationSchema.index({ emailHash: 1, createdAt: -1 });
+
+ApplicationSchema.statics.findOneByEmail = function(email) {
+  const emailHash = this.computeBlindIndex(email, normalizeEmail);
+  if (!emailHash) return null;
+  return this.findOne({ emailHash });
+};
+
+applyModelEncryption(ApplicationSchema, {
+  encryptedPaths: [
+    'fullName',
+    'email',
+    'phone',
+    'branch',
+    'college',
+    'interests',
+    'motivation',
+    'experience',
+    'availability',
+    'socials.linkedin',
+    'socials.github',
+    'socials.portfolio',
+    'notes.text',
+    'history.note',
+    'inviteCode',
+    'source',
+    'ip',
+    'userAgent',
+  ],
+  hashes: [
+    { source: 'email', target: 'emailHash', normalize: normalizeEmail },
+    { source: 'phone', target: 'phoneHash', normalize: normalizePhone },
+  ],
+});
 
 module.exports = mongoose.model('Application', ApplicationSchema);
