@@ -659,12 +659,12 @@ export default function Layout() {
   return (
     <div className="flex min-h-screen mesh-bg text-white">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 border-r border-gray-800/50 p-6 flex-col fixed h-full z-20" style={{background: 'linear-gradient(180deg, rgba(7,9,13,0.98) 0%, rgba(10,12,18,0.95) 100%)', backdropFilter: 'blur(20px)'}}>
+      <aside className="hidden lg:flex w-64 border-r border-gray-800/50 p-6 flex-col fixed h-full z-20 sidebar-bg">
         <SidebarContent />
       </aside>
 
       {/* Mobile Top Nav */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-30" style={{background: 'rgba(7,9,13,0.85)'}}>
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-30 mobile-nav-bg">
         <div className="flex items-center gap-2.5">
           {logoMode !== 'fallback' ? (
             <img
@@ -727,8 +727,7 @@ export default function Layout() {
             <motion.aside 
               initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 bottom-0 w-72 p-6 z-50 flex flex-col border-r border-white/5 lg:hidden"
-              style={{background: 'linear-gradient(180deg, rgba(7,9,13,0.99) 0%, rgba(10,12,18,0.97) 100%)', backdropFilter: 'blur(20px)'}}
+              className="fixed top-0 left-0 bottom-0 w-72 p-6 z-50 flex flex-col border-r border-white/5 lg:hidden sidebar-bg"
             >
               <SidebarContent />
             </motion.aside>

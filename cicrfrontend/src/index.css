@@ -810,3 +810,34 @@ a {
     transform: none;
   }
 }
+
+/* ========== AUTH PAGE ========== */
+.auth-bg {
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(168, 85, 247, 0.1) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 100%, rgba(34, 211, 238, 0.06) 0%, transparent 50%),
+    #050507;
+}
+
+/* ========== SIDEBAR ========== */
+.sidebar-bg {
+  background: linear-gradient(180deg, rgba(7, 9, 13, 0.98) 0%, rgba(10, 12, 18, 0.95) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.mobile-nav-bg {
+  background: rgba(7, 9, 13, 0.85);
+}
+
+/* ========== ICON LOGO GRADIENT ========== */
+.gradient-blue-purple {
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  box-shadow: 0 8px 32px rgba(37, 99, 235, 0.4);
+}
+
+.gradient-blue-purple-icon {
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  box-shadow: 0 8px 32px rgba(37, 99, 235, 0.5), 0 0 60px rgba(124, 58, 237, 0.2);
+}

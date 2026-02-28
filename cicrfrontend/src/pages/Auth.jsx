@@ -249,7 +249,7 @@ export default function Auth() {
   };
 
   return (
-    <div ref={containerRef} className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden font-sans page-motion-c" style={{background: 'radial-gradient(ellipse at 20% 50%, rgba(59,130,246,0.12) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(168,85,247,0.1) 0%, transparent 60%), radial-gradient(ellipse at 50% 100%, rgba(34,211,238,0.06) 0%, transparent 50%), #050507'}}>
+    <div ref={containerRef} className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden font-sans page-motion-c auth-bg">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/55 to-black/75" />
 
@@ -259,12 +259,12 @@ export default function Auth() {
         animate={{ opacity: 1, scale: 1 }}
         className="relative w-full max-w-md z-10 section-motion section-motion-delay-1"
       >
-        <div className="relative p-10 rounded-[2.5rem] shadow-[0_30px_90px_rgba(0,0,0,0.8)] glass-strong" style={{borderColor: 'rgba(255,255,255,0.06)'}}>
+        <div className="relative p-10 rounded-[2.5rem] shadow-[0_30px_90px_rgba(0,0,0,0.8)] glass-strong">
           <header className="text-center mb-10">
             <motion.div 
               initial={{ scale: 0, rotate: -10 }} animate={{ scale: 1, rotate: 0 }}
               transition={{ type: 'spring', damping: 15, stiffness: 200 }}
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6" style={{background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)', boxShadow: '0 8px 32px rgba(37,99,235,0.5), 0 0 60px rgba(124,58,237,0.2)'}}
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 gradient-blue-purple-icon"
             >
               <Fingerprint className="text-white" size={32} />
             </motion.div>
@@ -403,7 +403,7 @@ export default function Auth() {
               whileTap={{ scale: 0.98 }}
               type="submit"
               disabled={loading}
-              className="w-full text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex justify-center items-center gap-2 mt-8 glow-blue" style={{background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)', boxShadow: '0 8px 32px rgba(37,99,235,0.4)'}}
+              className="w-full text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex justify-center items-center gap-2 mt-8 gradient-blue-purple"
             >
               {loading ? (
                 <Loader2 className="animate-spin" />
@@ -464,7 +464,7 @@ function InputGroup({ icon: Icon, ...props }) {
       <input 
         required
         {...props}
-        className="w-full border border-white/8 p-4 pl-12 rounded-2xl text-white text-sm outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-600/10 transition-all placeholder:text-gray-600" style={{background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(10px)'}}
+        className="w-full border border-white/8 p-4 pl-12 rounded-2xl text-white text-sm outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-600/10 transition-all placeholder:text-gray-600 glass"
       />
     </div>
   );
