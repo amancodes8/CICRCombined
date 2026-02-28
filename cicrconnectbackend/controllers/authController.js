@@ -170,7 +170,7 @@ const loginUser = async (req, res) => {
 
   const user = await User.findOneByEmail(normalizedEmail);
   if (!user || !(await user.matchPassword(password))) {
-    return res.status(401).json({ message: 'Invalid credentials' });
+    return res.status(401).json({ code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' });
   }
 
   const approval = String(user.approvalStatus || '').trim().toLowerCase();
@@ -181,7 +181,10 @@ const loginUser = async (req, res) => {
 
   const isApproved = user.isVerified || approval === 'approved';
   if (!isApproved) {
-    return res.status(401).json({ message: 'Account pending admin approval' });
+    return res.status(401).json({
+      code: 'ACCOUNT_PENDING_APPROVAL',
+      message: 'Account pending admin approval',
+    });
   }
 
   res.json({

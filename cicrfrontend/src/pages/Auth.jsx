@@ -235,8 +235,14 @@ export default function Auth() {
       }
     } catch (err) {
       const fieldError = err.response?.data?.errors?.[0]?.message;
+      const code = String(err.response?.data?.code || '').trim();
       const message = fieldError || err.response?.data?.message || "Connection failed. Please check your network.";
-      setError(message);
+      if (isLogin && code === 'ACCOUNT_PENDING_APPROVAL') {
+        setError('');
+        setNotice('Account created successfully but pending admin approval. Ask Admin/Head to approve your profile, then sign in.');
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
