@@ -497,6 +497,7 @@ export default function Communication() {
                   own ||
                   (message.sender?.isAI &&
                     String(message.replyTo?.senderCollegeId || '') === String(user?.collegeId || ''));
+                const senderColor = userColor(message.sender?.collegeId || message.sender?.name);
 
                 return (
                   <div key={message._id}>
@@ -525,7 +526,7 @@ export default function Communication() {
                             style={
                               message.sender?.isAI
                                 ? undefined
-                                : { backgroundColor: `${userColor(message.sender?.collegeId || message.sender?.name)}22`, color: userColor(message.sender?.collegeId || message.sender?.name) }
+                                : { backgroundColor: `${senderColor}22`, color: senderColor }
                             }
                           >
                             {message.sender?.isAI ? (
@@ -560,7 +561,7 @@ export default function Communication() {
                                 ) : null}
                                 <span
                                   className="font-semibold break-all"
-                                  style={{ color: userColor(message.sender?.collegeId || message.sender?.name) }}
+                                  style={{ color: senderColor }}
                                 >
                                   {message.sender?.name || 'Member'}
                                 </span>
