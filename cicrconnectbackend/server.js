@@ -32,6 +32,14 @@ const isVercelOrigin = (origin) => {
     return false;
   }
 };
+const isLocalhostOrigin = (origin) => {
+  try {
+    const parsed = new URL(origin);
+    return ['localhost', '127.0.0.1'].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+};
 
 const createApp = () => {
   const app = express();
@@ -47,13 +55,18 @@ const createApp = () => {
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       const normalized = normalizeOrigin(origin);
-      if (allowedOrigins.has(normalized) || isVercelOrigin(normalized)) {
+      if (
+        allowedOrigins.has(normalized) ||
+        isVercelOrigin(normalized) ||
+        (env.nodeEnv !== 'production' && isLocalhostOrigin(normalized))
+      ) {
         return callback(null, true);
       }
       return callback(new Error(`CORS policy: origin not allowed (${normalized})`));
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+    credentials: true,
   };
 
   app.use(requestId);
