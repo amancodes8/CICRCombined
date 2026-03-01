@@ -17,6 +17,11 @@ jobs:
       run:
         working-directory: cicrmobile
     steps:
+      - name: Record start time
+        id: timer
+        run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
+        working-directory: .
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -42,6 +47,16 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            cicrmobile/android/.gradle
+          key: gradle-${{ runner.os }}-${{ hashFiles('cicrmobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
       - name: Build APK
         run: cd android && ./gradlew assembleRelease
 
@@ -51,3 +66,23 @@ jobs:
           name: cicrmobile-apk
           path: cicrmobile/android/app/build/outputs/apk/release/*.apk
           retention-days: 30
+
+      - name: Build time summary
+        if: always()
+        run: |
+          end=$(date +%s)
+          start=${{ steps.timer.outputs.start }}
+          elapsed=$((end - start))
+          minutes=$((elapsed / 60))
+          seconds=$((elapsed % 60))
+          echo "## ⏱️ APK Build Time" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Total wall time: **${minutes}m ${seconds}s**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Runner | \`ubuntu-latest\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Node | 22.22.0 |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Java | Temurin 17 |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Gradle cache | Enabled |" >> "$GITHUB_STEP_SUMMARY"
+        working-directory: .
