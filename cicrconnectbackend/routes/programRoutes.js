@@ -29,6 +29,12 @@ const {
   bookOfficeHourSlot,
   listMyOfficeHourBookings,
   updateOfficeHourBooking,
+  listContests,
+  createContest,
+  updateContest,
+  startContestAttempt,
+  submitContestAttempt,
+  listMyContestAttempts,
 } = require('../controllers/programController');
 
 const router = express.Router();
@@ -66,5 +72,12 @@ router.patch('/office-hours/slots/:id', protect, updateOfficeHourSlot);
 router.post('/office-hours/slots/:id/book', protect, bookOfficeHourSlot);
 router.get('/office-hours/bookings/mine', protect, listMyOfficeHourBookings);
 router.patch('/office-hours/bookings/:id', protect, updateOfficeHourBooking);
+
+router.get('/contests', protect, listContests);
+router.get('/contests/attempts/mine', protect, listMyContestAttempts);
+router.post('/contests', protect, createContest);
+router.patch('/contests/:id', protect, updateContest);
+router.post('/contests/:id/attempt', protect, startContestAttempt);
+router.post('/contests/:id/submit', protect, submitContestAttempt);
 
 module.exports = router;

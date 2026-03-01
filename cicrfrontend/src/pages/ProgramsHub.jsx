@@ -7,6 +7,8 @@ import {
   CalendarClock,
   Check,
   CheckCircle2,
+  ClipboardList,
+  Clock,
   Compass,
   Crown,
   Flag,
@@ -55,6 +57,12 @@ import {
   bookOfficeHourSlot,
   fetchMyOfficeHourBookings,
   updateOfficeHourBooking,
+  fetchContests,
+  createContest,
+  updateContest as updateContestApi,
+  startContestAttempt,
+  submitContestAttempt,
+  fetchMyContestAttempts,
 } from '../api';
 import PageHeader from '../components/PageHeader';
 import { DataEmpty, DataError, DataLoading } from '../components/DataState';
@@ -62,6 +70,7 @@ import { DataEmpty, DataError, DataLoading } from '../components/DataState';
 const TABS = [
   { id: 'overview', label: 'Overview', icon: Sparkles },
   { id: 'quests', label: 'Weekly Quests', icon: Target },
+  { id: 'contests', label: 'Contests', icon: ClipboardList },
   { id: 'mentor', label: 'Mentor Desk', icon: Handshake },
   { id: 'badges', label: 'Badges & Level', icon: Trophy },
   { id: 'ideas', label: 'Idea Incubator', icon: Lightbulb },
@@ -211,6 +220,25 @@ export default function ProgramsHub() {
     status: 'Open',
   });
 
+  const [contests, setContests] = useState([]);
+  const [myContestAttempts, setMyContestAttempts] = useState([]);
+  const [contestBusy, setContestBusy] = useState('');
+  const [activeContest, setActiveContest] = useState(null);
+  const [contestQuestions, setContestQuestions] = useState([]);
+  const [contestAnswers, setContestAnswers] = useState({});
+  const [contestAttempt, setContestAttempt] = useState(null);
+  const [contestCreateBusy, setContestCreateBusy] = useState(false);
+  const [contestForm, setContestForm] = useState({
+    title: '',
+    description: '',
+    duration: 30,
+    audience: 'AllMembers',
+    status: 'Draft',
+    startsAt: '',
+    endsAt: '',
+    questions: [{ questionText: '', questionType: 'MCQ', options: ['', '', '', ''], correctAnswer: '', points: 10 }],
+  });
+
   const loadPrograms = async () => {
     setLoading(true);
     setError('');
@@ -228,6 +256,8 @@ export default function ProgramsHub() {
         ideaRes,
         slotRes,
         myBookingsRes,
+        contestsRes,
+        myContestAttemptsRes,
       ] = await Promise.all([
         fetchProgramOverview().catch(() => ({ data: null })),
         fetchProgramConfig().catch(() => ({ data: null })),
@@ -240,6 +270,8 @@ export default function ProgramsHub() {
         fetchProgramIdeas().catch(() => ({ data: [] })),
         fetchOfficeHourSlots(isAdminOrHead ? { includePast: 'true' } : {}).catch(() => ({ data: [] })),
         fetchMyOfficeHourBookings().catch(() => ({ data: [] })),
+        fetchContests(isAdminOrHead ? { includeAll: 'true' } : {}).catch(() => ({ data: [] })),
+        fetchMyContestAttempts().catch(() => ({ data: [] })),
       ]);
 
       const nextConfig = configRes?.data || overviewRes?.data?.config || null;
@@ -252,6 +284,7 @@ export default function ProgramsHub() {
               badgeSystemEnabled: !!nextConfig.badgeSystemEnabled,
               ideaIncubatorEnabled: !!nextConfig.ideaIncubatorEnabled,
               officeHoursEnabled: !!nextConfig.officeHoursEnabled,
+              contestsEnabled: !!nextConfig.contestsEnabled,
               showProgramLeaderboard: !!nextConfig.showProgramLeaderboard,
             }
           : null
@@ -291,6 +324,8 @@ export default function ProgramsHub() {
 
       setOfficeSlots(Array.isArray(slotRes?.data) ? slotRes.data : []);
       setMyBookings(Array.isArray(myBookingsRes?.data) ? myBookingsRes.data : []);
+      setContests(Array.isArray(contestsRes?.data) ? contestsRes.data : []);
+      setMyContestAttempts(Array.isArray(myContestAttemptsRes?.data) ? myContestAttemptsRes.data : []);
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to load program hub data.');
     } finally {
@@ -628,6 +663,129 @@ export default function ProgramsHub() {
     }
   };
 
+  /* ─── Contest handlers ─── */
+
+  const myAttemptMap = useMemo(
+    () => new Map((Array.isArray(myContestAttempts) ? myContestAttempts : []).map((a) => [String(a.contest?._id || a.contest), a])),
+    [myContestAttempts]
+  );
+
+  const handleCreateContest = async (event) => {
+    event.preventDefault();
+    if (!isAdminOrHead) return;
+    setContestCreateBusy(true);
+    try {
+      await createContest({
+        ...contestForm,
+        questions: contestForm.questions.filter((q) => q.questionText.trim()),
+      });
+      dispatchToast('Contest created.', 'success');
+      setContestForm({
+        title: '',
+        description: '',
+        duration: 30,
+        audience: 'AllMembers',
+        status: 'Draft',
+        startsAt: '',
+        endsAt: '',
+        questions: [{ questionText: '', questionType: 'MCQ', options: ['', '', '', ''], correctAnswer: '', points: 10 }],
+      });
+      await loadPrograms();
+    } catch (err) {
+      dispatchToast(err.response?.data?.message || 'Failed to create contest.', 'error');
+    } finally {
+      setContestCreateBusy(false);
+    }
+  };
+
+  const handleUpdateContestStatus = async (contestId, status) => {
+    setContestBusy(`status:${contestId}`);
+    try {
+      await updateContestApi(contestId, { status });
+      dispatchToast(`Contest moved to ${status}.`, 'success');
+      await loadPrograms();
+    } catch (err) {
+      dispatchToast(err.response?.data?.message || 'Failed to update contest.', 'error');
+    } finally {
+      setContestBusy('');
+    }
+  };
+
+  const handleStartContest = async (contestId) => {
+    setContestBusy(`start:${contestId}`);
+    try {
+      const { data } = await startContestAttempt(contestId);
+      setActiveContest(contestId);
+      setContestAttempt(data.attempt);
+      setContestQuestions(Array.isArray(data.questions) ? data.questions : []);
+      const initial = {};
+      (data.attempt?.answers || []).forEach((a) => {
+        initial[a.questionId] = a.selectedAnswer;
+      });
+      setContestAnswers(initial);
+      if (data.attempt?.status === 'Submitted') {
+        dispatchToast('You have already submitted this contest.', 'info');
+      }
+    } catch (err) {
+      dispatchToast(err.response?.data?.message || 'Failed to start contest.', 'error');
+    } finally {
+      setContestBusy('');
+    }
+  };
+
+  const handleSubmitContest = async () => {
+    if (!activeContest) return;
+    setContestBusy(`submit:${activeContest}`);
+    try {
+      const answers = Object.entries(contestAnswers).map(([questionId, selectedAnswer]) => ({
+        questionId,
+        selectedAnswer,
+      }));
+      const { data } = await submitContestAttempt(activeContest, { answers });
+      setContestAttempt(data);
+      dispatchToast(`Contest submitted! Your score: ${data.score} / ${data.totalPoints}`, 'success');
+      setActiveContest(null);
+      setContestQuestions([]);
+      setContestAnswers({});
+      setContestAttempt(null);
+      await loadPrograms();
+    } catch (err) {
+      dispatchToast(err.response?.data?.message || 'Failed to submit contest.', 'error');
+    } finally {
+      setContestBusy('');
+    }
+  };
+
+  const addContestQuestion = () => {
+    setContestForm((prev) => ({
+      ...prev,
+      questions: [...prev.questions, { questionText: '', questionType: 'MCQ', options: ['', '', '', ''], correctAnswer: '', points: 10 }],
+    }));
+  };
+
+  const removeContestQuestion = (idx) => {
+    setContestForm((prev) => ({
+      ...prev,
+      questions: prev.questions.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const updateContestQuestion = (idx, field, value) => {
+    setContestForm((prev) => ({
+      ...prev,
+      questions: prev.questions.map((q, i) => (i === idx ? { ...q, [field]: value } : q)),
+    }));
+  };
+
+  const updateContestOption = (qIdx, oIdx, value) => {
+    setContestForm((prev) => ({
+      ...prev,
+      questions: prev.questions.map((q, i) =>
+        i === qIdx ? { ...q, options: q.options.map((o, j) => (j === oIdx ? value : o)) } : q
+      ),
+    }));
+  };
+
   if (loading) {
     return (
       <div className="ui-page pb-16 page-motion-a">
@@ -650,7 +808,7 @@ export default function ProgramsHub() {
         <PageHeader
           eyebrow="Member Experience"
           title="Programs Hub"
-          subtitle="Weekly quests, mentor support, badges, idea incubation, and office hours in one control plane."
+          subtitle="Weekly quests, contests, mentor support, badges, idea incubation, and office hours in one control plane."
           icon={BrainCircuit}
           actions={
             <>
@@ -697,8 +855,9 @@ export default function ProgramsHub() {
         >
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 pro-stagger">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 pro-stagger">
                 <QuickStat icon={Target} label="Active Quests" value={overview?.stats?.activeQuests || 0} />
+                <QuickStat icon={ClipboardList} label="Contests" value={contests.filter((c) => c.status === 'Active').length} />
                 <QuickStat icon={Handshake} label="Open Mentor Requests" value={overview?.stats?.myMentorOpen || 0} />
                 <QuickStat icon={Lightbulb} label="Ideas Raised" value={overview?.stats?.myIdeas || 0} />
                 <QuickStat icon={CalendarClock} label="Upcoming Bookings" value={overview?.stats?.myBookings || 0} />
@@ -781,6 +940,11 @@ export default function ProgramsHub() {
                       label="Office Hours"
                       value={configDraft.officeHoursEnabled}
                       onToggle={() => setConfigDraft((prev) => ({ ...prev, officeHoursEnabled: !prev.officeHoursEnabled }))}
+                    />
+                    <ToggleRow
+                      label="Contests"
+                      value={configDraft.contestsEnabled}
+                      onToggle={() => setConfigDraft((prev) => ({ ...prev, contestsEnabled: !prev.contestsEnabled }))}
                     />
                     <ToggleRow
                       label="Program Leaderboard"
@@ -929,6 +1093,252 @@ export default function ProgramsHub() {
                     ) : (
                       <DataEmpty label="No quest submissions pending review." />
                     )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'contests' && (
+            <div className="space-y-6">
+
+              {/* ── Active Contest Attempt View ── */}
+              {activeContest && contestAttempt && contestAttempt.status !== 'Submitted' && (
+                <div className="rounded-[1.5rem] border border-blue-500/30 bg-blue-500/5 p-5 md:p-6 space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-sm font-black uppercase tracking-[0.2em] text-blue-200 inline-flex items-center gap-2">
+                      <ClipboardList size={14} className="text-blue-300" /> Attempting Contest
+                    </h3>
+                    <div className="inline-flex items-center gap-2 text-xs text-gray-400">
+                      <Clock size={13} /> Started {formatDateTime(contestAttempt.startedAt)}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {contestQuestions.map((q, idx) => (
+                      <article key={q._id} className="rounded-xl border border-gray-800 px-4 py-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-bold text-white">
+                            <span className="text-cyan-300 mr-2">Q{idx + 1}.</span>
+                            {q.questionText}
+                          </p>
+                          <span className="text-[10px] font-black text-gray-500 uppercase shrink-0">{q.points} pts</span>
+                        </div>
+
+                        {q.questionType === 'MCQ' && Array.isArray(q.options) && q.options.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {q.options.map((opt, oIdx) => {
+                              const selected = contestAnswers[q._id] === opt;
+                              return (
+                                <button
+                                  key={oIdx}
+                                  type="button"
+                                  onClick={() => setContestAnswers((prev) => ({ ...prev, [q._id]: opt }))}
+                                  className={`text-left px-3 py-2 rounded-lg border text-xs transition-colors ${
+                                    selected
+                                      ? 'border-blue-500/50 bg-blue-500/15 text-blue-100 font-bold'
+                                      : 'border-gray-700 text-gray-300 hover:border-gray-600 hover:text-white'
+                                  }`}
+                                >
+                                  <span className="font-black mr-1.5 text-gray-500">{String.fromCharCode(65 + oIdx)}.</span>
+                                  {opt}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <input
+                            className="ui-input"
+                            value={contestAnswers[q._id] || ''}
+                            onChange={(e) => setContestAnswers((prev) => ({ ...prev, [q._id]: e.target.value }))}
+                            placeholder="Type your answer..."
+                          />
+                        )}
+                      </article>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleSubmitContest}
+                      disabled={contestBusy === `submit:${activeContest}`}
+                    >
+                      {contestBusy === `submit:${activeContest}` ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Submit Contest
+                    </button>
+                    <button
+                      type="button"
+                      className="btn border-gray-700 text-gray-400 hover:text-white"
+                      onClick={() => { setActiveContest(null); setContestQuestions([]); setContestAnswers({}); setContestAttempt(null); }}
+                    >
+                      <X size={13} /> Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Admin: Create Contest Form ── */}
+              {isAdminOrHead && (
+                <form onSubmit={handleCreateContest} className="rounded-[1.5rem] border border-gray-800 p-5 md:p-6 space-y-3">
+                  <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-300 inline-flex items-center gap-2">
+                    <Plus size={14} className="text-cyan-300" /> Create Contest
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <input className="ui-input" value={contestForm.title} onChange={(e) => setContestForm((p) => ({ ...p, title: e.target.value }))} placeholder="Contest title" required />
+                    <select className="ui-input" value={contestForm.audience} onChange={(e) => setContestForm((p) => ({ ...p, audience: e.target.value }))}>
+                      <option value="AllMembers">All Members</option>
+                      <option value="FirstYear">First Year</option>
+                      <option value="SecondYear">Second Year</option>
+                      <option value="FirstAndSecond">First & Second</option>
+                    </select>
+                    <input className="ui-input" type="number" min={1} max={300} value={contestForm.duration} onChange={(e) => setContestForm((p) => ({ ...p, duration: Number(e.target.value || 30) }))} placeholder="Duration (min)" />
+                    <select className="ui-input" value={contestForm.status} onChange={(e) => setContestForm((p) => ({ ...p, status: e.target.value }))}>
+                      <option value="Draft">Draft</option>
+                      <option value="Active">Active</option>
+                      <option value="Closed">Closed</option>
+                    </select>
+                    <input className="ui-input" type="datetime-local" value={contestForm.startsAt} onChange={(e) => setContestForm((p) => ({ ...p, startsAt: e.target.value }))} required />
+                    <input className="ui-input" type="datetime-local" value={contestForm.endsAt} onChange={(e) => setContestForm((p) => ({ ...p, endsAt: e.target.value }))} required />
+                    <textarea className="ui-input md:col-span-2" rows={2} value={contestForm.description} onChange={(e) => setContestForm((p) => ({ ...p, description: e.target.value }))} placeholder="Description (optional)" />
+                  </div>
+
+                  <h4 className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 pt-2">Questions</h4>
+                  <div className="space-y-3">
+                    {contestForm.questions.map((q, qIdx) => (
+                      <div key={qIdx} className="rounded-xl border border-gray-800 p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black text-cyan-300">Q{qIdx + 1}</span>
+                          <input className="ui-input flex-1" value={q.questionText} onChange={(e) => updateContestQuestion(qIdx, 'questionText', e.target.value)} placeholder="Question text" required />
+                          <select className="ui-input w-24" value={q.questionType} onChange={(e) => updateContestQuestion(qIdx, 'questionType', e.target.value)}>
+                            <option value="MCQ">MCQ</option>
+                            <option value="Text">Text</option>
+                          </select>
+                          <input className="ui-input w-16" type="number" min={1} max={100} value={q.points} onChange={(e) => updateContestQuestion(qIdx, 'points', Number(e.target.value || 10))} title="Points" />
+                          {contestForm.questions.length > 1 && (
+                            <button type="button" onClick={() => removeContestQuestion(qIdx)} className="text-rose-400 hover:text-rose-300"><X size={14} /></button>
+                          )}
+                        </div>
+                        {q.questionType === 'MCQ' && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {q.options.map((opt, oIdx) => (
+                              <input key={oIdx} className="ui-input text-xs" value={opt} onChange={(e) => updateContestOption(qIdx, oIdx, e.target.value)} placeholder={`Option ${String.fromCharCode(65 + oIdx)}`} />
+                            ))}
+                          </div>
+                        )}
+                        <input className="ui-input text-xs" value={q.correctAnswer} onChange={(e) => updateContestQuestion(qIdx, 'correctAnswer', e.target.value)} placeholder="Correct answer" required />
+                      </div>
+                    ))}
+                  </div>
+
+                  <button type="button" className="text-xs text-cyan-300 hover:text-cyan-200 inline-flex items-center gap-1" onClick={addContestQuestion}>
+                    <Plus size={12} /> Add Question
+                  </button>
+                  <div>
+                    <button className="btn btn-primary" type="submit" disabled={contestCreateBusy}>
+                      {contestCreateBusy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Create Contest
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* ── Available Contests List ── */}
+              <div className="rounded-[1.5rem] border border-gray-800 p-5 md:p-6 space-y-4">
+                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-300 inline-flex items-center gap-2">
+                  <ClipboardList size={14} className="text-cyan-300" /> Available Contests
+                </h3>
+                <div className="space-y-3">
+                  {contests.length > 0 ? (
+                    contests.map((c) => {
+                      const attempt = myAttemptMap.get(String(c._id));
+                      const submitted = attempt?.status === 'Submitted';
+                      const now = new Date();
+                      const isOpen = c.status === 'Active' && new Date(c.startsAt) <= now && now <= new Date(c.endsAt);
+                      return (
+                        <article key={c._id} className="rounded-xl border border-gray-800 px-4 py-3 space-y-2">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-bold text-white">{c.title}</p>
+                              {c.description && <p className="text-xs text-gray-400 mt-0.5">{c.description}</p>}
+                              <p className="text-xs text-gray-500 mt-1">
+                                {c.questions?.length || 0} questions • {c.duration} min • {c.audience}
+                              </p>
+                              <p className="text-xs text-cyan-200 mt-0.5">
+                                {formatDateTime(c.startsAt)} — {formatDateTime(c.endsAt)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${
+                                c.status === 'Active' ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
+                                  : c.status === 'Closed' ? 'text-rose-300 border-rose-500/40 bg-rose-500/10'
+                                  : 'text-gray-300 border-gray-700 bg-gray-800/30'
+                              }`}>{c.status}</span>
+
+                              {submitted && (
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md border text-emerald-300 border-emerald-500/40 bg-emerald-500/10">
+                                  Score: {attempt.score}/{attempt.totalPoints}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {!submitted && isOpen && (
+                              <button
+                                type="button"
+                                className="btn btn-primary text-xs"
+                                onClick={() => handleStartContest(c._id)}
+                                disabled={contestBusy === `start:${c._id}`}
+                              >
+                                {contestBusy === `start:${c._id}` ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                                {attempt ? 'Resume' : 'Attempt'}
+                              </button>
+                            )}
+
+                            {isAdminOrHead && c.status === 'Draft' && (
+                              <button type="button" className="btn text-xs border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10" onClick={() => handleUpdateContestStatus(c._id, 'Active')} disabled={contestBusy === `status:${c._id}`}>
+                                {contestBusy === `status:${c._id}` ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Activate
+                              </button>
+                            )}
+                            {isAdminOrHead && c.status === 'Active' && (
+                              <button type="button" className="btn text-xs border-rose-500/40 text-rose-300 hover:bg-rose-500/10" onClick={() => handleUpdateContestStatus(c._id, 'Closed')} disabled={contestBusy === `status:${c._id}`}>
+                                {contestBusy === `status:${c._id}` ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />} Close
+                              </button>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })
+                  ) : (
+                    <DataEmpty label="No contests available." />
+                  )}
+                </div>
+              </div>
+
+              {/* ── My Contest Attempts / Scores ── */}
+              {myContestAttempts.length > 0 && (
+                <div className="rounded-[1.5rem] border border-gray-800 p-5 md:p-6 space-y-4">
+                  <h3 className="text-sm font-black uppercase tracking-[0.2em] text-gray-300 inline-flex items-center gap-2">
+                    <Trophy size={14} className="text-amber-300" /> My Scores & Attempts
+                  </h3>
+                  <div className="space-y-3">
+                    {myContestAttempts.map((a) => (
+                      <article key={a._id} className="rounded-xl border border-gray-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-white">{a.contest?.title || 'Contest'}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {a.status === 'Submitted' ? `Submitted ${formatDateTime(a.submittedAt)}` : 'In Progress'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          {a.status === 'Submitted' ? (
+                            <p className="text-lg font-black text-cyan-200">{a.score}<span className="text-xs text-gray-500">/{a.totalPoints}</span></p>
+                          ) : (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md border text-blue-300 border-blue-500/40 bg-blue-500/10">In Progress</span>
+                          )}
+                        </div>
+                      </article>
+                    ))}
                   </div>
                 </div>
               )}

@@ -8,6 +8,7 @@ const ProgramConfigSchema = new mongoose.Schema(
     badgeSystemEnabled: { type: Boolean, default: true },
     ideaIncubatorEnabled: { type: Boolean, default: true },
     officeHoursEnabled: { type: Boolean, default: true },
+    contestsEnabled: { type: Boolean, default: true },
     showProgramLeaderboard: { type: Boolean, default: true },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },

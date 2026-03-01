@@ -7,6 +7,8 @@ const BadgeAward = require('../models/BadgeAward');
 const ProjectIdea = require('../models/ProjectIdea');
 const OfficeHourSlot = require('../models/OfficeHourSlot');
 const OfficeHourBooking = require('../models/OfficeHourBooking');
+const Contest = require('../models/Contest');
+const ContestAttempt = require('../models/ContestAttempt');
 const Project = require('../models/Project');
 const User = require('../models/User');
 const LearningSubmission = require('../models/LearningSubmission');
@@ -17,6 +19,7 @@ const ADMIN_ROLES = new Set(['admin', 'head']);
 const QUEST_AUDIENCES = ['AllMembers', 'FirstYear', 'SecondYear', 'FirstAndSecond'];
 const QUEST_CATEGORIES = ['Technical', 'Design', 'Communication', 'Operations', 'Community'];
 const QUEST_STATUSES = ['Draft', 'Active', 'Closed', 'Archived'];
+const CONTEST_STATUSES = ['Draft', 'Active', 'Closed'];
 const IDEA_STATUSES = ['UnderReview', 'Approved', 'Rejected', 'Converted'];
 const BADGE_CRITERIA_TYPES = ['PointsThreshold', 'QuestCompletions', 'IdeasConverted', 'MentorResolutions'];
 
@@ -454,6 +457,9 @@ const updateProgramConfig = async (req, res) => {
     }
     if (Object.prototype.hasOwnProperty.call(req.body, 'officeHoursEnabled')) {
       config.officeHoursEnabled = parseBool(req.body.officeHoursEnabled, config.officeHoursEnabled);
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'contestsEnabled')) {
+      config.contestsEnabled = parseBool(req.body.contestsEnabled, config.contestsEnabled);
     }
     if (Object.prototype.hasOwnProperty.call(req.body, 'showProgramLeaderboard')) {
       config.showProgramLeaderboard = parseBool(req.body.showProgramLeaderboard, config.showProgramLeaderboard);
@@ -1807,6 +1813,229 @@ const updateOfficeHourBooking = async (req, res) => {
   }
 };
 
+/* ─────────── Contests ─────────── */
+
+const listContests = async (req, res) => {
+  try {
+    const config = await getConfig();
+    if (!config.contestsEnabled && !isAdminOrHead(req.user)) {
+      return res.status(403).json({ message: 'Contests are currently disabled by admin.' });
+    }
+
+    const filter = {};
+    if (!isAdminOrHead(req.user)) {
+      filter.status = 'Active';
+      filter.audience = { $in: audienceForUser(req.user) };
+    } else if (!parseBool(req.query.includeAll, false)) {
+      filter.status = { $in: ['Active', 'Draft'] };
+    }
+
+    const rows = await Contest.find(filter).sort({ startsAt: -1 }).populate('createdBy', 'name collegeId');
+    return res.json(rows);
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+};
+
+const createContest = async (req, res) => {
+  try {
+    if (!isAdminOrHead(req.user)) {
+      return res.status(403).json({ message: 'Only Admin/Head can create contests.' });
+    }
+
+    const { title, description, questions, duration, audience, status, startsAt, endsAt } = req.body;
+
+    if (!sanitize(title)) return res.status(400).json({ message: 'Title is required.' });
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ message: 'At least one question is required.' });
+    }
+
+    const parsedQuestions = questions.map((q) => {
+      const qt = sanitize(q.questionText);
+      if (!qt) throw new Error('Each question needs question text.');
+      const ca = sanitize(q.correctAnswer);
+      if (!ca) throw new Error('Each question needs a correct answer.');
+      return {
+        questionText: qt.slice(0, 1000),
+        questionType: normalizeEnum(q.questionType, ['MCQ', 'Text'], 'MCQ'),
+        options: Array.isArray(q.options) ? q.options.map((o) => sanitize(o).slice(0, 300)).filter(Boolean) : [],
+        correctAnswer: ca.slice(0, 300),
+        points: parseInteger(q.points, 10),
+      };
+    });
+
+    const start = parseDate(startsAt);
+    const end = parseDate(endsAt);
+    if (!start || !end) return res.status(400).json({ message: 'Valid start and end dates are required.' });
+
+    const contest = await Contest.create({
+      title: sanitize(title).slice(0, 150),
+      description: sanitize(description).slice(0, 2000),
+      questions: parsedQuestions,
+      duration: parseInteger(duration, 30),
+      audience: normalizeEnum(audience, QUEST_AUDIENCES, 'AllMembers'),
+      status: normalizeEnum(status, CONTEST_STATUSES, 'Draft'),
+      startsAt: start,
+      endsAt: end,
+      createdBy: req.user.id,
+    });
+
+    return res.status(201).json(contest);
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+};
+
+const updateContest = async (req, res) => {
+  try {
+    if (!isAdminOrHead(req.user)) {
+      return res.status(403).json({ message: 'Only Admin/Head can update contests.' });
+    }
+
+    const contest = await Contest.findById(req.params.id);
+    if (!contest) return res.status(404).json({ message: 'Contest not found.' });
+
+    const allowed = ['title', 'description', 'questions', 'duration', 'audience', 'status', 'startsAt', 'endsAt'];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        if (key === 'status') {
+          contest.status = normalizeEnum(req.body.status, CONTEST_STATUSES, contest.status);
+        } else if (key === 'audience') {
+          contest.audience = normalizeEnum(req.body.audience, QUEST_AUDIENCES, contest.audience);
+        } else if (key === 'startsAt' || key === 'endsAt') {
+          const d = parseDate(req.body[key]);
+          if (d) contest[key] = d;
+        } else if (key === 'questions' && Array.isArray(req.body.questions)) {
+          contest.questions = req.body.questions.map((q) => ({
+            questionText: sanitize(q.questionText).slice(0, 1000),
+            questionType: normalizeEnum(q.questionType, ['MCQ', 'Text'], 'MCQ'),
+            options: Array.isArray(q.options) ? q.options.map((o) => sanitize(o).slice(0, 300)).filter(Boolean) : [],
+            correctAnswer: sanitize(q.correctAnswer).slice(0, 300),
+            points: parseInteger(q.points, 10),
+          }));
+        } else if (key === 'duration') {
+          contest.duration = parseInteger(req.body.duration, contest.duration);
+        } else {
+          contest[key] = sanitize(req.body[key]).slice(0, key === 'description' ? 2000 : 150);
+        }
+      }
+    }
+
+    contest.updatedBy = req.user.id;
+    await contest.save();
+    return res.json(contest);
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+};
+
+const startContestAttempt = async (req, res) => {
+  try {
+    const config = await getConfig();
+    if (!config.contestsEnabled && !isAdminOrHead(req.user)) {
+      return res.status(403).json({ message: 'Contests are currently disabled by admin.' });
+    }
+
+    const contest = await Contest.findById(req.params.id);
+    if (!contest) return res.status(404).json({ message: 'Contest not found.' });
+
+    if (!userCanAccessAudience(req.user, contest.audience)) {
+      return res.status(403).json({ message: 'This contest is not available for your year.' });
+    }
+
+    if (!isAdminOrHead(req.user)) {
+      const now = new Date();
+      if (contest.status !== 'Active') return res.status(403).json({ message: 'Contest is not active.' });
+      if (now < contest.startsAt || now > contest.endsAt) {
+        return res.status(403).json({ message: 'Contest is not within the open window.' });
+      }
+    }
+
+    const existing = await ContestAttempt.findOne({ contest: contest._id, member: req.user.id });
+    if (existing) {
+      const questions = contest.questions.map((q) => ({
+        _id: q._id,
+        questionText: q.questionText,
+        questionType: q.questionType,
+        options: q.options,
+        points: q.points,
+      }));
+      return res.json({ attempt: existing, questions });
+    }
+
+    const totalPoints = contest.questions.reduce((sum, q) => sum + (q.points || 10), 0);
+    const attempt = await ContestAttempt.create({
+      contest: contest._id,
+      member: req.user.id,
+      answers: [],
+      score: 0,
+      totalPoints,
+      status: 'InProgress',
+      startedAt: new Date(),
+    });
+
+    const questions = contest.questions.map((q) => ({
+      _id: q._id,
+      questionText: q.questionText,
+      questionType: q.questionType,
+      options: q.options,
+      points: q.points,
+    }));
+
+    return res.status(201).json({ attempt, questions });
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+};
+
+const submitContestAttempt = async (req, res) => {
+  try {
+    const contest = await Contest.findById(req.params.id);
+    if (!contest) return res.status(404).json({ message: 'Contest not found.' });
+
+    const attempt = await ContestAttempt.findOne({ contest: contest._id, member: req.user.id });
+    if (!attempt) return res.status(404).json({ message: 'No attempt found. Start the contest first.' });
+    if (attempt.status === 'Submitted') {
+      return res.status(400).json({ message: 'You have already submitted this contest.' });
+    }
+
+    const { answers } = req.body;
+    if (!Array.isArray(answers)) return res.status(400).json({ message: 'Answers array is required.' });
+
+    let score = 0;
+    const gradedAnswers = answers.map((a) => {
+      const question = contest.questions.id(a.questionId);
+      if (!question) return { questionId: a.questionId, selectedAnswer: sanitize(a.selectedAnswer).slice(0, 500) };
+      const selected = sanitize(a.selectedAnswer).slice(0, 500);
+      if (selected.toLowerCase() === question.correctAnswer.toLowerCase()) {
+        score += question.points || 10;
+      }
+      return { questionId: a.questionId, selectedAnswer: selected };
+    });
+
+    attempt.answers = gradedAnswers;
+    attempt.score = score;
+    attempt.status = 'Submitted';
+    attempt.submittedAt = new Date();
+    await attempt.save();
+
+    return res.json(attempt);
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+};
+
+const listMyContestAttempts = async (req, res) => {
+  try {
+    const rows = await ContestAttempt.find({ member: req.user.id })
+      .sort({ createdAt: -1 })
+      .populate('contest', 'title description duration status startsAt endsAt');
+    return res.json(rows);
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+};
+
 module.exports = {
   listProgramOverview,
   getProgramConfig,
@@ -1836,4 +2065,10 @@ module.exports = {
   bookOfficeHourSlot,
   listMyOfficeHourBookings,
   updateOfficeHourBooking,
+  listContests,
+  createContest,
+  updateContest,
+  startContestAttempt,
+  submitContestAttempt,
+  listMyContestAttempts,
 };
