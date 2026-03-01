@@ -39,6 +39,26 @@ const CommunicationMessageSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    editedAt: {
+      type: Date,
+      default: null,
+    },
+    editedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    pinned: {
+      isPinned: { type: Boolean, default: false },
+      pinnedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      pinnedAt: { type: Date, default: null },
+    },
+    reactions: [
+      {
+        emoji: { type: String, required: true, trim: true, maxlength: 16 },
+        users: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+      },
+    ],
   },
   { timestamps: true }
 );

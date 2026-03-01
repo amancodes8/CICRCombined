@@ -417,6 +417,11 @@ export const fetchCommunicationMessages = (options = 100) => {
   return API.get(`/communication/messages?${query.toString()}`);
 };
 export const createCommunicationMessage = (payload) => API.post('/communication/messages', payload);
+export const updateCommunicationMessage = (id, payload) => API.patch(`/communication/messages/${id}`, payload);
+export const sendCommunicationTyping = (payload) => API.post('/communication/typing', payload);
+export const toggleCommunicationReaction = (id, emoji) =>
+  API.post(`/communication/messages/${id}/reactions`, { emoji });
+export const setCommunicationPin = (id, pinned) => API.post(`/communication/messages/${id}/pin`, { pinned });
 export const deleteCommunicationMessage = async (id) => {
   const attempts = [
     () => API.post('/communication/messages', { action: 'delete', id }),

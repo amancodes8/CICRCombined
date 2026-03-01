@@ -42,6 +42,18 @@ const normalizeAvatarUrl = (value) => {
     }
 };
 
+const readDoc = (doc, path, fallback = null) => {
+    if (!doc) return fallback;
+    if (typeof doc.get === 'function') {
+        const value = doc.get(path);
+        return value === undefined ? fallback : value;
+    }
+    const value = path
+        .split('.')
+        .reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), doc);
+    return value === undefined ? fallback : value;
+};
+
 /**
  * @desc    Get logged in user's profile
  * @route   GET /api/users/profile
@@ -159,15 +171,15 @@ const getDirectoryMembers = async (_req, res) => {
         .sort({ createdAt: -1 });
 
     const directory = users.map((u) => ({
-        _id: u._id,
-        name: u.name || '',
-        email: u.email || '',
-        collegeId: u.collegeId || '',
-        role: u.role || 'User',
-        branch: String(u.branch || '').toUpperCase(),
-        year: u.year ?? null,
-        batch: u.batch || '',
-        joinedAt: u.joinedAt || null,
+        _id: readDoc(u, '_id'),
+        name: readDoc(u, 'name', '') || '',
+        email: readDoc(u, 'email', '') || '',
+        collegeId: readDoc(u, 'collegeId', '') || '',
+        role: readDoc(u, 'role', 'User') || 'User',
+        branch: String(readDoc(u, 'branch', '') || '').toUpperCase(),
+        year: readDoc(u, 'year', null),
+        batch: readDoc(u, 'batch', '') || '',
+        joinedAt: readDoc(u, 'joinedAt', null),
     }));
     directory.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 
@@ -194,20 +206,20 @@ const getPublicProfileByCollegeId = async (req, res) => {
 
     res.json({
         profile: {
-            name: member.name || user.name,
-            collegeId: member.collegeId || user.collegeId,
-            role: member.role || user.role,
-            branch: member.branch || user.branch || '',
-            year: member.year || user.year || null,
-            batch: member.batch || user.batch || '',
-            joinedAt: member.joinedAt || user.joinedAt || user.createdAt,
+            name: member.name || readDoc(user, 'name', ''),
+            collegeId: member.collegeId || readDoc(user, 'collegeId', ''),
+            role: member.role || readDoc(user, 'role', ''),
+            branch: member.branch || readDoc(user, 'branch', '') || '',
+            year: member.year || readDoc(user, 'year', null),
+            batch: member.batch || readDoc(user, 'batch', '') || '',
+            joinedAt: member.joinedAt || readDoc(user, 'joinedAt') || readDoc(user, 'createdAt'),
             yearsInCICR: member.yearsInCICR || 0,
             bio: member.bio || '',
-            avatarUrl: member.avatarUrl || user.avatarUrl || '',
+            avatarUrl: member.avatarUrl || readDoc(user, 'avatarUrl', '') || '',
             achievements: member.achievements || [],
             skills: member.skills || [],
             social: member.social || {},
-            alumniProfile: member.alumniProfile || user.alumniProfile || {},
+            alumniProfile: member.alumniProfile || readDoc(user, 'alumniProfile', {}) || {},
         },
         metrics: {
             totalProjectContributions: metrics.totalProjectContributions || 0,

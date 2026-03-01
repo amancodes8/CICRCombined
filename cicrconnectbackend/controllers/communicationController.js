@@ -12,6 +12,7 @@ const AI_MENTION_TOKEN = '@cicrai';
 const DEFAULT_CONVERSATION_ID = 'admin-stream';
 const DOMAIN_SCOPE_HINT =
   'You must answer only CICR-related topics and technology domains: robotics, programming, software, hardware, AI/ML, cybersecurity, IoT, embedded, electronics, networking, product building, and project workflows. If question is outside this scope or nonsense, refuse briefly and ask a relevant CICR/tech question instead.';
+const REACTION_EMOJI_REGEX = /^(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)$/u;
 const CONVERSATION_ID_REGEX = /^[a-zA-Z0-9:_-]{2,80}$/;
 const sanitizeConversationId = (value) => {
   const normalized = String(value || '').trim();
@@ -73,37 +74,95 @@ const parseCursor = async (rawCursor) => {
   return null;
 };
 
+const readDoc = (doc, path, fallback = null) => {
+  if (!doc) return fallback;
+  if (typeof doc.get === 'function') {
+    const value = doc.get(path);
+    return value === undefined ? fallback : value;
+  }
+  const value = path
+    .split('.')
+    .reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), doc);
+  return value === undefined ? fallback : value;
+};
+
+const sanitizeReactionEmoji = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.length > 16) return '';
+  if (!REACTION_EMOJI_REGEX.test(raw)) return '';
+  return raw;
+};
+
+const isPrivilegedRole = (role) => {
+  const normalized = String(role || '').toLowerCase();
+  return normalized === 'admin' || normalized === 'head';
+};
+
+const canManageMessage = (actor, message) => {
+  const senderId = readDoc(message, 'sender._id') || readDoc(message, 'sender');
+  const isOwner = senderId && String(senderId) === String(actor?._id || actor?.id || '');
+  return isOwner || isPrivilegedRole(actor?.role);
+};
+
+const summarizeReactions = (messageDoc) => {
+  const reactions = Array.isArray(readDoc(messageDoc, 'reactions'))
+    ? readDoc(messageDoc, 'reactions')
+    : [];
+
+  return reactions
+    .map((row) => {
+      const reactorIds = Array.isArray(readDoc(row, 'users'))
+        ? readDoc(row, 'users').map((id) => String(readDoc(id, '_id') || id)).filter(Boolean)
+        : [];
+      return {
+        emoji: readDoc(row, 'emoji', ''),
+        count: reactorIds.length,
+        reactorIds,
+      };
+    })
+    .filter((row) => row.emoji && row.count > 0);
+};
+
 const serializeMessage = (messageDoc) => ({
-  _id: messageDoc._id,
-  conversationId: sanitizeConversationId(messageDoc.conversationId),
-  text: messageDoc.text,
+  _id: readDoc(messageDoc, '_id'),
+  conversationId: sanitizeConversationId(readDoc(messageDoc, 'conversationId')),
+  text: readDoc(messageDoc, 'text', ''),
   sender:
-    messageDoc.sender
+    readDoc(messageDoc, 'sender')
       ? {
-          _id: messageDoc.sender._id,
-          name: messageDoc.sender.name,
-          collegeId: messageDoc.sender.collegeId,
-          role: messageDoc.sender.role,
+          _id: readDoc(messageDoc, 'sender._id'),
+          name: readDoc(messageDoc, 'sender.name', ''),
+          collegeId: readDoc(messageDoc, 'sender.collegeId', ''),
+          role: readDoc(messageDoc, 'sender.role', ''),
           isAI: false,
         }
-      : messageDoc.senderMeta
+      : readDoc(messageDoc, 'senderMeta')
       ? {
           _id: null,
-          name: messageDoc.senderMeta.name,
-          collegeId: messageDoc.senderMeta.collegeId,
-          role: messageDoc.senderMeta.role,
-          isAI: !!messageDoc.senderMeta.isAI,
+          name: readDoc(messageDoc, 'senderMeta.name', ''),
+          collegeId: readDoc(messageDoc, 'senderMeta.collegeId', ''),
+          role: readDoc(messageDoc, 'senderMeta.role', ''),
+          isAI: !!readDoc(messageDoc, 'senderMeta.isAI', false),
         }
       : null,
-  replyTo: messageDoc.replyTo || null,
-  mentions: Array.isArray(messageDoc.mentions)
-    ? messageDoc.mentions.map((m) => ({
-        _id: m._id,
-        name: m.name,
-        collegeId: m.collegeId,
+  replyTo: readDoc(messageDoc, 'replyTo', null),
+  mentions: Array.isArray(readDoc(messageDoc, 'mentions'))
+    ? readDoc(messageDoc, 'mentions').map((m) => ({
+        _id: readDoc(m, '_id'),
+        name: readDoc(m, 'name', ''),
+        collegeId: readDoc(m, 'collegeId', ''),
       }))
     : [],
-  createdAt: messageDoc.createdAt,
+  editedAt: readDoc(messageDoc, 'editedAt', null),
+  editedBy: readDoc(messageDoc, 'editedBy._id') || readDoc(messageDoc, 'editedBy') || null,
+  pinned: {
+    isPinned: !!readDoc(messageDoc, 'pinned.isPinned', false),
+    pinnedBy: readDoc(messageDoc, 'pinned.pinnedBy._id') || readDoc(messageDoc, 'pinned.pinnedBy') || null,
+    pinnedAt: readDoc(messageDoc, 'pinned.pinnedAt', null),
+  },
+  reactions: summarizeReactions(messageDoc),
+  createdAt: readDoc(messageDoc, 'createdAt'),
 });
 
 const broadcast = (event, payload, conversationId = DEFAULT_CONVERSATION_ID) => {
@@ -161,8 +220,9 @@ const queueAiReply = async (message) => {
     const context = recent
       .reverse()
       .map((m) => {
-        const name = m.sender?.name || m.senderMeta?.name || 'Member';
-        return `${name}: ${m.text}`;
+        const name = readDoc(m, 'sender.name') || readDoc(m, 'senderMeta.name') || 'Member';
+        const text = readDoc(m, 'text', '');
+        return `${name}: ${text}`;
       })
       .join('\n');
     const projectContext = projects
@@ -211,8 +271,7 @@ const performDelete = async (req, id) => {
     return { success: true, _id: String(id), alreadyDeleted: true };
   }
 
-  const role = String(req.user.role || '').toLowerCase();
-  const isPrivileged = role === 'admin' || role === 'head';
+  const isPrivileged = isPrivilegedRole(req.user?.role);
   const senderId =
     message.sender && typeof message.sender === 'object' ? message.sender._id : message.sender;
   const isOwner = !!senderId && String(senderId) === String(req.user._id);
@@ -251,7 +310,9 @@ const listMessages = async (req, res) => {
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1)
     .populate('sender', 'name collegeId role')
-    .populate('mentions', 'name collegeId');
+    .populate('mentions', 'name collegeId')
+    .populate('editedBy', 'name collegeId role')
+    .populate('pinned.pinnedBy', 'name collegeId role');
 
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
@@ -332,9 +393,9 @@ const createMessage = async (req, res) => {
     if (parent) {
       replyTo = {
         messageId: parent._id,
-        text: String(parent.text || '').slice(0, 180),
-        senderName: parent.sender?.name || parent.senderMeta?.name || 'Member',
-        senderCollegeId: parent.sender?.collegeId || parent.senderMeta?.collegeId || '',
+        text: String(readDoc(parent, 'text', '') || '').slice(0, 180),
+        senderName: readDoc(parent, 'sender.name') || readDoc(parent, 'senderMeta.name') || 'Member',
+        senderCollegeId: readDoc(parent, 'sender.collegeId') || readDoc(parent, 'senderMeta.collegeId') || '',
       };
     }
   }
@@ -349,7 +410,9 @@ const createMessage = async (req, res) => {
 
   const fullMessage = await CommunicationMessage.findById(created._id)
     .populate('sender', 'name collegeId role')
-    .populate('mentions', 'name collegeId');
+    .populate('mentions', 'name collegeId')
+    .populate('editedBy', 'name collegeId role')
+    .populate('pinned.pinnedBy', 'name collegeId role');
 
   const mentionRecipientIds = mentionUsers
     .filter((row) => {
@@ -361,7 +424,7 @@ const createMessage = async (req, res) => {
   if (mentionRecipientIds.length > 0) {
     await createNotifications({
       userIds: mentionRecipientIds,
-      title: `Mentioned by ${req.user.name || 'Member'}`,
+      title: `Mentioned by ${readDoc(req.user, 'name') || 'Member'}`,
       message: String(text).slice(0, 220),
       type: 'action',
       link: '/communication',
@@ -393,17 +456,17 @@ const listMentionCandidates = async (req, res) => {
   const filteredUsers = users
     .filter((row) => {
       if (!q) return true;
-      const name = String(row.name || '').toLowerCase();
-      const collegeId = String(row.collegeId || '').toLowerCase();
+      const name = String(readDoc(row, 'name', '') || '').toLowerCase();
+      const collegeId = String(readDoc(row, 'collegeId', '') || '').toLowerCase();
       return name.includes(q) || collegeId.includes(q);
     })
-    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+    .sort((a, b) => String(readDoc(a, 'name', '') || '').localeCompare(String(readDoc(b, 'name', '') || '')))
     .slice(0, 20)
     .map((row) => ({
-      _id: row._id,
-      name: row.name,
-      collegeId: row.collegeId,
-      role: row.role,
+      _id: readDoc(row, '_id'),
+      name: readDoc(row, 'name', ''),
+      collegeId: readDoc(row, 'collegeId', ''),
+      role: readDoc(row, 'role', ''),
     }));
 
   const aiCandidate =
@@ -422,10 +485,144 @@ const deleteMessage = async (req, res) => {
   return res.json(result);
 };
 
+const updateMessage = async (req, res) => {
+  const id = req.params.id;
+  const nextText = String(req.body?.text || '').trim();
+  if (!nextText) {
+    return res.status(400).json({ message: 'Message text is required' });
+  }
+  if (nextText.length > 1000) {
+    return res.status(400).json({ message: 'Message must be 1000 characters or less' });
+  }
+
+  const message = await CommunicationMessage.findById(id).populate('sender', 'name collegeId role');
+  if (!message) {
+    return res.status(404).json({ message: 'Message not found' });
+  }
+
+  if (!canManageMessage(req.user, message)) {
+    return res.status(403).json({ message: 'Not authorized to edit this message' });
+  }
+
+  if (readDoc(message, 'senderMeta.isAI')) {
+    return res.status(400).json({ message: 'AI-generated messages cannot be edited' });
+  }
+
+  message.text = nextText;
+  message.editedAt = new Date();
+  message.editedBy = req.user._id;
+  await message.save();
+
+  const fullMessage = await CommunicationMessage.findById(id)
+    .populate('sender', 'name collegeId role')
+    .populate('mentions', 'name collegeId')
+    .populate('editedBy', 'name collegeId role')
+    .populate('pinned.pinnedBy', 'name collegeId role');
+
+  const payload = serializeMessage(fullMessage);
+  broadcast('update-message', payload, sanitizeConversationId(message.conversationId));
+  return res.json(payload);
+};
+
+const toggleReaction = async (req, res) => {
+  const id = req.params.id;
+  const emoji = sanitizeReactionEmoji(req.body?.emoji);
+  if (!emoji) {
+    return res.status(400).json({ message: 'A valid emoji is required' });
+  }
+
+  const message = await CommunicationMessage.findById(id);
+  if (!message) {
+    return res.status(404).json({ message: 'Message not found' });
+  }
+
+  const actorId = String(req.user._id);
+  const current = Array.isArray(message.reactions) ? message.reactions : [];
+  const idx = current.findIndex((row) => String(row.emoji || '') === emoji);
+  if (idx === -1) {
+    current.push({ emoji, users: [req.user._id] });
+  } else {
+    const users = Array.isArray(current[idx].users) ? current[idx].users : [];
+    const has = users.some((row) => String(row) === actorId);
+    current[idx].users = has
+      ? users.filter((row) => String(row) !== actorId)
+      : [...users, req.user._id];
+    if (current[idx].users.length === 0) {
+      current.splice(idx, 1);
+    }
+  }
+
+  message.reactions = current;
+  await message.save();
+
+  const fullMessage = await CommunicationMessage.findById(id)
+    .populate('sender', 'name collegeId role')
+    .populate('mentions', 'name collegeId')
+    .populate('editedBy', 'name collegeId role')
+    .populate('pinned.pinnedBy', 'name collegeId role');
+  const payload = serializeMessage(fullMessage);
+  broadcast('update-message', payload, sanitizeConversationId(message.conversationId));
+  return res.json(payload);
+};
+
+const setPinned = async (req, res) => {
+  if (!isPrivilegedRole(req.user?.role)) {
+    return res.status(403).json({ message: 'Only Admin/Head can pin messages' });
+  }
+
+  const id = req.params.id;
+  const desired = req.body?.pinned;
+  const message = await CommunicationMessage.findById(id);
+  if (!message) {
+    return res.status(404).json({ message: 'Message not found' });
+  }
+
+  const nextPinned =
+    typeof desired === 'boolean' ? desired : !Boolean(readDoc(message, 'pinned.isPinned', false));
+
+  message.pinned = {
+    isPinned: nextPinned,
+    pinnedBy: nextPinned ? req.user._id : null,
+    pinnedAt: nextPinned ? new Date() : null,
+  };
+  await message.save();
+
+  const fullMessage = await CommunicationMessage.findById(id)
+    .populate('sender', 'name collegeId role')
+    .populate('mentions', 'name collegeId')
+    .populate('editedBy', 'name collegeId role')
+    .populate('pinned.pinnedBy', 'name collegeId role');
+  const payload = serializeMessage(fullMessage);
+  broadcast('update-message', payload, sanitizeConversationId(message.conversationId));
+  return res.json(payload);
+};
+
+const reportTyping = async (req, res) => {
+  const conversationId = sanitizeConversationId(req.body?.conversationId || req.query?.conversationId);
+  const isTyping = !!req.body?.isTyping;
+  const payload = {
+    conversationId,
+    user: {
+      _id: String(req.user?._id || ''),
+      name: String(req.user?.name || ''),
+      collegeId: String(req.user?.collegeId || ''),
+      role: String(req.user?.role || ''),
+    },
+    isTyping,
+    at: new Date().toISOString(),
+  };
+  broadcast('typing', payload, conversationId);
+  return res.json({ success: true });
+};
+
 module.exports = {
   listMessages,
   streamMessages,
   createMessage,
   listMentionCandidates,
   deleteMessage,
+  updateMessage,
+  toggleReaction,
+  setPinned,
+  reportTyping,
 };
