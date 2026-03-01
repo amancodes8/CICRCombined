@@ -758,11 +758,6 @@ export default function Communication() {
     e.preventDefault();
     if (!canSend) return;
   
-      if (editingMessageId) {
-        await saveEdit(editingMessageId);
-        return;
-      }
-  
     useEffect(() => {
       return () => {
         emitTyping(false);
