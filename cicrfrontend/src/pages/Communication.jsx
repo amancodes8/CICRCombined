@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowDown,
+  Bot,
   Circle,
   CornerUpLeft,
   Loader2,
   MessageCircle,
   Send,
   Trash2,
-  UserRound,
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -72,6 +73,26 @@ const userColor = (seed) => {
   return `hsl(${hue} 76% 68%)`;
 };
 
+const userInitials = (name) => {
+  const parts = String(name || '').trim().split(/\s+/);
+  if (parts.length === 0 || !parts[0]) return '?';
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const fullTimestamp = (value) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString([], {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
 const isGroupedMessage = (current, previous) => {
   if (!current || !previous) return false;
   if (String(current?.sender?._id || '') !== String(previous?.sender?._id || '')) return false;
@@ -111,6 +132,8 @@ export default function Communication() {
   const [serverError, setServerError] = useState('');
   const [replyTarget, setReplyTarget] = useState(null);
   const [actionError, setActionError] = useState('');
+  const [showScrollDown, setShowScrollDown] = useState(false);
+  const [newMsgCount, setNewMsgCount] = useState(0);
 
   const endRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -123,6 +146,18 @@ export default function Communication() {
   const currentRole = String(user?.role || '').toLowerCase();
   const canSend = Boolean(localStorage.getItem('token'));
   const canModerate = currentRole === 'admin' || currentRole === 'head';
+
+  const isNearBottom = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setShowScrollDown(false);
+    setNewMsgCount(0);
+  }, []);
 
   const sortedMessages = useMemo(
     () => [...messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
@@ -186,12 +221,30 @@ export default function Communication() {
       return;
     }
 
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [sortedMessages.length]);
+    if (isNearBottom()) {
+      endRef.current?.scrollIntoView({ behavior: 'smooth' });
+      setNewMsgCount(0);
+    } else {
+      setNewMsgCount((c) => c + 1);
+      setShowScrollDown(true);
+    }
+  }, [sortedMessages.length, isNearBottom]);
 
   useEffect(() => {
     markCommunicationRead(Date.now(), COMMUNICATION_CONVERSATION_ID);
   }, []);
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return undefined;
+    const handleScroll = () => {
+      const near = isNearBottom();
+      setShowScrollDown(!near);
+      if (near) setNewMsgCount(0);
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [isNearBottom]);
 
   useEffect(() => {
     if (!actionError) return undefined;
@@ -422,7 +475,15 @@ export default function Communication() {
             ) : null}
 
             {sortedMessages.length === 0 ? (
-              <p className="text-sm text-gray-500 px-1 py-4">No messages yet.</p>
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                <div className="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-4">
+                  <MessageCircle size={24} className="text-blue-400" />
+                </div>
+                <p className="text-sm font-semibold text-gray-300">No messages yet</p>
+                <p className="text-xs text-gray-500 mt-1 max-w-xs">
+                  Start the conversation! Use @collegeId to mention team members or @cicrai for AI assistance.
+                </p>
+              </div>
             ) : null}
 
             <AnimatePresence initial={false}>
@@ -436,6 +497,7 @@ export default function Communication() {
                   own ||
                   (message.sender?.isAI &&
                     String(message.replyTo?.senderCollegeId || '') === String(user?.collegeId || ''));
+                const senderColor = userColor(message.sender?.collegeId || message.sender?.name);
 
                 return (
                   <div key={message._id}>
@@ -453,91 +515,116 @@ export default function Communication() {
                       exit={{ opacity: 0, y: -10 }}
                       className={`flex ${own ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-2.5'}`}
                     >
-                      <motion.article
-                        whileHover={{ y: -1 }}
-                        onTouchStart={(e) => onBubbleTouchStart(message._id, e)}
-                        onTouchEnd={(e) => onBubbleTouchEnd(message, e)}
-                        className={`group max-w-[94%] sm:max-w-[88%] md:max-w-[74%] rounded-2xl px-3 py-2.5 border ${
-                          own
-                            ? 'bg-blue-600/14 border-blue-500/25'
-                            : message.sender?.isAI
-                            ? 'bg-emerald-600/10 border-emerald-500/25'
-                            : 'bg-[#0f1218] border-gray-700/75'
-                        }`}
-                      >
+                      <div className={`flex gap-2 max-w-[94%] sm:max-w-[88%] md:max-w-[74%] ${own ? 'flex-row-reverse' : ''}`}>
                         {!grouped ? (
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-xs text-gray-100 inline-flex items-center gap-1.5 min-w-0">
-                              <UserRound
-                                size={13}
-                                className={`${message.sender?.isAI ? 'text-emerald-400' : 'text-blue-400'} shrink-0 mt-[1px]`}
-                              />
-                              <span
-                                className="font-semibold break-all"
-                                style={{ color: userColor(message.sender?.collegeId || message.sender?.name) }}
-                              >
-                                {message.sender?.name || 'Member'}
-                              </span>
-                              <span className="text-gray-500 truncate">@{message.sender?.collegeId || 'N/A'}</span>
-                            </p>
+                          <div
+                            className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold mt-0.5 ${
+                              message.sender?.isAI
+                                ? 'bg-emerald-500/20 border border-emerald-500/30'
+                                : 'border border-gray-700/80'
+                            }`}
+                            style={
+                              message.sender?.isAI
+                                ? undefined
+                                : { backgroundColor: `${senderColor}22`, color: senderColor }
+                            }
+                          >
+                            {message.sender?.isAI ? (
+                              <Bot size={14} className="text-emerald-400" />
+                            ) : (
+                              userInitials(message.sender?.name)
+                            )}
+                          </div>
+                        ) : (
+                          <div className="w-7 shrink-0" />
+                        )}
 
-                            <div className="flex items-center gap-1.5 shrink-0">
+                        <motion.article
+                          whileHover={{ y: -1 }}
+                          onTouchStart={(e) => onBubbleTouchStart(message._id, e)}
+                          onTouchEnd={(e) => onBubbleTouchEnd(message, e)}
+                          className={`group flex-1 min-w-0 rounded-2xl px-3 py-2.5 border ${
+                            own
+                              ? 'bg-blue-600/14 border-blue-500/25'
+                              : message.sender?.isAI
+                              ? 'bg-emerald-600/10 border-emerald-500/25'
+                              : 'bg-[#0f1218] border-gray-700/75'
+                          }`}
+                        >
+                          {!grouped ? (
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-xs text-gray-100 inline-flex items-center gap-1.5 min-w-0">
+                                {message.sender?.isAI ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-1.5 py-0.5">
+                                    <Bot size={10} /> AI
+                                  </span>
+                                ) : null}
+                                <span
+                                  className="font-semibold break-all"
+                                  style={{ color: senderColor }}
+                                >
+                                  {message.sender?.name || 'Member'}
+                                </span>
+                                <span className="text-gray-500 truncate">@{message.sender?.collegeId || 'N/A'}</span>
+                              </p>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setReplyTarget(message)}
+                                  className="opacity-90 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-gray-500 hover:text-blue-300"
+                                  title="Reply"
+                                >
+                                  <CornerUpLeft size={13} />
+                                </button>
+
+                                {canDelete ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeMessage(message._id)}
+                                    disabled={deletingId === message._id}
+                                    className="opacity-90 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-gray-500 hover:text-red-400 disabled:opacity-40"
+                                    title="Delete"
+                                  >
+                                    {deletingId === message._id ? (
+                                      <Loader2 size={13} className="animate-spin" />
+                                    ) : (
+                                      <Trash2 size={13} />
+                                    )}
+                                  </button>
+                                ) : null}
+
+                                <p className="text-[10px] text-gray-500" title={fullTimestamp(message.createdAt)}>{timeLabel(message.createdAt)}</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-end gap-1.5 mb-1">
                               <button
                                 type="button"
                                 onClick={() => setReplyTarget(message)}
-                                className="opacity-90 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-gray-500 hover:text-blue-300"
+                                className="text-gray-500 hover:text-blue-300"
                                 title="Reply"
                               >
-                                <CornerUpLeft size={13} />
+                                <CornerUpLeft size={12} />
                               </button>
-
                               {canDelete ? (
                                 <button
                                   type="button"
                                   onClick={() => removeMessage(message._id)}
                                   disabled={deletingId === message._id}
-                                  className="opacity-90 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-gray-500 hover:text-red-400 disabled:opacity-40"
+                                  className="text-gray-500 hover:text-red-400 disabled:opacity-40"
                                   title="Delete"
                                 >
                                   {deletingId === message._id ? (
-                                    <Loader2 size={13} className="animate-spin" />
+                                    <Loader2 size={12} className="animate-spin" />
                                   ) : (
-                                    <Trash2 size={13} />
+                                    <Trash2 size={12} />
                                   )}
                                 </button>
                               ) : null}
-
-                              <p className="text-[10px] text-gray-500">{timeLabel(message.createdAt)}</p>
+                              <p className="text-[10px] text-gray-500" title={fullTimestamp(message.createdAt)}>{timeLabel(message.createdAt)}</p>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-end gap-1.5 mb-1">
-                            <button
-                              type="button"
-                              onClick={() => setReplyTarget(message)}
-                              className="text-gray-500 hover:text-blue-300"
-                              title="Reply"
-                            >
-                              <CornerUpLeft size={12} />
-                            </button>
-                            {canDelete ? (
-                              <button
-                                type="button"
-                                onClick={() => removeMessage(message._id)}
-                                disabled={deletingId === message._id}
-                                className="text-gray-500 hover:text-red-400 disabled:opacity-40"
-                                title="Delete"
-                              >
-                                {deletingId === message._id ? (
-                                  <Loader2 size={12} className="animate-spin" />
-                                ) : (
-                                  <Trash2 size={12} />
-                                )}
-                              </button>
-                            ) : null}
-                            <p className="text-[10px] text-gray-500">{timeLabel(message.createdAt)}</p>
-                          </div>
-                        )}
+                          )}
 
                         {message.replyTo?.text ? (
                           <div className="mt-1.5 rounded-xl border border-gray-700/70 bg-black/25 px-2.5 py-1.5">
@@ -551,13 +638,25 @@ export default function Communication() {
                         <p className="text-sm md:text-[15px] text-gray-200 mt-1.5 break-words leading-relaxed">
                           {decorateMentions(message.text)}
                         </p>
-                      </motion.article>
+                        </motion.article>
+                      </div>
                     </motion.div>
                   </div>
                 );
               })}
             </AnimatePresence>
             <div ref={endRef} />
+
+            {showScrollDown ? (
+              <button
+                type="button"
+                onClick={scrollToBottom}
+                className="sticky bottom-3 left-1/2 -translate-x-1/2 ml-auto mr-auto w-fit flex items-center gap-1.5 bg-blue-600/90 hover:bg-blue-600 border border-blue-400/30 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg transition-all z-10"
+              >
+                <ArrowDown size={13} />
+                {newMsgCount > 0 ? `${newMsgCount} new` : 'Jump to latest'}
+              </button>
+            ) : null}
           </div>
         )}
 
@@ -627,7 +726,7 @@ export default function Communication() {
 
             <div className="flex items-center justify-between gap-2 text-[11px] text-gray-500 px-1">
               <p>Enter to send, Shift+Enter for newline.</p>
-              <p className={text.length > 1800 ? 'text-amber-300' : ''}>{text.length}/2000</p>
+              <p className={text.length > 1900 ? 'text-red-400 font-semibold' : text.length > 1800 ? 'text-amber-300' : text.length > 1500 ? 'text-amber-400/60' : ''}>{text.length}/2000</p>
             </div>
           </form>
         </footer>
