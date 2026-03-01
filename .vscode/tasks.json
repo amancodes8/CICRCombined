@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Android APK",
+      "type": "shell",
+      "command": "npm run build:android",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/cicrmobile"
+      },
+      "problemMatcher": [],
+      "detail": "Generates native project and builds a release APK via Gradle"
+    },
+    {
+      "label": "Build Android APK (clean)",
+      "type": "shell",
+      "command": "npm run build:android:clean",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/cicrmobile"
+      },
+      "problemMatcher": [],
+      "detail": "Clean rebuild — regenerates the native project from scratch"
+    }
+  ]
+}

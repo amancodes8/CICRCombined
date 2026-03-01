@@ -140,3 +140,58 @@ You can also trigger it manually from the **Actions** tab using **workflow_dispa
 
 > Exact times are printed in the **Job Summary** of each workflow run.
 > Gradle dependency & build caches are stored between runs to speed up subsequent builds.
+
+### Building APK from VS Code
+
+You can build the APK directly from VS Code's integrated terminal without leaving the editor.
+
+#### Prerequisites
+
+| Requirement | Why |
+|-------------|-----|
+| **JDK 17** | Gradle needs it to compile native code |
+| **Android SDK** (via Android Studio or command-line tools) | Provides build tools, platform APIs |
+| **`ANDROID_HOME`** env variable set | Gradle uses it to locate the SDK |
+| **Node.js ≥ 18** | Runs Expo CLI and JS bundler |
+
+> **Tip:** Install [Android Studio](https://developer.android.com/studio) — it bundles the SDK, JDK, and emulator. After installation, set `ANDROID_HOME` to the SDK path (e.g. `~/Library/Android/sdk` on macOS, `%LOCALAPPDATA%\Android\Sdk` on Windows, `~/Android/Sdk` on Linux).
+
+#### Option 1 — npm script (recommended)
+
+Open the VS Code **Terminal** (`Ctrl+`` `) and run:
+
+```bash
+cd cicrmobile
+npm install                # first time only
+npm run build:android      # prebuild + Gradle assembleRelease
+```
+
+The APK is written to:
+
+```
+cicrmobile/android/app/build/outputs/apk/release/app-release.apk
+```
+
+Use `npm run build:android:clean` to regenerate the native project from scratch (useful after changing `app.json` or adding native plugins).
+
+#### Option 2 — VS Code Task
+
+The repo includes a `.vscode/tasks.json` with pre-configured build tasks:
+
+1. Press **Ctrl+Shift+P** (or **Cmd+Shift+P** on macOS)
+2. Type **"Tasks: Run Task"** and select it
+3. Choose **Build Android APK** (or **Build Android APK (clean)**)
+
+The build output appears in the VS Code terminal panel.
+
+#### Option 3 — EAS Build (cloud, no local SDK needed)
+
+If you don't have the Android SDK installed locally, use Expo's cloud build service:
+
+```bash
+cd cicrmobile
+npx eas login                          # sign in to your Expo account
+npx eas build --platform android --profile preview   # builds APK in the cloud
+```
+
+EAS Build takes ~10–15 min. The APK download link is printed when the build finishes.
