@@ -121,7 +121,7 @@ const dispatchToast = (message, type = 'info') => {
   }
 };
 
-let optimisticIdCounter = 0;
+const generateOptimisticId = () => `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 export default function Communication() {
   const [messages, setMessages] = useState([]);
@@ -264,9 +264,15 @@ export default function Communication() {
         if (payload?.conversationId && payload.conversationId !== COMMUNICATION_CONVERSATION_ID) return;
 
         setMessages((prev) => {
-          const withoutOptimistic = prev.filter(
-            (m) => !(m._optimistic && m._optimisticText === payload.text && String(m.sender?._id) === String(payload.sender?._id))
-          );
+          const withoutOptimistic = prev.filter((m) => {
+            if (!m._optimistic) return true;
+            if (m._optimisticText !== payload.text) return true;
+            if (String(m.sender?._id) !== String(payload.sender?._id)) return true;
+            const optimisticTs = new Date(m.createdAt).getTime();
+            const payloadTs = new Date(payload.createdAt).getTime();
+            if (Number.isFinite(optimisticTs) && Number.isFinite(payloadTs) && Math.abs(payloadTs - optimisticTs) > 30000) return true;
+            return false;
+          });
           if (withoutOptimistic.some((m) => m._id === payload._id)) return withoutOptimistic;
           markCommunicationRead(
             payload?.createdAt ? new Date(payload.createdAt).getTime() : Date.now(),
@@ -361,7 +367,7 @@ export default function Communication() {
     const body = text.trim();
     if (!body) return;
 
-    const optimisticId = `optimistic-${++optimisticIdCounter}`;
+    const optimisticId = generateOptimisticId();
     const optimisticMsg = {
       _id: optimisticId,
       _optimistic: true,
