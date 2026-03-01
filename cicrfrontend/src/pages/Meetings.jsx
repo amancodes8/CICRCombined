@@ -223,7 +223,7 @@ export default function Meetings() {
         <Metric label="Upcoming" value={summary.upcoming} hint="Future sessions" tone="amber" />
       </section>
 
-      <section className="section-motion section-motion-delay-2">
+      <section className="ui-toolbar-sticky section-motion section-motion-delay-2">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative w-full lg:max-w-md">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />

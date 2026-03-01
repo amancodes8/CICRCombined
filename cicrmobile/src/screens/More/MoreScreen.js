@@ -12,10 +12,13 @@ import { colors, fontSize, fontWeight, radius, spacing } from '../../theme';
 
 const MENU_ITEMS = [
   { key: 'Members', icon: 'people-outline', label: 'Members', color: colors.blue, desc: 'View team directory' },
+  { key: 'Communication', icon: 'chatbox-ellipses-outline', label: 'Communication', color: colors.cyan, desc: 'Club messaging channel' },
   { key: 'Inventory', icon: 'cube-outline', label: 'Inventory', color: colors.amber, desc: 'Component tracking' },
   { key: 'LearningHub', icon: 'school-outline', label: 'Learning Hub', color: colors.emerald, desc: 'Tracks & submissions' },
   { key: 'ProgramsHub', icon: 'trophy-outline', label: 'Programs Hub', color: colors.purple, desc: 'Quests & badges' },
   { key: 'Hierarchy', icon: 'git-branch-outline', label: 'Tasks', color: colors.cyan, desc: 'Task management' },
+  { key: 'AIChat', icon: 'sparkles-outline', label: 'AI Assistant', color: colors.accentBlue, desc: 'Ask about CICR' },
+  { key: 'Guidelines', icon: 'book-outline', label: 'Guidelines', color: colors.rose, desc: 'Club rules & policies' },
   { key: 'Notifications', icon: 'notifications-outline', label: 'Notifications', color: colors.rose, desc: 'Your alerts' },
 ];
 

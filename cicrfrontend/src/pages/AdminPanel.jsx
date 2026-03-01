@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import {
   fetchMembers,
   updateUserByAdmin,
@@ -17,6 +18,7 @@ import {
 } from '../api';
 import CicrAssistant from '../components/CicrAssistant';
 import PageHeader from '../components/PageHeader';
+import { DataEmpty, DataLoading } from '../components/DataState';
 import { 
   Shield, Trash2, UserPlus, Copy, Check, 
   Search, Mail, Send, Loader2, UserCheck, GraduationCap, Fingerprint,
@@ -118,10 +120,11 @@ function AdminSectionShell({ icon: Icon, title, subtitle, badge, actions, classN
 }
 
 export default function AdminPanel() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState(localStorage.getItem('admin_users_search') || '');
-  const [adminTab, setAdminTab] = useState(localStorage.getItem('admin_panel_tab') || 'users');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || localStorage.getItem('admin_users_search') || '');
+  const [adminTab, setAdminTab] = useState(searchParams.get('tab') || localStorage.getItem('admin_panel_tab') || 'users');
   const [sortBy, setSortBy] = useState(localStorage.getItem('admin_users_sort') || 'name_asc');
   const [userQuickFilter, setUserQuickFilter] = useState(localStorage.getItem('admin_users_quick_filter') || 'all');
   const [visibleColumns, setVisibleColumns] = useState(() => {
@@ -162,8 +165,8 @@ export default function AdminPanel() {
   const [resetCodeData, setResetCodeData] = useState(null);
   const [pendingActions, setPendingActions] = useState([]);
   const [applications, setApplications] = useState([]);
-  const [appFilter, setAppFilter] = useState('All');
-  const [appSearch, setAppSearch] = useState('');
+  const [appFilter, setAppFilter] = useState(searchParams.get('appStatus') || 'All');
+  const [appSearch, setAppSearch] = useState(searchParams.get('appQ') || '');
   const [appLoading, setAppLoading] = useState(true);
   const [selectedApplicationIds, setSelectedApplicationIds] = useState([]);
   const [draggingAppId, setDraggingAppId] = useState('');
@@ -212,6 +215,23 @@ export default function AdminPanel() {
   useEffect(() => {
     localStorage.setItem('admin_users_columns', JSON.stringify(visibleColumns));
   }, [visibleColumns]);
+
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (adminTab) next.set('tab', adminTab);
+        if (searchTerm.trim()) next.set('q', searchTerm.trim());
+        else next.delete('q');
+        if (appFilter && appFilter !== 'All') next.set('appStatus', appFilter);
+        else next.delete('appStatus');
+        if (appSearch.trim()) next.set('appQ', appSearch.trim());
+        else next.delete('appQ');
+        return next;
+      },
+      { replace: true }
+    );
+  }, [adminTab, appFilter, appSearch, searchTerm, setSearchParams]);
 
   useEffect(() => {
     localStorage.setItem(FILTER_PRESET_KEY, JSON.stringify(savedViews));
@@ -887,7 +907,7 @@ export default function AdminPanel() {
         />
       </div>
 
-      <div className="section-motion section-motion-delay-1">
+      <div className="ui-toolbar-sticky section-motion section-motion-delay-1">
         <div className="flex items-center gap-2 rounded-2xl border border-gray-800/90 p-1 bg-[#060a10]/80 overflow-x-auto">
           {adminTabs.map((tab) => (
             <button
@@ -933,7 +953,7 @@ export default function AdminPanel() {
                   <span className="text-[10px] font-black text-blue-300 uppercase tracking-[0.3em]">Access Key Active</span>
                   <div className="flex items-center justify-center lg:justify-start gap-5">
                     <h3 className="text-4xl md:text-5xl font-black font-mono tracking-[0.2em] text-white">{inviteCode}</h3>
-                    <button onClick={copyToClipboard} className="p-3 bg-[#0a0f17] border border-gray-700 rounded-xl hover:border-blue-500 transition-all">
+                    <button aria-label="Copy invite code" onClick={copyToClipboard} className="p-3 bg-[#0a0f17] border border-gray-700 rounded-xl hover:border-blue-500 transition-all">
                       {copied ? <Check size={20} className="text-green-500" /> : <Copy size={20} className="text-gray-400" />}
                     </button>
                   </div>
@@ -1023,6 +1043,7 @@ export default function AdminPanel() {
               <button
                 type="button"
                 onClick={copyResetCode}
+                aria-label="Copy reset code"
                 className="p-2 rounded-lg border border-gray-700 text-gray-300 hover:text-white hover:border-cyan-500/40"
                 title="Copy reset code"
               >
@@ -1077,7 +1098,7 @@ export default function AdminPanel() {
         badge={`${filteredApplications.length} visible`}
         className="section-motion section-motion-delay-2"
         actions={(
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <div className="ui-toolbar-sticky flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <select
               value={appFilter}
               onChange={(e) => setAppFilter(e.target.value)}
@@ -1096,6 +1117,7 @@ export default function AdminPanel() {
                 value={appSearch}
                 onChange={(e) => setAppSearch(e.target.value)}
                 placeholder="Search applicants..."
+                aria-label="Search applicants"
                 className="ui-input !text-xs !pl-10 !py-2 !pr-3 min-w-[220px]"
               />
             </div>
@@ -1116,7 +1138,7 @@ export default function AdminPanel() {
         </div>
 
         {appLoading ? (
-          <div className="text-sm text-gray-500">Loading applications...</div>
+          <DataLoading label="Loading applications..." />
         ) : (
           <div className="overflow-x-auto">
             <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 min-w-[1180px] xl:min-w-0">
@@ -1255,9 +1277,15 @@ export default function AdminPanel() {
         )}
 
         {!appLoading && filteredApplications.length === 0 && (
-          <div className="border border-dashed border-gray-800 rounded-xl p-6 text-sm text-gray-500 mt-4">
-            No applications found for the selected filter.
-          </div>
+          <DataEmpty
+            title="No applications found"
+            hint="Try changing status filter or search query."
+            actionLabel="Reset filters"
+            onAction={() => {
+              setAppFilter('All');
+              setAppSearch('');
+            }}
+          />
         )}
       </AdminSectionShell>
 
@@ -1349,7 +1377,7 @@ export default function AdminPanel() {
           )}
         >
           {auditLoading ? (
-            <div className="text-sm text-gray-500">Loading audit log...</div>
+            <DataLoading label="Loading audit log..." />
           ) : (
             <div className="max-h-[360px] overflow-auto space-y-2 pr-1">
               {auditRows.map((row) => (
@@ -1364,9 +1392,7 @@ export default function AdminPanel() {
                 </div>
               ))}
               {auditRows.length === 0 && (
-                <div className="border border-dashed border-gray-800 rounded-xl px-3 py-8 text-center text-sm text-gray-500">
-                  No audit entries found.
-                </div>
+                <DataEmpty label="No audit entries found." />
               )}
             </div>
           )}
@@ -1377,7 +1403,7 @@ export default function AdminPanel() {
       {adminTab === 'users' && (
         <>
           <div className="ui-table-shell section-motion section-motion-delay-3 bg-[#090e15]/75">
-            <div className="p-5 md:p-6 border-b border-gray-800 flex flex-col gap-4">
+            <div className="ui-toolbar-sticky p-5 md:p-6 border-b border-gray-800 flex flex-col gap-4">
               <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <UserCheck className="text-blue-400" size={22} />
@@ -1503,8 +1529,8 @@ export default function AdminPanel() {
                             <button
                               type="button"
                               onClick={() => deleteUserView(view.id)}
+                              aria-label={`Delete saved view ${view.name}`}
                               className="px-2 py-1.5 text-xs text-gray-500 hover:text-rose-300 hover:bg-rose-500/10"
-                              aria-label={`Delete view ${view.name}`}
                             >
                               ×
                             </button>
@@ -1631,6 +1657,7 @@ export default function AdminPanel() {
                         <td className="p-4 text-right">
                           <div className="inline-flex items-center gap-1">
                             <button
+                              aria-label="Generate password reset code"
                               onClick={() => handleGenerateResetCode(u._id, u.name)}
                               className="p-2 text-gray-500 hover:text-blue-300 hover:bg-blue-500/10 rounded-xl transition-all"
                               title="Generate password reset code"
@@ -1639,6 +1666,7 @@ export default function AdminPanel() {
                             </button>
                             {!['admin', 'head'].includes(String(u.role || '').toLowerCase()) && (
                               <button
+                                aria-label="Delete user"
                                 onClick={() => openDeleteDialog(u)}
                                 disabled={String(u._id) === currentUserId}
                                 className="p-2.5 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all disabled:opacity-40"
@@ -1656,9 +1684,16 @@ export default function AdminPanel() {
               </table>
 
               {sortedUsers.length === 0 && !loading && (
-                <div className="p-20 text-center text-gray-600">
-                  <Shield className="mx-auto mb-4 opacity-20" size={44} />
-                  <p className="font-black uppercase tracking-[0.24em] text-[10px]">No users found for current filters</p>
+                <div className="p-8">
+                  <DataEmpty
+                    title="No users found"
+                    hint="Adjust search or quick filters to widen results."
+                    actionLabel="Clear user filters"
+                    onAction={() => {
+                      setSearchTerm('');
+                      setUserQuickFilter('all');
+                    }}
+                  />
                 </div>
               )}
             </div>

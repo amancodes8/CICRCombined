@@ -316,15 +316,19 @@ const loginUser = async (req, res) => {
     });
   }
 
-  res.json({
+  const token = generateToken(user._id);
+  const profile = {
     _id: user._id,
     name: user.name,
     email: user.email,
+    collegeId: user.collegeId,
     role: user.role,
     warningCount: user.warningCount || 0,
     hasUnreadWarning: !!user.hasUnreadWarning,
-    token: generateToken(user._id),
-  });
+  };
+
+  // Return flat fields (web compat) + nested `result` (mobile compat)
+  res.json({ ...profile, token, result: { ...profile, token } });
 };
 
 const verifyEmail = async (req, res) => {

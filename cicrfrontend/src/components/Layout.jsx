@@ -54,6 +54,8 @@ export default function Layout() {
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
+  const [commandSeedQuery, setCommandSeedQuery] = useState('');
+  const [topSearch, setTopSearch] = useState('');
   const [sidebarAvatarFailed, setSidebarAvatarFailed] = useState(false);
   const [openNavGroups, setOpenNavGroups] = useState({
     core: true,
@@ -275,8 +277,19 @@ export default function Layout() {
   const openCommandPalette = useCallback(() => {
     closeNotifications();
     setIsMobileOpen(false);
+    setCommandSeedQuery('');
     setIsCommandOpen(true);
   }, [closeNotifications]);
+
+  const openCommandPaletteWithQuery = useCallback(
+    (value) => {
+      closeNotifications();
+      setIsMobileOpen(false);
+      setCommandSeedQuery(String(value || '').trim());
+      setIsCommandOpen(true);
+    },
+    [closeNotifications]
+  );
 
   const closeNavigationPanels = useCallback(() => {
     setIsMobileOpen(false);
@@ -295,12 +308,26 @@ export default function Layout() {
       if ((event.metaKey || event.ctrlKey) && key === 'k') {
         event.preventDefault();
         openCommandPalette();
+        return;
+      }
+
+      if (
+        key === '/' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !(event.target instanceof HTMLInputElement) &&
+        !(event.target instanceof HTMLTextAreaElement) &&
+        !(event.target?.isContentEditable)
+      ) {
+        event.preventDefault();
+        openCommandPaletteWithQuery(topSearch);
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [openCommandPalette]);
+  }, [openCommandPalette, openCommandPaletteWithQuery, topSearch]);
 
   const handleLogoError = () => {
     if (logoMode === 'bundle') {
@@ -891,14 +918,33 @@ export default function Layout() {
               );
             })}
           </nav>
-          <button
-            type="button"
-            onClick={openCommandPalette}
-            className="hidden md:inline-flex items-center gap-2 border border-gray-800 rounded-lg px-2.5 py-1.5 text-[10px] uppercase tracking-widest text-gray-400 hover:text-gray-200 hover:border-gray-700"
-          >
-            <Search size={12} />
-            Ctrl/⌘ K
-          </button>
+          <div className="hidden md:flex items-center gap-2">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                openCommandPaletteWithQuery(topSearch);
+              }}
+              className="relative"
+            >
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                value={topSearch}
+                onChange={(event) => setTopSearch(event.target.value)}
+                className="ui-input !py-1.5 !pl-8 !pr-2 !text-xs min-w-[220px]"
+                placeholder="Search pages/actions..."
+                aria-label="Global search"
+              />
+            </form>
+            <button
+              type="button"
+              onClick={() => openCommandPaletteWithQuery(topSearch)}
+              className="inline-flex items-center gap-2 border border-gray-800 rounded-lg px-2.5 py-1.5 text-[10px] uppercase tracking-widest text-gray-400 hover:text-gray-200 hover:border-gray-700"
+              aria-label="Open command palette"
+            >
+              <Search size={12} />
+              Ctrl/⌘ K
+            </button>
+          </div>
         </div>
         
         <AnimatePresence mode="wait" initial={false}>
@@ -925,7 +971,12 @@ export default function Layout() {
         onReadItem={handleReadNotification}
       />
 
-      <CommandPalette open={isCommandOpen} onClose={() => setIsCommandOpen(false)} commands={commandItems} />
+      <CommandPalette
+        open={isCommandOpen}
+        onClose={() => setIsCommandOpen(false)}
+        commands={commandItems}
+        initialQuery={commandSeedQuery}
+      />
     </div>
   );
 }

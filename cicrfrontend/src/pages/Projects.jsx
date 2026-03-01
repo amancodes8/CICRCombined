@@ -5,16 +5,15 @@ import {
   CalendarClock,
   ChevronRight,
   Layers3,
-  Loader2,
   Plus,
   Rocket,
   Search,
   ShieldCheck,
-  Target,
   Users,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { fetchProjects } from '../api';
+import { DataEmpty, DataLoading } from '../components/DataState';
 import PageHeader from '../components/PageHeader';
 
 const STATUS_OPTIONS = ['all', 'Planning', 'Active', 'On-Hold', 'Delayed', 'Awaiting Review', 'Completed', 'Archived', 'Ongoing'];
@@ -44,11 +43,12 @@ const statusClass = (status) => {
 const clampProgress = (value) => Math.max(0, Math.min(100, Number(value) || 0));
 
 export default function Projects() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
+  const initialStatus = searchParams.get('status') || 'all';
+  const [statusFilter, setStatusFilter] = useState(STATUS_OPTIONS.includes(initialStatus) ? initialStatus : 'all');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [selectedProjectId, setSelectedProjectId] = useState('');
 
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
@@ -73,6 +73,22 @@ export default function Projects() {
     };
     loadProjects();
   }, [eventId]);
+
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (searchTerm.trim()) next.set('q', searchTerm.trim());
+        else next.delete('q');
+
+        if (statusFilter && statusFilter !== 'all') next.set('status', statusFilter);
+        else next.delete('status');
+
+        return next;
+      },
+      { replace: true }
+    );
+  }, [searchTerm, setSearchParams, statusFilter]);
 
   const filteredProjects = useMemo(
     () =>
@@ -109,9 +125,8 @@ export default function Projects() {
 
   if (loading) {
     return (
-      <div className="h-[70vh] flex flex-col items-center justify-center gap-4">
-        <Loader2 className="animate-spin text-blue-500" size={40} />
-        <p className="text-gray-500 font-semibold text-sm">Loading projects...</p>
+      <div className="h-[70vh] flex items-center justify-center">
+        <DataLoading label="Loading projects..." />
       </div>
     );
   }
@@ -144,7 +159,7 @@ export default function Projects() {
         </div>
       </section>
 
-      <section className="border-b border-gray-800/70 pb-3 section-motion section-motion-delay-2">
+      <section className="ui-toolbar-sticky border border-gray-800/70 section-motion section-motion-delay-2">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-3 items-start lg:items-center">
           <div className="relative w-full">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
@@ -163,6 +178,7 @@ export default function Projects() {
                 key={status}
                 type="button"
                 onClick={() => setStatusFilter(status)}
+                aria-label={`Filter status ${status}`}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
                   statusFilter === status
                     ? 'text-cyan-100 border-cyan-500/50 bg-cyan-500/10'
@@ -177,9 +193,16 @@ export default function Projects() {
       </section>
 
       {filteredProjects.length === 0 ? (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20">
-          <Target className="mx-auto text-gray-700 mb-4" size={46} />
-          <p className="text-gray-500 font-semibold text-sm">No projects visible for this filter.</p>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-10">
+          <DataEmpty
+            title="No projects visible for this filter"
+            hint="Try clearing filters or search to broaden results."
+            actionLabel="Clear filters"
+            onAction={() => {
+              setSearchTerm('');
+              setStatusFilter('all');
+            }}
+          />
         </motion.div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.25fr)_340px] gap-8 section-motion section-motion-delay-3">

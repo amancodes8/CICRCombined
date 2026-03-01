@@ -41,6 +41,7 @@ import {
   updateIssueTicket,
   warnPostUser,
 } from '../api';
+import { DataEmpty } from '../components/DataState';
 import PageHeader from '../components/PageHeader';
 
 const ISSUE_CATEGORIES = ['General', 'Technical', 'Infrastructure', 'Event', 'Academic', 'Safety'];
@@ -548,12 +549,12 @@ export default function Community() {
 
                       <div className="flex items-center gap-1 shrink-0">
                         {(isPrivileged || post.user?._id === userData._id || post.user?._id === userData.id) && (
-                          <button onClick={() => handleDelete(post._id)} className="text-gray-600 hover:text-red-400 p-2">
+                          <button aria-label="Delete post" onClick={() => handleDelete(post._id)} className="text-gray-600 hover:text-red-400 p-2">
                             <Trash2 size={17} />
                           </button>
                         )}
                         {isPrivileged && post.user?._id !== userData._id && (
-                          <button onClick={() => handleWarn(post._id)} className="text-gray-600 hover:text-amber-400 p-2">
+                          <button aria-label="Warn user" onClick={() => handleWarn(post._id)} className="text-gray-600 hover:text-amber-400 p-2">
                             <AlertTriangle size={17} />
                           </button>
                         )}
@@ -575,10 +576,16 @@ export default function Community() {
                 ))}
 
                 {posts.length === 0 && (
-                  <div className="text-center py-16">
-                    <MessageSquare className="mx-auto text-gray-600 mb-3" size={44} />
-                    <h4 className="text-lg font-semibold text-gray-300">No posts yet</h4>
-                    <p className="text-gray-500 mt-1 text-sm">Share the first update with your team.</p>
+                  <div className="py-8">
+                    <DataEmpty
+                      title="No posts yet"
+                      hint="Share the first update with your team."
+                      actionLabel="Create first post"
+                      onAction={() => {
+                        const textarea = document.querySelector('textarea.ui-input');
+                        textarea?.focus();
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -684,6 +691,7 @@ export default function Community() {
                   <button
                     type="button"
                     onClick={resetDirectoryFilters}
+                    aria-label="Reset directory filters"
                     className="inline-flex items-center justify-center border border-gray-700/80 rounded-lg px-3 text-gray-400 hover:text-white hover:border-cyan-500/45"
                     title="Reset filters"
                   >

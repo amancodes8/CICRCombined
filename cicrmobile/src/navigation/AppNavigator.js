@@ -15,19 +15,30 @@ import AuthScreen from '../screens/Auth/LoginScreen';
 import DashboardScreen from '../screens/Dashboard/DashboardScreen';
 import ProjectsScreen from '../screens/Projects/ProjectsScreen';
 import ProjectDetailsScreen from '../screens/Projects/ProjectDetailsScreen';
+import CreateProjectScreen from '../screens/Projects/CreateProjectScreen';
+import ProjectReviewScreen from '../screens/Projects/ProjectReviewScreen';
 import CommunityScreen from '../screens/Community/CommunityScreen';
 import MeetingsScreen from '../screens/Meetings/MeetingsScreen';
+import ScheduleMeetingScreen from '../screens/Meetings/ScheduleMeetingScreen';
 import EventsScreen from '../screens/Events/EventsScreen';
 import EventDetailsScreen from '../screens/Events/EventDetailsScreen';
+import CreateEventScreen from '../screens/Events/CreateEventScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
 import MoreScreen from '../screens/More/MoreScreen';
 import MembersScreen from '../screens/More/MembersScreen';
 import InventoryScreen from '../screens/More/InventoryScreen';
+import InventoryDetailScreen from '../screens/More/InventoryDetailScreen';
+import AddInventoryScreen from '../screens/More/AddInventoryScreen';
+import MyInventoryScreen from '../screens/More/MyInventoryScreen';
 import LearningHubScreen from '../screens/More/LearningHubScreen';
 import ProgramsHubScreen from '../screens/More/ProgramsHubScreen';
 import HierarchyScreen from '../screens/More/HierarchyScreen';
 import NotificationsScreen from '../screens/More/NotificationsScreen';
 import AdminPanelScreen from '../screens/More/AdminPanelScreen';
+import CommunicationScreen from '../screens/More/CommunicationScreen';
+import GuidelinesScreen from '../screens/More/GuidelinesScreen';
+import PublicProfileScreen from '../screens/More/PublicProfileScreen';
+import AIChatScreen from '../screens/More/AIChatScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -55,6 +66,8 @@ function ProjectsStack() {
     <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen name="ProjectsList" component={ProjectsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ProjectDetails" component={ProjectDetailsScreen} options={{ title: 'Project' }} />
+      <Stack.Screen name="CreateProject" component={CreateProjectScreen} options={{ title: 'New Project' }} />
+      <Stack.Screen name="ProjectReview" component={ProjectReviewScreen} options={{ title: 'Review' }} />
     </Stack.Navigator>
   );
 }
@@ -64,6 +77,7 @@ function EventsStack() {
     <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen name="EventsList" component={EventsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="EventDetails" component={EventDetailsScreen} options={{ title: 'Event' }} />
+      <Stack.Screen name="CreateEvent" component={CreateEventScreen} options={{ title: 'New Event' }} />
     </Stack.Navigator>
   );
 }
@@ -73,12 +87,19 @@ function MoreStack() {
     <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen name="MoreHome" component={MoreScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Members" component={MembersScreen} options={{ title: 'Members' }} />
+      <Stack.Screen name="PublicProfile" component={PublicProfileScreen} options={{ title: 'Profile' }} />
       <Stack.Screen name="Inventory" component={InventoryScreen} options={{ title: 'Inventory' }} />
+      <Stack.Screen name="InventoryDetail" component={InventoryDetailScreen} options={{ title: 'Item Detail' }} />
+      <Stack.Screen name="AddInventory" component={AddInventoryScreen} options={{ title: 'Add Item' }} />
+      <Stack.Screen name="MyInventory" component={MyInventoryScreen} options={{ title: 'My Items' }} />
       <Stack.Screen name="LearningHub" component={LearningHubScreen} options={{ title: 'Learning Hub' }} />
       <Stack.Screen name="ProgramsHub" component={ProgramsHubScreen} options={{ title: 'Programs Hub' }} />
       <Stack.Screen name="Hierarchy" component={HierarchyScreen} options={{ title: 'Tasks' }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
       <Stack.Screen name="AdminPanel" component={AdminPanelScreen} options={{ title: 'Admin' }} />
+      <Stack.Screen name="Communication" component={CommunicationScreen} options={{ title: 'Chat' }} />
+      <Stack.Screen name="Guidelines" component={GuidelinesScreen} options={{ title: 'Guidelines' }} />
+      <Stack.Screen name="AIChat" component={AIChatScreen} options={{ title: 'AI Assistant' }} />
     </Stack.Navigator>
   );
 }
@@ -142,6 +163,7 @@ export default function AppNavigator() {
           <Stack.Screen name="Main" component={MainTabs} />
           {/* Global stack screens accessible from anywhere */}
           <Stack.Screen name="Meetings" component={MeetingsScreen} options={{ ...screenOptions, title: 'Meetings', headerShown: true }} />
+          <Stack.Screen name="ScheduleMeeting" component={ScheduleMeetingScreen} options={{ ...screenOptions, title: 'Schedule Meeting', headerShown: true }} />
         </Stack.Navigator>
       ) : (
         <AuthStack />

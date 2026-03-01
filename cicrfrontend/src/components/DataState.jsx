@@ -2,24 +2,41 @@ import { Loader2, RotateCcw, SearchX } from 'lucide-react';
 
 export function DataLoading({ label = 'Loading data...' }) {
   return (
-    <div className="ui-empty py-12">
-      <div className="inline-flex flex-col items-center gap-3">
-        <div className="relative w-8 h-8">
-          <span className="absolute inset-0 rounded-full border-2 border-blue-500/20 animate-ping" />
-          <span className="absolute inset-0.5 rounded-full border-2 border-t-blue-400 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+    <div className="ui-empty py-10">
+      <div className="space-y-4">
+        <div className="inline-flex items-center gap-3">
+          <div className="relative w-8 h-8">
+            <span className="absolute inset-0 rounded-full border-2 border-blue-500/20 animate-ping" />
+            <span className="absolute inset-0.5 rounded-full border-2 border-t-blue-400 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+          </div>
+          <span className="text-xs text-gray-400 uppercase tracking-widest font-bold">{label}</span>
         </div>
-        <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">{label}</span>
+
+        <div className="grid gap-2">
+          <div className="ui-skeleton h-3 w-3/4" />
+          <div className="ui-skeleton h-3 w-full" />
+          <div className="ui-skeleton h-3 w-5/6" />
+        </div>
       </div>
     </div>
   );
 }
 
-export function DataEmpty({ label = 'No records found.', actionLabel, onAction }) {
+export function DataEmpty({
+  title,
+  hint,
+  label,
+  actionLabel,
+  onAction,
+}) {
+  const displayTitle = title || label || 'No records found.';
+
   return (
     <div className="ui-empty py-12">
       <div className="inline-flex flex-col items-center gap-3">
         <SearchX size={28} className="text-gray-600" />
-        <p className="text-sm text-gray-500">{label}</p>
+        <p className="text-sm text-gray-300 font-semibold">{displayTitle}</p>
+        {hint ? <p className="text-xs text-gray-500 max-w-md">{hint}</p> : null}
         {actionLabel && onAction ? (
           <button type="button" onClick={onAction} className="btn btn-ghost mt-1">
             {actionLabel}

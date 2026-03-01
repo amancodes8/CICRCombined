@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -13,9 +14,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { fetchEvents } from '../../api';
+import { deleteEvent, fetchEvents } from '../../api';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { Badge, Card, EmptyState, LoadingScreen } from '../../components/UI';
+import useAuth from '../../hooks/useAuth';
 import { colors, fontSize, fontWeight, radius, spacing } from '../../theme';
 
 const fmtDate = (v) => {
@@ -25,6 +27,8 @@ const fmtDate = (v) => {
 
 export default function EventsScreen() {
   const navigation = useNavigation();
+  const { user } = useAuth();
+  const isAdmin = ['admin', 'head'].includes((user?.role || '').toLowerCase());
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -43,10 +47,23 @@ export default function EventsScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  const handleDeleteEvent = (ev) => {
+    Alert.alert('Delete Event', `Delete "${ev.title || ev.name}"?`, [
+      { text: 'Cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { try { await deleteEvent(ev._id); load(); } catch (err) { Alert.alert('Error', err.response?.data?.message || 'Failed.'); } } },
+    ]);
+  };
+
   if (loading) return <LoadingScreen />;
 
   return (
     <ScreenWrapper title="Events" subtitle={`${events.length} events`} icon="calendar-outline" scrollable={false}>
+      {isAdmin && (
+        <TouchableOpacity style={styles.createBtn} onPress={() => navigation.navigate('CreateEvent')}>
+          <Ionicons name="add-circle-outline" size={18} color={colors.white} />
+          <Text style={styles.createBtnText}>Create Event</Text>
+        </TouchableOpacity>
+      )}
       <FlatList
         data={events}
         keyExtractor={(item) => item._id}
@@ -79,6 +96,11 @@ export default function EventsScreen() {
                   )}
                 </View>
                 {item.status && <Badge label={item.status} style={{ marginTop: spacing.sm }} />}
+                {isAdmin && (
+                  <TouchableOpacity style={styles.delBtn} onPress={() => handleDeleteEvent(item)}>
+                    <Ionicons name="trash-outline" size={14} color={colors.rose} />
+                  </TouchableOpacity>
+                )}
               </View>
             </Card>
           </TouchableOpacity>
@@ -105,4 +127,11 @@ const styles = StyleSheet.create({
   eventMeta: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.sm },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { color: colors.textTertiary, fontSize: fontSize.xs },
+  createBtn: {
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', gap: 6,
+    backgroundColor: colors.accentBlue, borderRadius: radius.sm,
+    paddingVertical: spacing.sm, paddingHorizontal: spacing.md, marginBottom: spacing.md,
+  },
+  createBtnText: { color: colors.white, fontSize: fontSize.sm, fontWeight: fontWeight.medium },
+  delBtn: { marginTop: spacing.sm },
 });

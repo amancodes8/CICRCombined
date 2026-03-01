@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import {
   BookOpenCheck,
   Brain,
@@ -98,6 +99,7 @@ const createComposerState = () => ({
 });
 
 export default function LearningHub() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const user = profile.result || profile;
   const role = String(user.role || '').toLowerCase();
@@ -110,7 +112,7 @@ export default function LearningHub() {
   const [overview, setOverview] = useState(null);
   const [config, setConfig] = useState(null);
   const [tracks, setTracks] = useState([]);
-  const [selectedTrackId, setSelectedTrackId] = useState('');
+  const [selectedTrackId, setSelectedTrackId] = useState(searchParams.get('track') || localStorage.getItem('learning_selected_track') || '');
   const [mySubmissions, setMySubmissions] = useState([]);
   const [submissionDrafts, setSubmissionDrafts] = useState({});
   const [submittingTaskKey, setSubmittingTaskKey] = useState('');
@@ -189,6 +191,19 @@ export default function LearningHub() {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!selectedTrackId) return;
+    localStorage.setItem('learning_selected_track', String(selectedTrackId));
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('track', String(selectedTrackId));
+        return next;
+      },
+      { replace: true }
+    );
+  }, [selectedTrackId, setSearchParams]);
 
   const selectedTrack = useMemo(
     () => tracks.find((track) => String(track._id) === String(selectedTrackId)) || null,
@@ -461,7 +476,7 @@ export default function LearningHub() {
       </section>
 
       <section className="grid grid-cols-1 2xl:grid-cols-12 gap-6 section-motion section-motion-delay-2">
-        <article className="2xl:col-span-5 border border-gray-800 rounded-[1.6rem] p-5 md:p-6 space-y-4">
+        <article className="2xl:col-span-5 border border-gray-800 rounded-[1.6rem] p-5 md:p-6 space-y-4 ui-toolbar-sticky">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-black uppercase tracking-[0.2em] text-gray-200 inline-flex items-center gap-2">
               <Lightbulb size={15} className="text-cyan-300" /> Recommended Queue

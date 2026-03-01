@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { createPost, fetchPosts, likePost } from '../../api';
+import { createPost, deletePost, fetchPosts, likePost, warnPostUser } from '../../api';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { Avatar, Card, EmptyState, LoadingScreen } from '../../components/UI';
 import useAuth from '../../hooks/useAuth';
@@ -33,6 +33,7 @@ const formatDate = (v) => {
 
 export default function CommunityScreen() {
   const { user } = useAuth();
+  const isAdmin = ['admin', 'head'].includes((user?.role || '').toLowerCase());
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -85,6 +86,20 @@ export default function CommunityScreen() {
     } catch {
       // silent
     }
+  };
+
+  const handleDelete = (id) => {
+    Alert.alert('Delete Post', 'Delete this post?', [
+      { text: 'Cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { try { await deletePost(id); load(); } catch (err) { Alert.alert('Error', err.response?.data?.message || 'Failed.'); } } },
+    ]);
+  };
+
+  const handleWarn = (id) => {
+    Alert.prompt?.('Warn User', 'Enter warning reason:', async (reason) => {
+      if (!reason?.trim()) return;
+      try { await warnPostUser(id, reason.trim()); Alert.alert('Done', 'Warning sent.'); } catch (err) { Alert.alert('Error', err.response?.data?.message || 'Failed.'); }
+    }) || Alert.alert('Warn', 'Warning functionality requires Alert.prompt (iOS).');
   };
 
   if (loading) return <LoadingScreen />;
@@ -140,6 +155,18 @@ export default function CommunityScreen() {
                   <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? colors.rose : colors.textTertiary} />
                   <Text style={[styles.actionText, liked && { color: colors.rose }]}>{item.likes?.length || 0}</Text>
                 </TouchableOpacity>
+                {isAdmin && (
+                  <>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item._id)}>
+                      <Ionicons name="trash-outline" size={16} color={colors.rose} />
+                      <Text style={[styles.actionText, { color: colors.rose }]}>Delete</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleWarn(item._id)}>
+                      <Ionicons name="warning-outline" size={16} color={colors.amber} />
+                      <Text style={[styles.actionText, { color: colors.amber }]}>Warn</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </Card>
           );

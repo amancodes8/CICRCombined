@@ -807,7 +807,7 @@ export default function Events() {
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.12fr)_360px] gap-8 section-motion section-motion-delay-3">
           <section className="overflow-hidden border-y border-gray-800/80">
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 md:px-6 py-3 border-b border-gray-800/80">
+            <div className="ui-toolbar-sticky flex flex-wrap items-center justify-between gap-3 px-4 md:px-6 py-3 border-b border-gray-800/80">
               <div className="relative min-w-[220px] flex-1 max-w-md">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                 <input

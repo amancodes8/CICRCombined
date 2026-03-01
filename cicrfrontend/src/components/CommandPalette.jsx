@@ -4,15 +4,15 @@ import { Command, Search } from 'lucide-react';
 
 const normalize = (value) => String(value || '').toLowerCase();
 
-export default function CommandPalette({ open, onClose, commands = [] }) {
+export default function CommandPalette({ open, onClose, commands = [], initialQuery = '' }) {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
     if (!open) return;
-    setQuery('');
+    setQuery(String(initialQuery || ''));
     setActiveIndex(0);
-  }, [open]);
+  }, [initialQuery, open]);
 
   const filtered = useMemo(() => {
     const q = normalize(query).trim();

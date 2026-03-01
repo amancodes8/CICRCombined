@@ -23,6 +23,26 @@ import { colors, fontSize, fontWeight, radius, spacing } from '../../theme';
 
 const MODES = { login: 'login', signup: 'signup', forgot: 'forgot' };
 
+/* ── InputRow extracted OUTSIDE to avoid remount on every keystroke ── */
+function InputRow({ icon, placeholder, value, onChangeText, secure, autoCapitalize, keyboardType }) {
+  return (
+    <View style={styles.inputWrap}>
+      <Ionicons name={icon} size={18} color={colors.textTertiary} style={styles.inputIcon} />
+      <TextInput
+        style={styles.input}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textTertiary}
+        value={value}
+        onChangeText={onChangeText}
+        secureTextEntry={secure}
+        autoCapitalize={autoCapitalize || 'none'}
+        autoCorrect={false}
+        keyboardType={keyboardType || 'default'}
+      />
+    </View>
+  );
+}
+
 export default function AuthScreen() {
   const { signIn } = useAuth();
   const [mode, setMode] = useState(MODES.login);
@@ -41,7 +61,7 @@ export default function AuthScreen() {
     newPassword: '',
   });
 
-  const set = (key, val) => setForm((p) => ({ ...p, [key]: val }));
+  const set = useCallback((key, val) => setForm((p) => ({ ...p, [key]: val })), []);
 
   const resetForm = () => {
     setForm({ name: '', email: '', password: '', collegeId: '', inviteCode: '', otp: '', resetCode: '', newPassword: '' });
@@ -54,13 +74,16 @@ export default function AuthScreen() {
   };
 
   const handleLogin = useCallback(async () => {
-    if (!form.email || !form.password) return Alert.alert('Error', 'Email and password are required.');
+    const identifier = (form.email || '').trim();
+    const password = (form.password || '').trim();
+    if (!identifier || !password) return Alert.alert('Error', 'Email / College ID and password are required.');
     setLoading(true);
     try {
-      const res = await login({ email: form.email, password: form.password });
-      await signIn(res.data.token, res.data);
+      const res = await login({ email: identifier, password });
+      const data = res.data?.result || res.data;
+      await signIn(data.token, data);
     } catch (err) {
-      const msg = err.response?.data?.message || 'Login failed.';
+      const msg = err.response?.data?.message || err.message || 'Login failed.';
       const code = err.response?.data?.code;
       if (code === 'ACCOUNT_PENDING_APPROVAL') {
         Alert.alert('Pending', 'Your account is pending admin approval.');
@@ -121,22 +144,6 @@ export default function AuthScreen() {
       setLoading(false);
     }
   }, [form, forgotMethod, otpSent]);
-
-  const InputRow = ({ icon, placeholder, value, onChangeText, secure, autoCapitalize }) => (
-    <View style={styles.inputWrap}>
-      <Ionicons name={icon} size={18} color={colors.textTertiary} style={styles.inputIcon} />
-      <TextInput
-        style={styles.input}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textTertiary}
-        value={value}
-        onChangeText={onChangeText}
-        secureTextEntry={secure}
-        autoCapitalize={autoCapitalize || 'none'}
-        autoCorrect={false}
-      />
-    </View>
-  );
 
   return (
     <View style={styles.container}>

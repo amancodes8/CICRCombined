@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -12,9 +13,11 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchMeetings } from '../../api';
+import { useNavigation } from '@react-navigation/native';
+import { deleteMeeting, fetchMeetings } from '../../api';
 import ScreenWrapper from '../../components/ScreenWrapper';
 import { Avatar, Card, EmptyState, LoadingScreen } from '../../components/UI';
+import useAuth from '../../hooks/useAuth';
 import { colors, fontSize, fontWeight, radius, spacing } from '../../theme';
 
 const fmtDate = (v) => {
@@ -30,6 +33,9 @@ const fmtTime = (v) => {
 };
 
 export default function MeetingsScreen() {
+  const navigation = useNavigation();
+  const { user } = useAuth();
+  const canSchedule = ['admin', 'head', 'teamLead'].includes((user?.role || '').toLowerCase()) || Number(user?.year) >= 2;
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,6 +52,15 @@ export default function MeetingsScreen() {
       setRefreshing(false);
     }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleDelete = (m) => {
+    Alert.alert('Delete Meeting', `Delete "${m.title || m.agenda}"?`, [
+      { text: 'Cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { try { await deleteMeeting(m._id); load(); } catch (err) { Alert.alert('Error', err.response?.data?.message || 'Failed.'); } } },
+    ]);
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -68,6 +83,13 @@ export default function MeetingsScreen() {
 
   return (
     <ScreenWrapper title="Meetings" subtitle={`${meetings.length} total`} icon="calendar-outline" scrollable={false}>
+      {/* Schedule button */}
+      {canSchedule && (
+        <TouchableOpacity style={styles.scheduleBtn} onPress={() => navigation.navigate('ScheduleMeeting')}>
+          <Ionicons name="add-circle-outline" size={18} color={colors.white} />
+          <Text style={styles.scheduleBtnText}>Schedule Meeting</Text>
+        </TouchableOpacity>
+      )}
       {/* Tab bar */}
       <View style={styles.tabBar}>
         <TouchableOpacity style={[styles.tab, tab === 'upcoming' && styles.tabActive]} onPress={() => setTab('upcoming')}>
@@ -117,6 +139,12 @@ export default function MeetingsScreen() {
                 <Text style={styles.linkText} numberOfLines={1}>{item.link}</Text>
               </View>
             )}
+            {canSchedule && (
+              <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
+                <Ionicons name="trash-outline" size={14} color={colors.rose} />
+                <Text style={styles.deleteBtnText}>Delete</Text>
+              </TouchableOpacity>
+            )}
           </Card>
         )}
       />
@@ -155,4 +183,15 @@ const styles = StyleSheet.create({
   attendees: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.borderSubtle },
   linkText: { color: colors.accentBlue, fontSize: fontSize.xs, flex: 1 },
+  scheduleBtn: {
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', gap: 6,
+    backgroundColor: colors.accentBlue, borderRadius: radius.sm,
+    paddingVertical: spacing.sm, paddingHorizontal: spacing.md, marginBottom: spacing.md,
+  },
+  scheduleBtnText: { color: colors.white, fontSize: fontSize.sm, fontWeight: fontWeight.medium },
+  deleteBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end',
+    marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.borderSubtle,
+  },
+  deleteBtnText: { color: colors.rose, fontSize: fontSize.xs },
 });

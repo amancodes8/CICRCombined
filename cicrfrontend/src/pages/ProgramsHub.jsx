@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import {
   BookMarked,
   BrainCircuit,
@@ -122,6 +123,7 @@ const formatDateTime = (value) => {
 };
 
 export default function ProgramsHub() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const user = profile.result || profile;
   const role = String(user.role || '').toLowerCase();
@@ -129,7 +131,7 @@ export default function ProgramsHub() {
   const isAdminOrHead = role === 'admin' || role === 'head';
   const isSeniorMentor = isAdminOrHead || role === 'alumni' || (role === 'user' && Number.isFinite(year) && year >= 2);
 
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || localStorage.getItem('programs_tab') || 'overview');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -300,6 +302,18 @@ export default function ProgramsHub() {
     loadPrograms();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('programs_tab', activeTab);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (activeTab) next.set('tab', activeTab);
+        return next;
+      },
+      { replace: true }
+    );
+  }, [activeTab, setSearchParams]);
 
   const myQuestMap = useMemo(
     () =>
@@ -648,7 +662,7 @@ export default function ProgramsHub() {
         />
       </section>
 
-      <section className="section-motion section-motion-delay-1">
+      <section className="ui-toolbar-sticky section-motion section-motion-delay-1">
         <div className="flex flex-wrap gap-2">
           {TABS.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -656,6 +670,8 @@ export default function ProgramsHub() {
               <button
                 key={tab.id}
                 type="button"
+                aria-label={`Open ${tab.label} tab`}
+                aria-pressed={isActive}
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-3.5 py-2 rounded-xl border text-xs uppercase tracking-[0.14em] font-black transition-colors inline-flex items-center gap-1.5 ${
                   isActive
@@ -1289,6 +1305,8 @@ function ToggleRow({ label, value, onToggle }) {
       <button
         type="button"
         onClick={onToggle}
+        aria-label={`Toggle ${label}`}
+        aria-pressed={value}
         className={`relative h-7 w-12 rounded-full border transition-colors ${
           value ? 'border-emerald-500/50 bg-emerald-500/20' : 'border-gray-700 bg-gray-800/40'
         }`}
