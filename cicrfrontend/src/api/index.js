@@ -693,6 +693,26 @@ export const fetchMyOfficeHourBookings = () =>
   });
 export const updateOfficeHourBooking = (id, payload) => API.patch(`/programs/office-hours/bookings/${id}`, payload);
 
+export const fetchContests = (params = {}) => {
+  const query = new URLSearchParams(params);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return cachedGet({
+    key: `programs:contests:${suffix}`,
+    request: () => API.get(`/programs/contests${suffix}`),
+    ttlMs: 45 * 1000,
+  });
+};
+export const createContest = (payload) => API.post('/programs/contests', payload);
+export const updateContest = (id, payload) => API.patch(`/programs/contests/${id}`, payload);
+export const startContestAttempt = (id) => API.post(`/programs/contests/${id}/attempt`);
+export const submitContestAttempt = (id, payload) => API.post(`/programs/contests/${id}/submit`, payload);
+export const fetchMyContestAttempts = () =>
+  cachedGet({
+    key: 'programs:contest-attempts:mine',
+    request: () => API.get('/programs/contests/attempts/mine'),
+    ttlMs: 30 * 1000,
+  });
+
 export const clearLocalApiCache = (matcher = '') => {
   clearApiCache(matcher);
 };
