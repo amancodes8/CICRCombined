@@ -158,7 +158,7 @@ You can build the APK directly from VS Code's integrated terminal without leavin
 
 #### Option 1 — npm script (recommended)
 
-Open the VS Code **Terminal** (`Ctrl+`` `) and run:
+Open the VS Code **Terminal** (`` Ctrl+` ``) and run:
 
 ```bash
 cd cicrmobile
