@@ -2,12 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   Bot,
+  Check,
+  CheckCheck,
   Circle,
   CornerUpLeft,
   Loader2,
   MessageCircle,
   Send,
   Trash2,
+  Users,
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -18,7 +21,6 @@ import {
   fetchCommunicationMessages,
   fetchMentionCandidates,
 } from '../api';
-import PageHeader from '../components/PageHeader';
 
 const COMMUNICATION_CONVERSATION_ID = 'admin-stream';
 const getCommunicationSeenKey = (conversationId = COMMUNICATION_CONVERSATION_ID) =>
@@ -57,7 +59,7 @@ const decorateMentions = (text) =>
     .split(/(@[a-zA-Z0-9._-]{3,40})/g)
     .map((part, idx) =>
       part.startsWith('@') ? (
-        <span key={idx} className="text-blue-300 font-semibold">
+        <span key={idx} className="text-[#53bdeb] font-semibold">
           {part}
         </span>
       ) : (
@@ -119,13 +121,14 @@ const dispatchToast = (message, type = 'info') => {
   }
 };
 
+const generateOptimisticId = () => `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
 export default function Communication() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
-  const [sending, setSending] = useState(false);
   const [deletingId, setDeletingId] = useState('');
   const [text, setText] = useState('');
   const [mentionOptions, setMentionOptions] = useState([]);
@@ -261,12 +264,21 @@ export default function Communication() {
         if (payload?.conversationId && payload.conversationId !== COMMUNICATION_CONVERSATION_ID) return;
 
         setMessages((prev) => {
-          if (prev.some((m) => m._id === payload._id)) return prev;
+          const withoutOptimistic = prev.filter((m) => {
+            if (!m._optimistic) return true;
+            if (m._optimisticText !== payload.text) return true;
+            if (String(m.sender?._id) !== String(payload.sender?._id)) return true;
+            const optimisticTs = new Date(m.createdAt).getTime();
+            const payloadTs = new Date(payload.createdAt).getTime();
+            if (Number.isFinite(optimisticTs) && Number.isFinite(payloadTs) && Math.abs(payloadTs - optimisticTs) > 30000) return true;
+            return false;
+          });
+          if (withoutOptimistic.some((m) => m._id === payload._id)) return withoutOptimistic;
           markCommunicationRead(
             payload?.createdAt ? new Date(payload.createdAt).getTime() : Date.now(),
             COMMUNICATION_CONVERSATION_ID
           );
-          return [...prev, payload];
+          return [...withoutOptimistic, payload];
         });
       } catch {
         // ignore malformed payload
@@ -355,7 +367,36 @@ export default function Communication() {
     const body = text.trim();
     if (!body) return;
 
-    setSending(true);
+    const optimisticId = generateOptimisticId();
+    const optimisticMsg = {
+      _id: optimisticId,
+      _optimistic: true,
+      _optimisticText: body,
+      text: body,
+      sender: {
+        _id: currentUserId,
+        name: user?.name || 'You',
+        collegeId: user?.collegeId || '',
+        role: user?.role || '',
+        isAI: false,
+      },
+      replyTo: replyTarget ? {
+        messageId: replyTarget._id,
+        text: String(replyTarget.text || '').slice(0, 180),
+        senderName: replyTarget.sender?.name || 'Member',
+        senderCollegeId: replyTarget.sender?.collegeId || '',
+      } : null,
+      mentions: [],
+      createdAt: new Date().toISOString(),
+      conversationId: COMMUNICATION_CONVERSATION_ID,
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setText('');
+    setReplyTarget(null);
+    setMentionOptions([]);
+    setActionError('');
+
     try {
       const { data } = await createCommunicationMessage({
         text: body,
@@ -363,20 +404,18 @@ export default function Communication() {
         conversationId: COMMUNICATION_CONVERSATION_ID,
       });
 
-      setMessages((prev) => (prev.some((m) => m._id === data._id) ? prev : [...prev, data]));
+      setMessages((prev) => {
+        const withoutOptimistic = prev.filter((m) => m._id !== optimisticId);
+        if (withoutOptimistic.some((m) => m._id === data._id)) return withoutOptimistic;
+        return [...withoutOptimistic, data];
+      });
       markCommunicationRead(
         data?.createdAt ? new Date(data.createdAt).getTime() : Date.now(),
         COMMUNICATION_CONVERSATION_ID
       );
-
-      setText('');
-      setReplyTarget(null);
-      setMentionOptions([]);
-      setActionError('');
     } catch (err) {
+      setMessages((prev) => prev.filter((m) => m._id !== optimisticId));
       setActionError(err.response?.data?.message || 'Unable to send message');
-    } finally {
-      setSending(false);
     }
   };
 
@@ -417,337 +456,326 @@ export default function Communication() {
   };
 
   return (
-    <div className="ui-page max-w-5xl pb-4 md:pb-8 page-motion-d">
-      <section className="px-1 py-2 md:py-3 section-motion section-motion-delay-1">
-        <PageHeader
-          eyebrow="Collab Stream"
-          title="Admin Conversation Hub"
-          subtitle="Operational team chat with live sync, mentions, and moderation controls."
-          icon={MessageCircle}
-          badge={
-            <>
-              <Circle size={8} className="text-emerald-300 fill-emerald-300" /> Live Stream
-            </>
-          }
-        />
-      </section>
-
-      <section className="grid grid-cols-2 gap-3 section-motion section-motion-delay-2">
-        <Metric label="Messages" value={streamStats.totalMessages} hint="Conversation volume" />
-        <Metric label="Participants" value={streamStats.participants} hint="Active contributors" tone="blue" />
-      </section>
-
-      <section className="mt-4 flex flex-col h-[calc(100vh-250px)] md:h-[calc(100vh-235px)] min-h-[480px] section-motion section-motion-delay-2 border border-gray-800/80 rounded-2xl overflow-hidden">
-        <header className="px-4 py-3 border-b border-gray-800/80 flex items-center justify-between gap-3">
-          <h2 className="text-sm md:text-base font-semibold text-white inline-flex items-center gap-2">
-            <MessageCircle size={16} className="text-cyan-300" /> Conversation
-          </h2>
-          <p className="text-xs text-gray-500">Swipe right on mobile to reply</p>
-        </header>
-
-        {serverError ? (
-          <div className="mx-4 mt-3 rounded-xl border border-red-500/35 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-            {serverError}
+    <div className="wa-chat-page">
+      <header className="wa-chat-header">
+        <div className="wa-chat-header-left">
+          <div className="wa-chat-avatar-group">
+            <MessageCircle size={20} />
           </div>
-        ) : null}
-
-        {loading ? (
-          <div className="h-32 flex items-center justify-center flex-1">
-            <Loader2 className="animate-spin text-blue-500" />
+          <div>
+            <h1 className="wa-chat-title">Admin Conversation Hub</h1>
+            <p className="wa-chat-subtitle">
+              <Circle size={6} className="wa-live-dot" />
+              <span>{streamStats.participants} participant{streamStats.participants !== 1 ? 's' : ''}</span>
+              <span className="wa-chat-dot">·</span>
+              <span>{streamStats.totalMessages} message{streamStats.totalMessages !== 1 ? 's' : ''}</span>
+            </p>
           </div>
-        ) : (
-          <div
-            ref={scrollContainerRef}
-            className="mt-2 flex-1 min-h-0 overflow-y-auto px-2 md:px-3 space-y-1.5"
-          >
-            {hasMore ? (
-              <div className="flex justify-center py-2">
-                <button
-                  type="button"
-                  onClick={loadOlderMessages}
-                  disabled={loadingMore}
-                  className="btn btn-ghost !w-auto !px-3 !py-1.5"
-                >
-                  {loadingMore ? <Loader2 size={12} className="animate-spin" /> : null}
-                  {loadingMore ? 'Loading older...' : 'Load older messages'}
-                </button>
-              </div>
-            ) : null}
+        </div>
+        <div className="wa-chat-header-right">
+          <Users size={18} className="wa-header-icon" />
+        </div>
+      </header>
 
-            {sortedMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-                <div className="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-4">
-                  <MessageCircle size={24} className="text-blue-400" />
-                </div>
-                <p className="text-sm font-semibold text-gray-300">No messages yet</p>
-                <p className="text-xs text-gray-500 mt-1 max-w-xs">
-                  Start the conversation! Use @collegeId to mention team members or @cicrai for AI assistance.
-                </p>
-              </div>
-            ) : null}
+      {serverError ? (
+        <div className="wa-error-banner">
+          {serverError}
+        </div>
+      ) : null}
 
-            <AnimatePresence initial={false}>
-              {sortedMessages.map((message, index) => {
-                const previous = sortedMessages[index - 1];
-                const grouped = isGroupedMessage(message, previous);
-                const own = String(message.sender?._id) === String(currentUserId);
-                const showDayDivider = dayKey(message.createdAt) !== dayKey(previous?.createdAt);
-                const canDelete =
-                  canModerate ||
-                  own ||
-                  (message.sender?.isAI &&
-                    String(message.replyTo?.senderCollegeId || '') === String(user?.collegeId || ''));
-                const senderColor = userColor(message.sender?.collegeId || message.sender?.name);
+      {loading ? (
+        <div className="wa-chat-loading">
+          <div className="wa-loading-spinner">
+            <Loader2 size={28} className="animate-spin" />
+            <p>Loading messages...</p>
+          </div>
+        </div>
+      ) : (
+        <div
+          ref={scrollContainerRef}
+          className="wa-chat-body"
+        >
+          {hasMore ? (
+            <div className="wa-load-more">
+              <button
+                type="button"
+                onClick={loadOlderMessages}
+                disabled={loadingMore}
+                className="wa-load-more-btn"
+              >
+                {loadingMore ? <Loader2 size={14} className="animate-spin" /> : null}
+                {loadingMore ? 'Loading...' : 'Load older messages'}
+              </button>
+            </div>
+          ) : null}
 
-                return (
-                  <div key={message._id}>
-                    {showDayDivider ? (
-                      <div className="py-3 flex items-center justify-center">
-                        <span className="text-[11px] uppercase tracking-[0.14em] text-gray-500 border border-gray-800/70 rounded-full px-3 py-1">
-                          {dayLabel(message.createdAt)}
-                        </span>
-                      </div>
-                    ) : null}
+          {sortedMessages.length === 0 ? (
+            <div className="wa-empty-state">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                className="wa-empty-icon"
+              >
+                <MessageCircle size={32} />
+              </motion.div>
+              <p className="wa-empty-title">No messages yet</p>
+              <p className="wa-empty-hint">
+                Start the conversation! Use @collegeId to mention team members or @cicrai for AI.
+              </p>
+            </div>
+          ) : null}
 
+          <AnimatePresence initial={false}>
+            {sortedMessages.map((message, index) => {
+              const previous = sortedMessages[index - 1];
+              const grouped = isGroupedMessage(message, previous);
+              const own = String(message.sender?._id) === String(currentUserId);
+              const showDayDivider = dayKey(message.createdAt) !== dayKey(previous?.createdAt);
+              const canDelete =
+                canModerate ||
+                own ||
+                (message.sender?.isAI &&
+                  String(message.replyTo?.senderCollegeId || '') === String(user?.collegeId || ''));
+              const senderColor = userColor(message.sender?.collegeId || message.sender?.name);
+              const isOptimistic = Boolean(message._optimistic);
+              const isAI = Boolean(message.sender?.isAI);
+
+              return (
+                <div key={message._id}>
+                  {showDayDivider ? (
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className={`flex ${own ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-2.5'}`}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="wa-day-divider"
                     >
-                      <div className={`flex gap-2 max-w-[94%] sm:max-w-[88%] md:max-w-[74%] ${own ? 'flex-row-reverse' : ''}`}>
-                        {!grouped ? (
-                          <div
-                            className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold mt-0.5 ${
-                              message.sender?.isAI
-                                ? 'bg-emerald-500/20 border border-emerald-500/30'
-                                : 'border border-gray-700/80'
-                            }`}
-                            style={
-                              message.sender?.isAI
-                                ? undefined
-                                : { backgroundColor: `${senderColor}22`, color: senderColor }
-                            }
-                          >
-                            {message.sender?.isAI ? (
-                              <Bot size={14} className="text-emerald-400" />
-                            ) : (
-                              userInitials(message.sender?.name)
-                            )}
-                          </div>
-                        ) : (
-                          <div className="w-7 shrink-0" />
-                        )}
+                      <span className="wa-day-pill">
+                        {dayLabel(message.createdAt)}
+                      </span>
+                    </motion.div>
+                  ) : null}
 
-                        <motion.article
-                          whileHover={{ y: -1 }}
-                          onTouchStart={(e) => onBubbleTouchStart(message._id, e)}
-                          onTouchEnd={(e) => onBubbleTouchEnd(message, e)}
-                          className={`group flex-1 min-w-0 rounded-2xl px-3 py-2.5 border ${
-                            own
-                              ? 'bg-blue-600/14 border-blue-500/25'
-                              : message.sender?.isAI
-                              ? 'bg-emerald-600/10 border-emerald-500/25'
-                              : 'bg-[#0f1218] border-gray-700/75'
-                          }`}
+                  <motion.div
+                    initial={{ opacity: 0, y: 16, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    className={`wa-msg-row ${own ? 'wa-msg-own' : 'wa-msg-other'} ${grouped ? 'wa-msg-grouped' : ''}`}
+                  >
+                    <div className={`wa-bubble-wrap ${own ? 'wa-bubble-wrap-own' : ''}`}>
+                      {!own && !grouped ? (
+                        <div
+                          className={`wa-avatar ${isAI ? 'wa-avatar-ai' : ''}`}
+                          style={isAI ? undefined : { backgroundColor: `${senderColor}30`, color: senderColor }}
                         >
-                          {!grouped ? (
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="text-xs text-gray-100 inline-flex items-center gap-1.5 min-w-0">
-                                {message.sender?.isAI ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-1.5 py-0.5">
-                                    <Bot size={10} /> AI
-                                  </span>
-                                ) : null}
-                                <span
-                                  className="font-semibold break-all"
-                                  style={{ color: senderColor }}
-                                >
-                                  {message.sender?.name || 'Member'}
-                                </span>
-                                <span className="text-gray-500 truncate">@{message.sender?.collegeId || 'N/A'}</span>
-                              </p>
+                          {isAI ? <Bot size={14} /> : userInitials(message.sender?.name)}
+                        </div>
+                      ) : !own && grouped ? (
+                        <div className="wa-avatar-spacer" />
+                      ) : null}
 
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => setReplyTarget(message)}
-                                  className="opacity-90 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-gray-500 hover:text-blue-300"
-                                  title="Reply"
-                                >
-                                  <CornerUpLeft size={13} />
-                                </button>
-
-                                {canDelete ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeMessage(message._id)}
-                                    disabled={deletingId === message._id}
-                                    className="opacity-90 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-gray-500 hover:text-red-400 disabled:opacity-40"
-                                    title="Delete"
-                                  >
-                                    {deletingId === message._id ? (
-                                      <Loader2 size={13} className="animate-spin" />
-                                    ) : (
-                                      <Trash2 size={13} />
-                                    )}
-                                  </button>
-                                ) : null}
-
-                                <p className="text-[10px] text-gray-500" title={fullTimestamp(message.createdAt)}>{timeLabel(message.createdAt)}</p>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-end gap-1.5 mb-1">
-                              <button
-                                type="button"
-                                onClick={() => setReplyTarget(message)}
-                                className="text-gray-500 hover:text-blue-300"
-                                title="Reply"
-                              >
-                                <CornerUpLeft size={12} />
-                              </button>
-                              {canDelete ? (
-                                <button
-                                  type="button"
-                                  onClick={() => removeMessage(message._id)}
-                                  disabled={deletingId === message._id}
-                                  className="text-gray-500 hover:text-red-400 disabled:opacity-40"
-                                  title="Delete"
-                                >
-                                  {deletingId === message._id ? (
-                                    <Loader2 size={12} className="animate-spin" />
-                                  ) : (
-                                    <Trash2 size={12} />
-                                  )}
-                                </button>
-                              ) : null}
-                              <p className="text-[10px] text-gray-500" title={fullTimestamp(message.createdAt)}>{timeLabel(message.createdAt)}</p>
-                            </div>
-                          )}
-
-                        {message.replyTo?.text ? (
-                          <div className="mt-1.5 rounded-xl border border-gray-700/70 bg-black/25 px-2.5 py-1.5">
-                            <p className="text-[10px] text-blue-300 font-semibold">
-                              Reply to {message.replyTo.senderName} @{message.replyTo.senderCollegeId}
-                            </p>
-                            <p className="text-xs text-gray-400 line-clamp-2">{message.replyTo.text}</p>
+                      <motion.article
+                        whileHover={{ scale: 1.005 }}
+                        onTouchStart={(e) => onBubbleTouchStart(message._id, e)}
+                        onTouchEnd={(e) => onBubbleTouchEnd(message, e)}
+                        className={`wa-bubble group ${
+                          own
+                            ? 'wa-bubble-out'
+                            : isAI
+                            ? 'wa-bubble-ai'
+                            : 'wa-bubble-in'
+                        } ${isOptimistic ? 'wa-bubble-sending' : ''} ${!grouped ? 'wa-bubble-tail' : ''}`}
+                      >
+                        {!grouped && !own ? (
+                          <div className="wa-bubble-sender">
+                            {isAI ? (
+                              <span className="wa-ai-badge">
+                                <Bot size={10} /> AI
+                              </span>
+                            ) : null}
+                            <span className="wa-sender-name" style={{ color: senderColor }}>
+                              {message.sender?.name || 'Member'}
+                            </span>
+                            <span className="wa-sender-id">@{message.sender?.collegeId || 'N/A'}</span>
                           </div>
                         ) : null}
 
-                        <p className="text-sm md:text-[15px] text-gray-200 mt-1.5 break-words leading-relaxed">
+                        {message.replyTo?.text ? (
+                          <div className={`wa-reply-preview ${own ? 'wa-reply-preview-own' : ''}`}>
+                            <p className="wa-reply-name">
+                              {message.replyTo.senderName} @{message.replyTo.senderCollegeId}
+                            </p>
+                            <p className="wa-reply-text">{message.replyTo.text}</p>
+                          </div>
+                        ) : null}
+
+                        <p className="wa-bubble-text">
                           {decorateMentions(message.text)}
                         </p>
-                        </motion.article>
-                      </div>
-                    </motion.div>
-                  </div>
-                );
-              })}
-            </AnimatePresence>
-            <div ref={endRef} />
 
+                        <div className="wa-bubble-meta">
+                          <span className="wa-bubble-time" title={fullTimestamp(message.createdAt)}>
+                            {timeLabel(message.createdAt)}
+                          </span>
+                          {own ? (
+                            <span className="wa-bubble-status">
+                              {isOptimistic ? (
+                                <Check size={12} className="wa-tick-pending" />
+                              ) : (
+                                <CheckCheck size={12} className="wa-tick-sent" />
+                              )}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="wa-bubble-actions">
+                          <button
+                            type="button"
+                            onClick={() => setReplyTarget(message)}
+                            className="wa-action-btn"
+                            title="Reply"
+                          >
+                            <CornerUpLeft size={13} />
+                          </button>
+                          {canDelete ? (
+                            <button
+                              type="button"
+                              onClick={() => removeMessage(message._id)}
+                              disabled={deletingId === message._id}
+                              className="wa-action-btn wa-action-delete"
+                              title="Delete"
+                            >
+                              {deletingId === message._id ? (
+                                <Loader2 size={13} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={13} />
+                              )}
+                            </button>
+                          ) : null}
+                        </div>
+                      </motion.article>
+                    </div>
+                  </motion.div>
+                </div>
+              );
+            })}
+          </AnimatePresence>
+          <div ref={endRef} />
+
+          <AnimatePresence>
             {showScrollDown ? (
-              <button
+              <motion.button
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
                 type="button"
                 onClick={scrollToBottom}
-                className="sticky bottom-3 left-1/2 -translate-x-1/2 ml-auto mr-auto w-fit flex items-center gap-1.5 bg-blue-600/90 hover:bg-blue-600 border border-blue-400/30 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg transition-all z-10"
+                className="wa-scroll-down"
               >
-                <ArrowDown size={13} />
-                {newMsgCount > 0 ? `${newMsgCount} new` : 'Jump to latest'}
-              </button>
+                <ArrowDown size={16} />
+                {newMsgCount > 0 ? <span className="wa-new-badge">{newMsgCount}</span> : null}
+              </motion.button>
             ) : null}
-          </div>
-        )}
+          </AnimatePresence>
+        </div>
+      )}
 
-        <footer className="border-t border-gray-800/80 bg-[#070b11] px-3 py-3 md:px-4 md:py-3">
-          <form onSubmit={send} className="space-y-2">
-            {replyTarget ? (
-              <div className="bg-blue-600/10 border border-blue-500/30 rounded-xl px-3 py-2 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] text-blue-300 font-semibold">
-                    Replying to {replyTarget.sender?.name || 'Member'} @{replyTarget.sender?.collegeId || 'N/A'}
+      <footer className="wa-chat-footer">
+        <AnimatePresence>
+          {replyTarget ? (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="wa-reply-bar"
+            >
+              <div className="wa-reply-bar-inner">
+                <div className="wa-reply-bar-content">
+                  <p className="wa-reply-bar-name">
+                    {replyTarget.sender?.name || 'Member'}
                   </p>
-                  <p className="text-xs text-gray-300 line-clamp-2">{replyTarget.text}</p>
+                  <p className="wa-reply-bar-text">{replyTarget.text}</p>
                 </div>
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center h-7 w-7 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                  className="wa-reply-bar-close"
                   onClick={() => setReplyTarget(null)}
                   title="Cancel reply"
                   aria-label="Cancel reply"
                 >
-                  <X size={14} />
+                  <X size={16} />
                 </button>
               </div>
-            ) : null}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
-            {actionError ? (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs rounded-xl px-3 py-2">
-                {actionError}
-              </div>
-            ) : null}
+        <AnimatePresence>
+          {actionError ? (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="wa-error-toast"
+            >
+              {actionError}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
-            {mentionOptions.length > 0 ? (
-              <div className="border border-gray-800/80 rounded-xl p-1.5 max-h-36 overflow-auto bg-[#0b1016]">
-                {mentionOptions.map((candidate) => (
-                  <button
-                    key={candidate._id}
-                    type="button"
-                    onClick={() => replaceCurrentMention(candidate.collegeId)}
-                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-gray-800/70 text-xs md:text-sm"
-                  >
-                    <span className="text-white">{candidate.name}</span>
-                    <span className="text-gray-500 ml-2">@{candidate.collegeId}</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
+        <AnimatePresence>
+          {mentionOptions.length > 0 ? (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="wa-mention-list"
+            >
+              {mentionOptions.map((candidate) => (
+                <button
+                  key={candidate._id}
+                  type="button"
+                  onClick={() => replaceCurrentMention(candidate.collegeId)}
+                  className="wa-mention-item"
+                >
+                  <span className="wa-mention-name">{candidate.name}</span>
+                  <span className="wa-mention-id">@{candidate.collegeId}</span>
+                </button>
+              ))}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
-            <div className="flex items-end gap-2">
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={onInputKeyDown}
-                rows={1}
-                placeholder={canSend ? 'Type a message... use @collegeId to mention' : 'Sign in to send messages'}
-                disabled={!canSend || sending}
-                className="flex-1 resize-none bg-[#0f141b] border border-gray-700/80 rounded-2xl px-3 py-2.5 text-sm md:text-base text-white outline-none focus:border-blue-500 disabled:opacity-60 min-h-[42px] max-h-32 overflow-y-auto"
-              />
+        <form onSubmit={send} className="wa-input-row">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={onInputKeyDown}
+            rows={1}
+            placeholder={canSend ? 'Type a message...' : 'Sign in to send messages'}
+            disabled={!canSend}
+            className="wa-input"
+          />
 
-              <button
-                disabled={!canSend || sending}
-                className="btn btn-primary !w-auto !px-4 !py-2.5"
-                title="Send"
-              >
-                {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-              </button>
-            </div>
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            disabled={!canSend || !text.trim()}
+            className="wa-send-btn"
+            title="Send"
+          >
+            <Send size={18} />
+          </motion.button>
+        </form>
 
-            <div className="flex items-center justify-between gap-2 text-[11px] text-gray-500 px-1">
-              <p>Enter to send, Shift+Enter for newline.</p>
-              <p className={text.length > 1900 ? 'text-red-400 font-semibold' : text.length > 1800 ? 'text-amber-300' : text.length > 1500 ? 'text-amber-400/60' : ''}>{text.length}/2000</p>
-            </div>
-          </form>
-        </footer>
-      </section>
+        <div className="wa-input-hints">
+          <p>Enter to send · Shift+Enter for newline · @collegeId to mention</p>
+          {text.length > 1500 ? (
+            <p className={text.length > 1900 ? 'wa-char-danger' : text.length > 1800 ? 'wa-char-warn' : 'wa-char-soft'}>
+              {text.length}/2000
+            </p>
+          ) : null}
+        </div>
+      </footer>
     </div>
-  );
-}
-
-function Metric({ label, value, hint, tone = 'slate' }) {
-  const toneClass =
-    tone === 'blue'
-      ? 'border-blue-500/30'
-      : tone === 'emerald'
-      ? 'border-emerald-500/30'
-      : 'border-gray-700/70';
-
-  return (
-    <article className={`px-3 py-3 border-y ${toneClass}`}>
-      <p className="text-[11px] uppercase tracking-[0.14em] text-gray-500 font-semibold">{label}</p>
-      <p className="mt-1 text-2xl font-black text-white">{value}</p>
-      <p className="mt-1 text-xs text-gray-500">{hint}</p>
-    </article>
   );
 }
