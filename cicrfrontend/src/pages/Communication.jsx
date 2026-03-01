@@ -137,6 +137,7 @@ export default function Communication() {
   const [actionError, setActionError] = useState('');
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [newMsgCount, setNewMsgCount] = useState(0);
+  const [selectedMsgId, setSelectedMsgId] = useState(null);
 
   const endRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -613,7 +614,11 @@ export default function Communication() {
                           {decorateMentions(message.text)}
                         </p>
 
-                        <div className="wa-bubble-meta">
+                        <div
+                          className="wa-bubble-meta"
+                          onClick={() => setSelectedMsgId((prev) => (prev === message._id ? null : message._id))}
+                          style={{ cursor: 'pointer' }}
+                        >
                           <span className="wa-bubble-time" title={fullTimestamp(message.createdAt)}>
                             {timeLabel(message.createdAt)}
                           </span>
@@ -627,6 +632,45 @@ export default function Communication() {
                             </span>
                           ) : null}
                         </div>
+
+                        <AnimatePresence>
+                          {selectedMsgId === message._id ? (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="wa-msg-details"
+                            >
+                              <p className="wa-msg-detail-row">
+                                <span className="wa-msg-detail-label">From</span>
+                                <span className="wa-msg-detail-value">{message.sender?.name || 'Member'}{message.sender?.collegeId ? ` (@${message.sender.collegeId})` : ''}</span>
+                              </p>
+                              {message.sender?.role ? (
+                                <p className="wa-msg-detail-row">
+                                  <span className="wa-msg-detail-label">Role</span>
+                                  <span className="wa-msg-detail-value">{message.sender.role}</span>
+                                </p>
+                              ) : null}
+                              <p className="wa-msg-detail-row">
+                                <span className="wa-msg-detail-label">Sent</span>
+                                <span className="wa-msg-detail-value">{fullTimestamp(message.createdAt)}</span>
+                              </p>
+                              <p className="wa-msg-detail-row">
+                                <span className="wa-msg-detail-label">Status</span>
+                                <span className="wa-msg-detail-value">
+                                  {isOptimistic ? (
+                                    <span className="wa-detail-status wa-detail-sending"><Check size={10} /> Sending</span>
+                                  ) : own ? (
+                                    <span className="wa-detail-status wa-detail-delivered"><CheckCheck size={10} /> Delivered</span>
+                                  ) : (
+                                    <span className="wa-detail-status wa-detail-received"><CheckCheck size={10} /> Received</span>
+                                  )}
+                                </span>
+                              </p>
+                            </motion.div>
+                          ) : null}
+                        </AnimatePresence>
 
                         <div className="wa-bubble-actions">
                           <button
@@ -758,6 +802,7 @@ export default function Communication() {
           />
 
           <motion.button
+            type="submit"
             whileTap={{ scale: 0.9 }}
             disabled={!canSend || !text.trim()}
             className="wa-send-btn"

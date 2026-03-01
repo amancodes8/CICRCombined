@@ -517,7 +517,7 @@ export default function Layout() {
     }),
   };
 
-  const SidebarContent = () => (
+  const sidebarContent = (
     <>
       {/* Brand Logo */}
       <motion.div
@@ -743,7 +743,7 @@ export default function Layout() {
     <div className="flex min-h-screen mesh-bg text-white">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-64 border-r border-gray-800/50 p-6 flex-col fixed h-full z-20 sidebar-bg">
-        <SidebarContent />
+        {sidebarContent}
       </aside>
 
       {/* Mobile Top Nav */}
@@ -827,7 +827,7 @@ export default function Layout() {
               transition={{ type: 'spring', damping: 28, stiffness: 260, mass: 0.8 }}
               className="fixed top-0 left-0 bottom-0 w-72 p-6 z-50 flex flex-col border-r border-white/5 lg:hidden sidebar-bg overflow-hidden"
             >
-              <SidebarContent />
+              {sidebarContent}
             </motion.aside>
           </>
         )}
