@@ -119,3 +119,24 @@ npx expo export --platform web
 npx eas build --platform android
 npx eas build --platform ios
 ```
+
+### APK Build via GitHub Actions
+
+The repository includes a GitHub Actions workflow (`.github/workflows/build-apk.yml`) that
+automatically builds a release APK whenever changes are pushed to `cicrmobile/` on `main`.
+You can also trigger it manually from the **Actions** tab using **workflow_dispatch**.
+
+**Estimated build times** (on `ubuntu-latest`):
+
+| Step | Typical Duration |
+|------|-----------------|
+| Setup (checkout, Java 17, Node 22) | ~10 s |
+| `npm ci` | ~10 – 20 s |
+| `expo prebuild` | ~5 s |
+| Gradle `assembleRelease` (cold cache) | ~8 – 12 min |
+| Gradle `assembleRelease` (warm cache) | ~4 – 6 min |
+| **Total (first run)** | **~10 – 15 min** |
+| **Total (cached)** | **~5 – 8 min** |
+
+> Exact times are printed in the **Job Summary** of each workflow run.
+> Gradle dependency & build caches are stored between runs to speed up subsequent builds.
