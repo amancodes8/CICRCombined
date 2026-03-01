@@ -1,11 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-// Import the helpers and factory used in server.js.
-// We re-declare them here to unit-test CORS origin logic in isolation,
-// matching the implementation in server.js exactly.
-const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
-
+// Re-declare the helpers from server.js to unit-test CORS origin logic in isolation.
 const isVercelOrigin = (origin) => {
   try {
     const parsed = new URL(origin);
