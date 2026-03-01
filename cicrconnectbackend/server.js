@@ -48,6 +48,7 @@ const createApp = () => {
 
   const allowedOrigins = new Set([
     'https://cicrconnect.vercel.app',
+    'http://localhost:8081/',
     ...env.frontendUrls.map((url) => normalizeOrigin(url)),
   ]);
 
