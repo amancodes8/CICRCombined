@@ -16,6 +16,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.cicr.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#070a0f",
         "foregroundImage": "./assets/android-icon-foreground.png",
