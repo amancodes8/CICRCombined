@@ -6,6 +6,7 @@ export default function FormField({
   required = false,
   optional = false,
   hint = '',
+  requiredHint = 'Required field',
   error = '',
   className = '',
   children,
@@ -23,7 +24,15 @@ export default function FormField({
     return '';
   }, [children, error, required, touched]);
 
-  const describedBy = fieldError ? `${id || 'field'}-error` : hint ? `${id || 'field'}-hint` : undefined;
+  const displayHint = fieldError
+    ? ''
+    : hint || (required ? requiredHint : '');
+
+  const describedBy = fieldError
+    ? `${id || 'field'}-error`
+    : displayHint
+    ? `${id || 'field'}-hint`
+    : undefined;
 
   const enhancedChild = useMemo(() => {
     const child = Children.toArray(children)[0];
@@ -56,8 +65,8 @@ export default function FormField({
       {enhancedChild}
       {fieldError ? (
         <p id={`${id || 'field'}-error`} role="alert" className="ui-field-error">{fieldError}</p>
-      ) : hint ? (
-        <p id={`${id || 'field'}-hint`} className="ui-field-hint">{hint}</p>
+      ) : displayHint ? (
+        <p id={`${id || 'field'}-hint`} aria-live="polite" className="ui-field-hint">{displayHint}</p>
       ) : null}
     </div>
   );

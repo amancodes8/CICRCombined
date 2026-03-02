@@ -45,13 +45,13 @@ export default function Auth() {
     let pointerX = 0;
     let pointerY = 0;
 
-    const particleCount = 280;
+    const particleCount = 140;
     const particles = Array.from({ length: particleCount }, () => ({
       x: (Math.random() - 0.5) * 22,
       y: (Math.random() - 0.5) * 14,
       z: Math.random() * 22 - 11,
-      speed: 0.03 + Math.random() * 0.05,
-      size: 0.6 + Math.random() * 1.2,
+      speed: 0.02 + Math.random() * 0.035,
+      size: 0.5 + Math.random() * 0.95,
       seed: Math.random() * Math.PI * 2,
     }));
 
@@ -76,10 +76,10 @@ export default function Auth() {
         }
 
         const depthFactor = 1 - (p.z + 11) / 22;
-        const driftX = Math.sin(t * 0.45 + p.seed) * 0.35;
-        const driftY = Math.cos(t * 0.37 + p.seed) * 0.28;
-        const parallaxX = pointerX * (0.9 + depthFactor * 1.9);
-        const parallaxY = pointerY * (0.8 + depthFactor * 1.6);
+        const driftX = Math.sin(t * 0.4 + p.seed) * 0.22;
+        const driftY = Math.cos(t * 0.32 + p.seed) * 0.2;
+        const parallaxX = pointerX * (0.45 + depthFactor * 1.05);
+        const parallaxY = pointerY * (0.4 + depthFactor * 0.9);
         const pt = project({
           x: p.x + driftX + parallaxX,
           y: p.y + driftY + parallaxY,
@@ -119,8 +119,8 @@ export default function Auth() {
     const onPointerMove = (e) => {
       const rect = container.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
-      pointerX = ((e.clientX - rect.left) / rect.width - 0.5) * 1.4;
-      pointerY = ((e.clientY - rect.top) / rect.height - 0.5) * 1.1;
+      pointerX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.9;
+      pointerY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.75;
     };
     const onPointerLeave = () => {
       pointerX = 0;
@@ -251,7 +251,7 @@ export default function Auth() {
   return (
     <div ref={containerRef} className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden font-sans page-motion-c auth-bg">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/55 to-black/75" />
+      <div className="absolute inset-0 bg-linear-to-b from-black/30 via-black/55 to-black/75" />
 
       <motion.div 
         layout
@@ -271,7 +271,7 @@ export default function Auth() {
             <h2 className="text-4xl text-white font-black tracking-tighter">
               {isForgot ? (otpSent ? 'Set Password' : 'Reset Password') : (isLogin ? 'Sign In' : 'Join CICR')}
             </h2>
-            <p className="text-gray-500 mt-3 text-sm font-medium tracking-wide uppercase">
+            <p className="text-gray-300 mt-3 text-sm font-medium tracking-wide uppercase">
               {isForgot
                 ? (
                     forgotMethod === 'emailOtp'
@@ -316,9 +316,9 @@ export default function Auth() {
                   exit={{ opacity: 0, x: 20 }}
                   className="space-y-5"
                 >
-                  <InputGroup icon={User} name="name" placeholder="Full Name" value={formData.name} onChange={handleChange} />
-                  <InputGroup icon={Hash} name="collegeId" placeholder="College ID" value={formData.collegeId} onChange={handleChange} />
-                  <InputGroup icon={Ticket} name="inviteCode" placeholder="Access Code*" value={formData.inviteCode} onChange={handleChange} />
+                  <InputGroup icon={User} name="name" label="Full Name" placeholder="Full Name" value={formData.name} onChange={handleChange} />
+                  <InputGroup icon={Hash} name="collegeId" label="College ID" placeholder="College ID" value={formData.collegeId} onChange={handleChange} />
+                  <InputGroup icon={Ticket} name="inviteCode" label="Access Code" placeholder="Access Code*" value={formData.inviteCode} onChange={handleChange} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -327,6 +327,7 @@ export default function Auth() {
               <InputGroup
                 icon={Mail}
                 name="email"
+                label={isLogin ? 'Email or College ID' : 'Email Address'}
                 type="text"
                 placeholder={isLogin ? "Email or College ID" : "Email Address"}
                 value={formData.email}
@@ -347,7 +348,7 @@ export default function Auth() {
                     className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
                       forgotMethod === 'emailOtp'
                         ? 'border-blue-500/50 text-blue-200 bg-blue-500/10'
-                        : 'border-white/10 text-gray-500'
+                        : 'border-white/10 text-gray-300'
                     }`}
                   >
                     Email OTP
@@ -363,7 +364,7 @@ export default function Auth() {
                     className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
                       forgotMethod === 'resetCode'
                         ? 'border-blue-500/50 text-blue-200 bg-blue-500/10'
-                        : 'border-white/10 text-gray-500'
+                        : 'border-white/10 text-gray-300'
                     }`}
                   >
                     Reset Code
@@ -371,36 +372,36 @@ export default function Auth() {
                 </div>
                 {forgotMethod === 'emailOtp' && (
                   <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-200">
+                    <p className="text-xs font-black uppercase tracking-widest text-amber-200">
                       Warning: Email OTP not available. Please use Reset Code.
                     </p>
                   </div>
                 )}
-                <InputGroup icon={Hash} name="collegeId" placeholder="College ID" value={formData.collegeId} onChange={handleChange} />
+                <InputGroup icon={Hash} name="collegeId" label="College ID" placeholder="College ID" value={formData.collegeId} onChange={handleChange} />
               </>
             )}
 
             {!isForgot && (
-              <InputGroup icon={Lock} name="password" type="password" placeholder="Password" value={formData.password} onChange={handleChange} />
+              <InputGroup icon={Lock} name="password" label="Password" type="password" placeholder="Password" value={formData.password} onChange={handleChange} />
             )}
 
             {isForgot && forgotMethod === 'emailOtp' && otpSent && (
               <>
-                <InputGroup icon={Ticket} name="otp" placeholder="6-digit OTP" value={formData.otp} onChange={handleChange} />
-                <InputGroup icon={Lock} name="newPassword" type="password" placeholder="New Password" value={formData.newPassword} onChange={handleChange} />
+                <InputGroup icon={Ticket} name="otp" label="OTP" placeholder="6-digit OTP" value={formData.otp} onChange={handleChange} />
+                <InputGroup icon={Lock} name="newPassword" label="New Password" type="password" placeholder="New Password" value={formData.newPassword} onChange={handleChange} />
               </>
             )}
 
             {isForgot && forgotMethod === 'resetCode' && (
               <>
-                <InputGroup icon={Ticket} name="resetCode" placeholder="Admin-issued reset code" value={formData.resetCode} onChange={handleChange} />
-                <InputGroup icon={Lock} name="newPassword" type="password" placeholder="New Password" value={formData.newPassword} onChange={handleChange} />
+                <InputGroup icon={Ticket} name="resetCode" label="Reset Code" placeholder="Admin-issued reset code" value={formData.resetCode} onChange={handleChange} />
+                <InputGroup icon={Lock} name="newPassword" label="New Password" type="password" placeholder="New Password" value={formData.newPassword} onChange={handleChange} />
               </>
             )}
 
             <motion.button 
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.005 }}
+              whileTap={{ scale: 0.992 }}
               type="submit"
               disabled={loading}
               className="w-full text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex justify-center items-center gap-2 mt-8 gradient-blue-purple"
@@ -426,7 +427,7 @@ export default function Auth() {
             {isLogin && (
               <button
                 onClick={() => { setMode('forgot'); setOtpSent(false); setError(''); setNotice(''); }}
-                className="text-xs font-black uppercase tracking-[0.2em] text-gray-600 hover:text-blue-500 transition-all mr-6"
+                className="text-xs font-black uppercase tracking-[0.2em] text-gray-300 hover:text-blue-500 transition-all mr-6"
               >
                 Forgot Password
               </button>
@@ -455,17 +456,28 @@ export default function Auth() {
 }
 
 // Sub-component for Inputs to keep the main return clean
-function InputGroup({ icon: Icon, ...props }) {
+function InputGroup({ icon: Icon, label, required = true, ...props }) {
+  const fieldId = props.id || props.name;
+
   return (
-    <div className="relative group">
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-blue-500 transition-colors">
-        <Icon size={18} />
+    <div className="space-y-1.5">
+      {label ? (
+        <label htmlFor={fieldId} className="block text-xs font-semibold text-gray-300 tracking-wide">
+          {label}
+          {required ? <span className="text-rose-300"> *</span> : null}
+        </label>
+      ) : null}
+      <div className="relative group">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
+          <Icon size={18} />
+        </div>
+        <input
+          required={required}
+          id={fieldId}
+          {...props}
+          className="w-full border border-white/8 p-4 pl-12 rounded-2xl text-white text-sm outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-600/10 transition-all placeholder:text-gray-400 glass"
+        />
       </div>
-      <input 
-        required
-        {...props}
-        className="w-full border border-white/8 p-4 pl-12 rounded-2xl text-white text-sm outline-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-600/10 transition-all placeholder:text-gray-600 glass"
-      />
     </div>
   );
 }

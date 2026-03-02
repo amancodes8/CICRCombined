@@ -30,13 +30,14 @@ export function DataEmpty({
   onAction,
 }) {
   const displayTitle = title || label || 'No records found.';
+  const displayHint = hint || 'Try adjusting filters, clearing search, or creating a new entry.';
 
   return (
     <div className="ui-empty py-12">
       <div className="inline-flex flex-col items-center gap-3">
         <SearchX size={28} className="text-gray-600" />
         <p className="text-sm text-gray-300 font-semibold">{displayTitle}</p>
-        {hint ? <p className="text-xs text-gray-500 max-w-md">{hint}</p> : null}
+        <p className="text-xs text-gray-500 max-w-md">{displayHint}</p>
         {actionLabel && onAction ? (
           <button type="button" onClick={onAction} className="btn btn-ghost mt-1">
             {actionLabel}
@@ -47,7 +48,7 @@ export function DataEmpty({
   );
 }
 
-export function DataError({ label = 'Something went wrong.', onRetry }) {
+export function DataError({ label = 'Something went wrong.', hint = 'Please retry. If the issue persists, refresh this page.', onRetry }) {
   return (
     <div className="ui-empty border-red-500/25 py-12">
       <div className="inline-flex flex-col items-center gap-3">
@@ -55,6 +56,7 @@ export function DataError({ label = 'Something went wrong.', onRetry }) {
           <RotateCcw size={18} className="text-red-400" />
         </div>
         <p className="text-sm text-red-300/80">{label}</p>
+        <p className="text-xs text-red-200/70 max-w-md">{hint}</p>
         {onRetry ? (
           <button type="button" onClick={onRetry} className="btn btn-danger mt-1">
             <RotateCcw size={13} /> Retry

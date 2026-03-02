@@ -217,7 +217,7 @@ function KpiTile({ label, value, delta, hint, tone = 'cyan', icon: Icon = BarCha
           initial={{ width: 0 }}
           animate={{ width: `${Math.min(100, Math.max(16, Math.abs(Number(delta || 0)) * 8 + 22))}%` }}
           transition={{ duration: 0.8, delay: 0.1 + index * 0.05 }}
-          className={`h-full bg-gradient-to-r ${theme.accent}`}
+          className={`h-full bg-linear-to-r ${theme.accent}`}
         />
       </div>
     </motion.article>
@@ -313,6 +313,7 @@ export default function Dashboard() {
   const [timeWindow, setTimeWindow] = useState('7d');
   const [roleFilter, setRoleFilter] = useState('all');
   const [projectStatusFilter, setProjectStatusFilter] = useState('all');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [collapsed, setCollapsed] = useState(
     SECTION_KEYS.reduce((acc, key) => {
       acc[key] = false;
@@ -616,7 +617,7 @@ export default function Dashboard() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: 'easeOut' }}
-        className="relative overflow-hidden border-b border-cyan-500/30 bg-gradient-to-br from-[#0a131e] via-[#09111a] to-[#080d14] section-motion section-motion-delay-1"
+        className="relative overflow-hidden border-b border-cyan-500/30 bg-linear-to-br from-[#0a131e] via-[#09111a] to-[#080d14] section-motion section-motion-delay-1"
       >
         <div className="relative z-10 px-4 md:px-6 py-6 md:py-7">
           <PageHeader
@@ -659,7 +660,7 @@ export default function Dashboard() {
       {loadError ? (
         <section className="border border-amber-500/35 bg-amber-500/10 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
           <p className="text-sm text-amber-100">{loadError}</p>
-          <button type="button" onClick={loadDashboard} className="btn btn-secondary !w-auto !text-xs">
+          <button type="button" onClick={loadDashboard} className="btn btn-secondary w-auto! text-xs!">
             <Loader2 size={12} /> Retry
           </button>
         </section>
@@ -689,7 +690,7 @@ export default function Dashboard() {
         transition={{ duration: 0.45 }}
         className="border-y border-gray-800/75 px-2 py-4 section-motion section-motion-delay-2"
       >
-        <div className="grid grid-cols-1 lg:grid-cols-[auto_auto_1fr] gap-4 items-start lg:items-center">
+        <div className="space-y-4">
           <div>
             <p className="text-xs text-gray-400 font-semibold mb-1.5">Time Window</p>
             <div className="flex flex-wrap gap-2">
@@ -711,42 +712,60 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div>
-            <p className="text-xs text-gray-400 font-semibold mb-1.5">Role Scope</p>
-            <select
-              aria-label="Role scope filter"
-              value={roleFilter}
-              onChange={(event) => setRoleFilter(event.target.value)}
-              className="ui-input !py-2 !text-xs !max-w-[12rem]"
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-gray-400 font-semibold">Advanced Filters</p>
+            <button
+              type="button"
+              onClick={() => setShowAdvancedFilters((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:text-white"
+              aria-expanded={showAdvancedFilters}
+              aria-controls="dashboard-advanced-filters"
             >
-              {ROLE_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              {showAdvancedFilters ? 'Hide' : 'Show'}
+              {showAdvancedFilters ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
           </div>
 
-          <div>
-            <p className="text-xs text-gray-400 font-semibold mb-1.5">Project Status</p>
-            <div className="flex flex-wrap gap-2">
-              {PROJECT_STATUS_OPTIONS.map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  aria-label={`Filter project status ${status}`}
-                  onClick={() => setProjectStatusFilter(status)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                    projectStatusFilter === status
-                      ? 'border-blue-500/45 text-blue-100 bg-blue-500/10'
-                      : 'border-gray-800 text-gray-500 hover:text-gray-300'
-                  }`}
+          {showAdvancedFilters ? (
+            <div id="dashboard-advanced-filters" className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4 items-start lg:items-center">
+              <div>
+                <p className="text-xs text-gray-400 font-semibold mb-1.5">Role Scope</p>
+                <select
+                  aria-label="Role scope filter"
+                  value={roleFilter}
+                  onChange={(event) => setRoleFilter(event.target.value)}
+                  className="ui-input py-2! text-xs! max-w-48"
                 >
-                  {status}
-                </button>
-              ))}
+                  {ROLE_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-400 font-semibold mb-1.5">Project Status</p>
+                <div className="flex flex-wrap gap-2">
+                  {PROJECT_STATUS_OPTIONS.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      aria-label={`Filter project status ${status}`}
+                      onClick={() => setProjectStatusFilter(status)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                        projectStatusFilter === status
+                          ? 'border-blue-500/45 text-blue-100 bg-blue-500/10'
+                          : 'border-gray-800 text-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
       </motion.section>
 
@@ -772,7 +791,7 @@ export default function Dashboard() {
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true, amount: 0.6 }}
                     transition={{ duration: 0.3, delay: index * 0.02 }}
-                    className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 py-2.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors"
+                    className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 py-2.5 px-2 rounded-lg hover:bg-white/3 transition-colors"
                   >
                     <span className="mt-1.5 w-2 h-2 rounded-full bg-cyan-400" />
                     <div className="min-w-0">
@@ -810,7 +829,7 @@ export default function Dashboard() {
               <EmptyInline title="No meetings for current filters." ctaLabel="Schedule meeting" to="/schedule" />
             ) : (
               <div className="overflow-x-auto">
-                <div className="min-w-[560px]">
+                <div className="min-w-140">
                   <div className="grid grid-cols-[minmax(0,1.2fr)_0.9fr_0.7fr] gap-3 text-sm text-gray-400 font-semibold py-2 border-b border-gray-800">
                     <span>Meeting</span>
                     <span>When</span>
@@ -823,7 +842,7 @@ export default function Dashboard() {
                       whileInView={{ opacity: 1, x: 0 }}
                       viewport={{ once: true, amount: 0.7 }}
                       transition={{ delay: index * 0.02, duration: 0.26 }}
-                      className="grid grid-cols-[minmax(0,1.2fr)_0.9fr_0.7fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/[0.02] transition-colors"
+                      className="grid grid-cols-[minmax(0,1.2fr)_0.9fr_0.7fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/2 transition-colors"
                     >
                       <div className="min-w-0">
                         <p className="text-sm text-white font-semibold truncate">{meeting.title}</p>
@@ -855,7 +874,7 @@ export default function Dashboard() {
               <EmptyInline title="No projects for the selected filters." ctaLabel="Open projects" to="/projects" />
             ) : (
               <div className="overflow-x-auto">
-                <div className="min-w-[640px]">
+                <div className="min-w-160">
                   <div className="grid grid-cols-[minmax(0,1.15fr)_0.6fr_0.65fr_0.45fr] gap-3 text-sm text-gray-400 font-semibold py-2 border-b border-gray-800">
                     <span>Project</span>
                     <span>Stage</span>
@@ -872,14 +891,14 @@ export default function Dashboard() {
                     >
                       <Link
                         to={`/projects/${project._id}`}
-                        className="grid grid-cols-[minmax(0,1.15fr)_0.6fr_0.65fr_0.45fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/[0.02] transition-colors"
+                        className="grid grid-cols-[minmax(0,1.15fr)_0.6fr_0.65fr_0.45fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/2 transition-colors"
                       >
                         <div className="min-w-0">
                           <p className="text-sm text-white font-semibold truncate">{project.title}</p>
                           <p className="text-xs text-gray-400 truncate">{project.event?.title || 'Standalone'}</p>
                           <div className="mt-2 h-1.5 rounded-full bg-gray-800 overflow-hidden">
                             <div
-                              className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
+                              className="h-full bg-linear-to-r from-cyan-400 via-blue-400 to-indigo-400"
                               style={{ width: `${Math.max(0, Math.min(100, Number(project.progress || 0)))}%` }}
                             />
                           </div>
@@ -910,7 +929,7 @@ export default function Dashboard() {
               <EmptyInline title="No discussions match your filters." ctaLabel="Start discussion" to="/community" />
             ) : (
               <div className="overflow-x-auto">
-                <div className="min-w-[560px]">
+                <div className="min-w-140">
                   <div className="grid grid-cols-[minmax(0,1.35fr)_0.65fr_0.55fr] gap-3 text-sm text-gray-400 font-semibold py-2 border-b border-gray-800">
                     <span>Discussion</span>
                     <span>Author</span>
@@ -926,7 +945,7 @@ export default function Dashboard() {
                     >
                       <Link
                         to="/community"
-                        className="grid grid-cols-[minmax(0,1.35fr)_0.65fr_0.55fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/[0.02] transition-colors"
+                        className="grid grid-cols-[minmax(0,1.35fr)_0.65fr_0.55fr] gap-3 py-3 border-b border-gray-800/70 hover:bg-white/2 transition-colors"
                       >
                         <div className="min-w-0">
                           <p className="text-xs text-blue-300 font-semibold">{post.type || 'Update'}</p>
@@ -992,7 +1011,7 @@ export default function Dashboard() {
               <p className="inline-flex items-center gap-2"><Users size={12} className="text-blue-300" /> {directoryMembers.length} members in directory</p>
             </div>
             <div className="mt-3">
-              <Link to="/profile" className="btn btn-ghost !w-auto !text-xs">Open Profile</Link>
+              <Link to="/profile" className="btn btn-ghost w-auto! text-xs!">Open Profile</Link>
             </div>
           </motion.section>
 
@@ -1021,7 +1040,7 @@ export default function Dashboard() {
                       whileInView={{ width: `${Math.max(8, item.percent)}%` }}
                       viewport={{ once: true, amount: 0.7 }}
                       transition={{ duration: 0.75, ease: 'easeOut' }}
-                      className={`h-full bg-gradient-to-r ${item.tone}`}
+                      className={`h-full bg-linear-to-r ${item.tone}`}
                     />
                   </div>
                 </article>
@@ -1118,7 +1137,7 @@ export default function Dashboard() {
                 </p>
               ) : null}
               <div className="mt-3">
-                <Link to="/admin" className="btn btn-ghost !w-auto !text-xs">Open Recruitment</Link>
+                <Link to="/admin" className="btn btn-ghost w-auto! text-xs!">Open Recruitment</Link>
               </div>
             </motion.section>
           ) : null}
@@ -1127,9 +1146,9 @@ export default function Dashboard() {
 
       <nav className="fixed bottom-4 left-4 right-4 z-30 lg:hidden">
         <div className="rounded-2xl border border-gray-800 bg-[#080d13]/95 backdrop-blur p-2 grid grid-cols-3 gap-2">
-          <Link to="/projects" className="btn btn-secondary !text-[10px] !py-2">Projects</Link>
-          <Link to="/community?tab=issues" className="btn btn-secondary !text-[10px] !py-2">Issue</Link>
-          <Link to="/events" className="btn btn-primary !text-[10px] !py-2">Events</Link>
+          <Link to="/projects" className="btn btn-secondary text-[10px]! py-2!">Projects</Link>
+          <Link to="/community?tab=issues" className="btn btn-secondary text-[10px]! py-2!">Issue</Link>
+          <Link to="/events" className="btn btn-primary text-[10px]! py-2!">Events</Link>
         </div>
       </nav>
     </div>

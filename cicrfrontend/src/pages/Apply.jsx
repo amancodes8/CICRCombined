@@ -42,6 +42,7 @@ export default function Apply() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState({});
+  const [submitNotice, setSubmitNotice] = useState('');
 
   const { values: form, setValues: setForm, isDirty, lastSavedAt, resetForm } = useDraftForm({
     storageKey: 'draft_public_apply_form',
@@ -76,6 +77,7 @@ export default function Apply() {
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }));
+    if (submitNotice) setSubmitNotice('');
   };
 
   const validate = () => {
@@ -96,9 +98,13 @@ export default function Apply() {
     e.preventDefault();
     const nextErrors = validate();
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      setSubmitNotice('Please review the highlighted fields before submitting.');
+      return;
+    }
 
     setSubmitting(true);
+    setSubmitNotice('Submitting your application...');
     try {
       const payload = {
         fullName: form.fullName,
@@ -123,8 +129,10 @@ export default function Apply() {
       setSubmitted(true);
       resetForm({ ...INITIAL_FORM, eventId: '' });
       dispatchToast('Application submitted successfully.', 'success');
+      setSubmitNotice('Application submitted successfully.');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Unable to submit application.', 'error');
+      setSubmitNotice('Submission failed. Please retry in a moment.');
     } finally {
       setSubmitting(false);
     }
@@ -137,7 +145,7 @@ export default function Apply() {
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4 }}
-          className="border border-gray-800 rounded-[2rem] p-10 max-w-lg text-center pro-hover-lift"
+          className="border border-gray-800 rounded-4xl p-10 max-w-lg text-center pro-hover-lift"
         >
           <CheckCircle2 size={48} className="text-emerald-400 mx-auto" />
           <h2 className="text-2xl font-black text-white mt-4">Application Received</h2>
@@ -177,7 +185,7 @@ export default function Apply() {
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.05 }}
-          className="border border-gray-800 rounded-[2rem] p-6 md:p-8 space-y-5"
+          className="border border-gray-800 rounded-4xl p-6 md:p-8 space-y-5"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="Full Name" required error={errors.fullName}>
@@ -188,7 +196,7 @@ export default function Apply() {
                 className="ui-input"
               />
             </FormField>
-            <FormField label="Email" required error={errors.email}>
+            <FormField label="Email" required hint="Use an active email for updates" error={errors.email}>
               <input
                 type="email"
                 value={form.email}
@@ -197,7 +205,7 @@ export default function Apply() {
                 className="ui-input"
               />
             </FormField>
-            <FormField label="Phone" required error={errors.phone}>
+            <FormField label="Phone" required hint="Include active contact number" error={errors.phone}>
               <input
                 value={form.phone}
                 onChange={(e) => updateField('phone', e.target.value)}
@@ -272,7 +280,7 @@ export default function Apply() {
             </FormField>
           </div>
 
-          <FormField label="Motivation" required error={errors.motivation}>
+          <FormField label="Motivation" required hint="Minimum 20 characters" error={errors.motivation}>
             <textarea
               value={form.motivation}
               onChange={(e) => updateField('motivation', e.target.value)}
@@ -317,10 +325,11 @@ export default function Apply() {
           />
 
           <div className="mobile-sticky-action">
-            <button type="submit" disabled={submitting} className="btn btn-primary !px-5 !py-3">
+            <button type="submit" disabled={submitting} className="btn btn-primary px-5! py-3!">
               {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
               Submit Application
             </button>
+            {submitNotice ? <p className="mt-2 text-xs text-gray-300">{submitNotice}</p> : null}
           </div>
         </motion.form>
 

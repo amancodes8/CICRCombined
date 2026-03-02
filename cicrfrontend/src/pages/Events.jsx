@@ -26,6 +26,7 @@ const EVENT_TYPES = ['Orientation', 'Workshop', 'Recruitment', 'Competition', 'S
 const PROJECT_DOMAINS = ['Tech', 'Management', 'PR'];
 const PROJECT_STAGES = ['Planning', 'Execution', 'Testing', 'Review', 'Deployment'];
 const EVENT_STATUS_FILTERS = ['All', 'Scheduled', 'Completed', 'Cancelled'];
+const EVENTS_VIEW_KEY = 'events_saved_view_v1';
 
 const INITIAL_EVENT_FORM = {
   title: '',
@@ -94,20 +95,34 @@ const downloadCsv = (filename, headers, rows) => {
 };
 
 export default function Events() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const savedView = (() => {
+    try {
+      const raw = localStorage.getItem(EVENTS_VIEW_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  })();
+
   const createFormRef = useRef(null);
+  const noticeTimerRef = useRef(null);
   const [events, setEvents] = useState([]);
   const [members, setMembers] = useState([]);
   const [projectDrafts, setProjectDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [exportingEventId, setExportingEventId] = useState('');
-  const [selectedEventId, setSelectedEventId] = useState('');
+  const [selectedEventId, setSelectedEventId] = useState(searchParams.get('focus') || savedView.focus || '');
   const [selectedEventDetails, setSelectedEventDetails] = useState(null);
   const [selectedDetailsLoading, setSelectedDetailsLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const candidate = searchParams.get('status') || savedView.status || 'All';
+    return EVENT_STATUS_FILTERS.includes(candidate) ? candidate : 'All';
+  });
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || savedView.q || '');
   const [errors, setErrors] = useState({});
+  const [actionNotice, setActionNotice] = useState(null);
 
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const user = profile.result || profile;
@@ -149,6 +164,59 @@ export default function Events() {
     createFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     window.setTimeout(() => document.getElementById('event-title')?.focus(), 160);
   }, [isAdmin, searchParams]);
+
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+
+        if (searchQuery.trim()) next.set('q', searchQuery.trim());
+        else next.delete('q');
+
+        if (statusFilter !== 'All') next.set('status', statusFilter);
+        else next.delete('status');
+
+        if (selectedEventId) next.set('focus', selectedEventId);
+        else next.delete('focus');
+
+        return next;
+      },
+      { replace: true }
+    );
+  }, [searchQuery, selectedEventId, setSearchParams, statusFilter]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        EVENTS_VIEW_KEY,
+        JSON.stringify({
+          q: searchQuery,
+          status: statusFilter,
+          focus: selectedEventId,
+        })
+      );
+    } catch {
+      // ignore persistence errors
+    }
+  }, [searchQuery, selectedEventId, statusFilter]);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current) {
+        window.clearTimeout(noticeTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showActionNotice = (text, type = 'info') => {
+    if (noticeTimerRef.current) {
+      window.clearTimeout(noticeTimerRef.current);
+    }
+    setActionNotice({ text, type });
+    noticeTimerRef.current = window.setTimeout(() => {
+      setActionNotice(null);
+    }, 3600);
+  };
 
   const openEvents = useMemo(() => events.filter((event) => event.status === 'Scheduled'), [events]);
   const orderedEvents = useMemo(
@@ -347,8 +415,10 @@ export default function Events() {
       resetForm(INITIAL_EVENT_FORM);
       setProjectDrafts([]);
       dispatchToast('Event created successfully.', 'success');
+      showActionNotice('Event created and selected for review.', 'success');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Failed to create event.', 'error');
+      showActionNotice('Could not create event. Check required fields and retry.', 'error');
     } finally {
       setCreating(false);
     }
@@ -360,8 +430,10 @@ export default function Events() {
       setEvents((prev) => prev.map((item) => (item._id === data._id ? data : item)));
       setSelectedEventDetails((prev) => (prev && prev._id === data._id ? { ...prev, ...data } : prev));
       dispatchToast(`Event marked ${status}.`, 'success');
+      showActionNotice(`Status updated to ${status}.`, 'success');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Failed to update event.', 'error');
+      showActionNotice('Status update failed. Please retry.', 'error');
     }
   };
 
@@ -375,8 +447,10 @@ export default function Events() {
         setSelectedEventDetails(null);
       }
       dispatchToast('Event removed.', 'success');
+      showActionNotice('Event deleted successfully.', 'success');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Failed to delete event.', 'error');
+      showActionNotice('Delete failed. Please retry.', 'error');
     }
   };
 
@@ -500,8 +574,10 @@ export default function Events() {
 
       downloadCsv(filename, headers, rows);
       dispatchToast('Event sheet exported successfully.', 'success');
+      showActionNotice('Event sheet exported successfully.', 'success');
     } catch (err) {
       dispatchToast(err.response?.data?.message || 'Failed to export event details.', 'error');
+      showActionNotice('Export failed. Please retry.', 'error');
     } finally {
       setExportingEventId('');
     }
@@ -541,6 +617,20 @@ export default function Events() {
         <StreamMetric label="Cancelled" value={eventCounts.cancelled} tone="rose" />
       </section>
 
+      {actionNotice ? (
+        <section
+          className={`rounded-xl border px-3 py-2 text-sm ${
+            actionNotice.type === 'error'
+              ? 'border-rose-500/35 bg-rose-500/10 text-rose-200'
+              : actionNotice.type === 'success'
+              ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-200'
+              : 'border-cyan-500/35 bg-cyan-500/10 text-cyan-200'
+          }`}
+        >
+          {actionNotice.text}
+        </section>
+      ) : null}
+
       {isAdmin ? (
         <motion.form
           ref={createFormRef}
@@ -555,14 +645,14 @@ export default function Events() {
               <Plus size={14} /> Create Event
             </div>
             {lastSavedAt ? (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-400">
                 Draft autosaved {new Date(lastSavedAt).toLocaleTimeString()}
               </span>
             ) : null}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField id="event-title" label="Event Title" required error={errors.title}>
+            <FormField id="event-title" label="Event Title" required hint="Minimum 4 characters" error={errors.title}>
               <input
                 id="event-title"
                 value={form.title}
@@ -581,7 +671,7 @@ export default function Events() {
                 ))}
               </select>
             </FormField>
-            <FormField label="Location / Link" required error={errors.location}>
+            <FormField label="Location / Link" required hint="Use venue name or meeting URL" error={errors.location}>
               <input
                 value={form.location}
                 onChange={(e) => updateField('location', e.target.value)}
@@ -589,23 +679,23 @@ export default function Events() {
                 className="ui-input"
               />
             </FormField>
-            <FormField label="Starts At" required error={errors.startTime}>
+            <FormField label="Starts At" required hint="Event opening date and time" error={errors.startTime}>
               <input
                 type="datetime-local"
                 value={form.startTime}
                 onChange={(e) => updateField('startTime', e.target.value)}
-                className="ui-input [color-scheme:dark]"
+                className="ui-input scheme-dark"
               />
             </FormField>
-            <FormField label="Ends At" required error={errors.endTime}>
+            <FormField label="Ends At" required hint="Must be after start time" error={errors.endTime}>
               <input
                 type="datetime-local"
                 value={form.endTime}
                 onChange={(e) => updateField('endTime', e.target.value)}
-                className="ui-input [color-scheme:dark]"
+                className="ui-input scheme-dark"
               />
             </FormField>
-            <FormField label="Application Deadline" optional error={errors.applicationDeadline}>
+            <FormField label="Application Deadline" optional hint="Required when applications are enabled" error={errors.applicationDeadline}>
               <input
                 type="date"
                 value={form.applicationDeadline}
@@ -639,13 +729,13 @@ export default function Events() {
               <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                 <Layers3 size={14} className="text-cyan-300" /> Initialize Projects (Optional)
               </h3>
-              <button type="button" onClick={addProjectDraft} className="btn btn-secondary !px-3 !py-1.5 !text-xs">
+              <button type="button" onClick={addProjectDraft} className="btn btn-secondary px-3! py-1.5! text-xs!">
                 Add Project
               </button>
             </div>
 
             {projectDrafts.length === 0 ? (
-              <p className="text-xs text-gray-500">No project blueprints added yet.</p>
+              <p className="text-xs text-gray-400">No project blueprints added yet.</p>
             ) : null}
 
             {projectDrafts.map((row, index) => (
@@ -708,7 +798,7 @@ export default function Events() {
                       type="datetime-local"
                       value={row.startTime}
                       onChange={(e) => setProjectField(index, 'startTime', e.target.value)}
-                      className="ui-input [color-scheme:dark]"
+                      className="ui-input scheme-dark"
                     />
                   </FormField>
                   <FormField label="Deadline" required error={errors[`project_${index}_deadline`]}>
@@ -716,7 +806,7 @@ export default function Events() {
                       type="datetime-local"
                       value={row.deadline}
                       onChange={(e) => setProjectField(index, 'deadline', e.target.value)}
-                      className="ui-input [color-scheme:dark]"
+                      className="ui-input scheme-dark"
                     />
                   </FormField>
                   <FormField label="Stage" required>
@@ -790,7 +880,7 @@ export default function Events() {
           </div>
 
           <div className="mobile-sticky-action">
-            <button type="submit" disabled={creating} className="btn btn-primary !px-4 !py-2.5 !text-xs">
+            <button type="submit" disabled={creating} className="btn btn-primary px-4! py-2.5! text-xs!">
               {creating ? 'Saving...' : 'Create Event'}
             </button>
           </div>
@@ -808,30 +898,28 @@ export default function Events() {
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.12fr)_360px] gap-8 section-motion section-motion-delay-3">
           <section className="overflow-hidden border-y border-gray-800/80">
             <div className="ui-toolbar-sticky flex flex-wrap items-center justify-between gap-3 px-4 md:px-6 py-3 border-b border-gray-800/80">
-              <div className="relative min-w-[220px] flex-1 max-w-md">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <div className="relative min-w-55 flex-1 max-w-md">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search title, type, location..."
-                  className="ui-input !pl-9 !py-2"
+                  className="ui-input pl-9! py-2!"
                 />
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {EVENT_STATUS_FILTERS.map((filter) => (
-                  <button
-                    key={filter}
-                    type="button"
-                    onClick={() => setStatusFilter(filter)}
-                    className={`px-3 py-1.5 text-xs border transition-colors ${
-                      statusFilter === filter
-                        ? 'border-cyan-500/60 text-cyan-100 bg-cyan-500/10'
-                        : 'border-gray-800 text-gray-400 hover:text-gray-200 hover:border-gray-700'
-                    }`}
-                  >
-                    {filter}
-                  </button>
-                ))}
+              <div className="w-full sm:w-55">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  aria-label="Filter events by status"
+                  className="ui-input py-2!"
+                >
+                  {EVENT_STATUS_FILTERS.map((filter) => (
+                    <option key={filter} value={filter}>
+                      {filter === 'all' ? 'All statuses' : filter}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -842,7 +930,7 @@ export default function Events() {
             </div>
 
             {filteredEvents.length === 0 ? (
-              <p className="px-4 md:px-6 py-10 text-sm text-gray-500">No events match your current filters.</p>
+              <p className="px-4 md:px-6 py-10 text-sm text-gray-400">No events match your current filters.</p>
             ) : (
               <div className="divide-y divide-gray-800/80">
                 {filteredEvents.map((event, idx) => {
@@ -863,7 +951,7 @@ export default function Events() {
                     transition={{ delay: idx * 0.04, duration: 0.35 }}
                     onClick={() => setSelectedEventId(event._id)}
                     className={`w-full text-left px-4 md:px-6 py-4 transition-all ${
-                      active ? 'bg-cyan-500/[0.06]' : 'hover:bg-white/[0.03]'
+                      active ? 'bg-cyan-500/6' : 'hover:bg-white/3'
                     }`}
                   >
                     <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.6fr)_0.7fr_0.75fr] gap-3 items-center">
@@ -895,7 +983,7 @@ export default function Events() {
                       </div>
                       <div className="text-right text-sm">
                         <p className="text-white font-semibold">{event.projectCount || 0}</p>
-                        <p className="text-xs text-gray-500">tracks</p>
+                        <p className="text-xs text-gray-400">tracks</p>
                       </div>
                     </div>
                   </motion.button>
@@ -926,14 +1014,14 @@ export default function Events() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Link to={`/events/${selectedEvent._id}`} className="btn btn-secondary !text-xs !px-3 !py-2">
+                  <Link to={`/events/${selectedEvent._id}`} className="btn btn-secondary text-xs! px-3! py-2!">
                     <ArrowRight size={12} /> Open Details
                   </Link>
-                  <Link to={`/projects?event=${selectedEvent._id}`} className="btn btn-secondary !text-xs !px-3 !py-2">
+                  <Link to={`/projects?event=${selectedEvent._id}`} className="btn btn-secondary text-xs! px-3! py-2!">
                     <Layers3 size={12} /> Project Tracks
                   </Link>
                   {selectedEvent.allowApplications ? (
-                    <Link to={`/apply?event=${selectedEvent._id}`} className="btn btn-secondary !text-xs !px-3 !py-2">
+                    <Link to={`/apply?event=${selectedEvent._id}`} className="btn btn-secondary text-xs! px-3! py-2!">
                       <Users size={12} /> Application Form
                     </Link>
                   ) : null}
@@ -944,28 +1032,28 @@ export default function Events() {
                     {selectedEvent.status === 'Scheduled' ? (
                       <button
                         onClick={() => handleStatusUpdate(selectedEvent._id, 'Completed')}
-                        className="btn btn-secondary !text-xs !px-3 !py-2 !text-emerald-200 !border-emerald-500/40"
+                        className="btn btn-secondary text-xs! px-3! py-2! text-emerald-200! border-emerald-500/40!"
                       >
                         <CheckCircle2 size={12} /> Complete
                       </button>
                     ) : null}
                     <button
                       onClick={() => handleStatusUpdate(selectedEvent._id, 'Cancelled')}
-                      className="btn btn-secondary !text-xs !px-3 !py-2 !text-rose-200 !border-rose-500/40"
+                      className="btn btn-secondary text-xs! px-3! py-2! text-rose-200! border-rose-500/40!"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={() => handleExportEvent(selectedEvent._id)}
                       disabled={exportingEventId === selectedEvent._id}
-                      className="btn btn-secondary !text-xs !px-3 !py-2 !text-cyan-200 !border-cyan-500/40"
+                      className="btn btn-secondary text-xs! px-3! py-2! text-cyan-200! border-cyan-500/40!"
                     >
                       <Download size={12} />
                       {exportingEventId === selectedEvent._id ? 'Exporting...' : 'Export'}
                     </button>
                     <button
                       onClick={() => handleDelete(selectedEvent._id)}
-                      className="btn btn-secondary !text-xs !px-3 !py-2 !text-gray-200"
+                      className="btn btn-secondary text-xs! px-3! py-2! text-gray-200!"
                     >
                       <Trash2 size={12} /> Delete
                     </button>
@@ -975,9 +1063,9 @@ export default function Events() {
                 <div className="space-y-2">
                   <p className="text-xs text-gray-400 font-semibold">Project Snapshot</p>
                   {selectedDetailsLoading ? (
-                    <p className="text-sm text-gray-500">Loading project summary...</p>
+                    <p className="text-sm text-gray-400">Loading project summary...</p>
                   ) : selectedProjects.length === 0 ? (
-                    <p className="text-sm text-gray-500">No projects seeded for this event yet.</p>
+                    <p className="text-sm text-gray-400">No projects seeded for this event yet.</p>
                   ) : (
                     <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                       {selectedProjects.slice(0, 8).map((project) => (
@@ -988,7 +1076,7 @@ export default function Events() {
                           </div>
                           <div className="mt-2 h-1.5 rounded-full bg-gray-800 overflow-hidden">
                             <div
-                              className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
+                              className="h-full bg-linear-to-r from-cyan-400 via-blue-400 to-indigo-400"
                               style={{ width: `${Math.max(0, Math.min(100, Number(project.progress || 0)))}%` }}
                             />
                           </div>
@@ -999,7 +1087,7 @@ export default function Events() {
                 </div>
               </>
             ) : (
-              <p className="text-sm text-gray-500">Select an event to view details.</p>
+              <p className="text-sm text-gray-400">Select an event to view details.</p>
             )}
           </aside>
         </div>

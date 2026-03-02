@@ -560,13 +560,13 @@ export default function Layout() {
         >
           {logoMode !== 'fallback' ? (
             <img
-              className="h-9 w-auto max-w-[124px] object-contain drop-shadow-[0_0_14px_rgba(96,165,250,0.35)]"
+              className="h-9 w-auto max-w-31 object-contain drop-shadow-[0_0_14px_rgba(96,165,250,0.35)]"
               src={logoSrc}
               alt="CICR logo"
               onError={handleLogoError}
             />
           ) : (
-            <div className="h-9 min-w-[54px] px-3 rounded-lg border border-blue-500/35 inline-flex items-center justify-center text-[10px] uppercase tracking-[0.24em] text-blue-300 font-black">
+            <div className="h-9 min-w-13.5 px-3 rounded-lg border border-blue-500/35 inline-flex items-center justify-center text-[10px] uppercase tracking-[0.24em] text-blue-300 font-black">
               CICR
             </div>
           )}
@@ -590,7 +590,7 @@ export default function Layout() {
         <button
           type="button"
           onClick={openNotifications}
-          className="w-full inline-flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-800 text-gray-300 hover:border-blue-500/40 hover:text-white transition-all duration-200 hover:bg-white/[0.02]"
+          className="w-full inline-flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-800 text-gray-300 hover:border-blue-500/40 hover:text-white transition-all duration-200 hover:bg-white/2"
         >
           <span className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.14em] font-black">
             <Bell size={14} className="text-blue-400" />
@@ -620,7 +620,7 @@ export default function Layout() {
         <button
           type="button"
           onClick={openCommandPalette}
-          className="w-full inline-flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-800 text-gray-300 hover:border-blue-500/40 hover:text-white transition-all duration-200 hover:bg-white/[0.02]"
+          className="w-full inline-flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-800 text-gray-300 hover:border-blue-500/40 hover:text-white transition-all duration-200 hover:bg-white/2"
         >
           <span className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.14em] font-black">
             <Search size={14} className="text-cyan-300" />
@@ -740,7 +740,7 @@ export default function Layout() {
         <Link to="/profile" onClick={closeNavigationPanels}>
           <div className="sidebar-profile-card group px-3 py-3 rounded-xl border border-white/8 bg-white/3 backdrop-blur-sm cursor-pointer">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-lg flex items-center justify-center text-blue-400 font-black overflow-hidden">
+              <div className="w-9 h-9 bg-linear-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-lg flex items-center justify-center text-blue-400 font-black overflow-hidden">
                 {user.avatarUrl && !sidebarAvatarFailed ? (
                   <img
                     src={user.avatarUrl}
@@ -768,23 +768,27 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen mesh-bg text-white">
+      <a href="#app-main-content" className="skip-link">
+        Skip to main content
+      </a>
+
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 border-r border-gray-800/50 p-6 flex-col fixed h-full z-20 sidebar-bg">
+      <aside aria-label="Primary navigation" className="hidden lg:flex w-64 border-r border-gray-800/50 p-6 flex-col fixed h-full z-20 sidebar-bg">
         {sidebarContent}
       </aside>
 
       {/* Mobile Top Nav */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-30 mobile-nav-bg">
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-30 mobile-nav-bg" role="banner">
         <div className="flex items-center gap-2.5">
           {logoMode !== 'fallback' ? (
             <img
-              className="h-7 w-auto max-w-[88px] object-contain drop-shadow-[0_0_12px_rgba(96,165,250,0.35)]"
+              className="h-7 w-auto max-w-22 object-contain drop-shadow-[0_0_12px_rgba(96,165,250,0.35)]"
               src={logoSrc}
               alt="CICR logo"
               onError={handleLogoError}
             />
           ) : (
-            <div className="h-7 min-w-[44px] px-2 rounded-md border border-blue-500/35 inline-flex items-center justify-center text-[9px] uppercase tracking-[0.2em] text-blue-300 font-black">
+            <div className="h-7 min-w-11 px-2 rounded-md border border-blue-500/35 inline-flex items-center justify-center text-[9px] uppercase tracking-[0.2em] text-blue-300 font-black">
               CICR
             </div>
           )}
@@ -835,7 +839,7 @@ export default function Layout() {
             </motion.span>
           </button>
         </div>
-      </div>
+      </header>
 
       {/* Mobile Sidebar Drawer */}
       <AnimatePresence>
@@ -861,10 +865,10 @@ export default function Layout() {
       </AnimatePresence>
 
       {/* Main Content Area */}
-      <main className="flex-1 lg:ml-64 p-4 md:p-8 pt-24 lg:pt-8 min-h-screen relative overflow-x-hidden">
+      <main id="app-main-content" role="main" className="flex-1 lg:ml-64 p-4 md:p-8 pt-24 lg:pt-8 min-h-screen relative overflow-x-hidden">
         {/* Aesthetic Background Glow */}
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-600/8 blur-[160px] rounded-full -z-10 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-600/5 blur-[140px] rounded-full -z-10 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-150 h-150 bg-blue-600/8 blur-[160px] rounded-full -z-10 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-100 h-100 bg-purple-600/5 blur-[140px] rounded-full -z-10 pointer-events-none" />
 
         {(() => {
           const missing = [];
@@ -898,7 +902,7 @@ export default function Layout() {
         })()}
 
         <div className="mb-4 md:mb-6 flex items-center justify-between gap-3">
-          <nav className="inline-flex items-center flex-wrap gap-2 text-[10px] md:text-xs uppercase tracking-widest text-gray-500">
+          <nav aria-label="Breadcrumb" className="inline-flex items-center flex-wrap gap-2 text-[10px] md:text-xs uppercase tracking-widest text-gray-500">
             <Link to="/dashboard" className="hover:text-gray-200 transition-colors">
               Home
             </Link>
@@ -930,7 +934,7 @@ export default function Layout() {
               <input
                 value={topSearch}
                 onChange={(event) => setTopSearch(event.target.value)}
-                className="ui-input !py-1.5 !pl-8 !pr-2 !text-xs min-w-[220px]"
+                className="ui-input py-1.5! pl-8! pr-2! text-xs! min-w-55"
                 placeholder="Search pages/actions..."
                 aria-label="Global search"
               />

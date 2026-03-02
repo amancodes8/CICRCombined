@@ -35,7 +35,7 @@ export default function PageHeader({
             className="mt-2 flex items-center gap-3 min-w-0"
           >
             {Icon ? (
-              <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/10 border border-blue-500/20 shrink-0">
+              <div className="p-2 rounded-xl bg-linear-to-br from-blue-500/20 to-purple-500/10 border border-blue-500/20 shrink-0">
                 <Icon size={18} className="text-cyan-300" />
               </div>
             ) : null}
@@ -58,7 +58,7 @@ export default function PageHeader({
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.35, delay: 0.12 }}
-            className="w-full lg:w-auto flex flex-col sm:flex-row gap-2"
+            className="ui-header-actions w-full lg:w-auto flex flex-col sm:flex-row gap-2"
           >
             {actions}
           </motion.div>

@@ -465,14 +465,14 @@ export default function Community() {
                 className="border-y border-gray-800/80 py-5 md:py-6 space-y-4"
               >
                 <div className="flex gap-4">
-                  <div className="hidden sm:flex w-11 h-11 rounded-xl border border-cyan-500/35 flex-shrink-0 items-center justify-center font-semibold text-cyan-200 text-lg">
+                  <div className="hidden sm:flex w-11 h-11 rounded-xl border border-cyan-500/35 shrink-0 items-center justify-center font-semibold text-cyan-200 text-lg">
                     {userData.name?.[0] || 'M'}
                   </div>
                   <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     placeholder="Share an update, idea, requirement, or event note..."
-                    className="ui-input min-h-[120px] resize-none"
+                    className="ui-input min-h-30 resize-none"
                     rows={4}
                   />
                 </div>
@@ -499,10 +499,10 @@ export default function Community() {
                     value={postTopic}
                     onChange={(e) => setPostTopic(e.target.value)}
                     placeholder="Topic (AI, Robotics, Placement...)"
-                    className="ui-input w-full sm:w-64 !text-sm"
+                    className="ui-input w-full sm:w-64 text-sm!"
                   />
 
-                  <button className="btn btn-primary w-full sm:w-auto !px-5 !py-2.5 !text-xs inline-flex items-center justify-center gap-2">
+                  <button className="btn btn-primary w-full sm:w-auto px-5! py-2.5! text-xs! inline-flex items-center justify-center gap-2">
                     <Send size={14} />
                     Post
                   </button>
@@ -516,7 +516,7 @@ export default function Community() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.04 }}
-                    className="px-1 md:px-2 py-5 hover:bg-white/[0.02] transition-colors"
+                    className="px-1 md:px-2 py-5 hover:bg-white/2 transition-colors"
                   >
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex gap-4 min-w-0">
@@ -648,14 +648,14 @@ export default function Community() {
                     placeholder="Search by name, ID, email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="ui-input !pl-12"
+                    className="ui-input pl-12!"
                   />
                 </div>
 
                 <select
                   value={filterBranch}
                   onChange={(e) => setFilterBranch(e.target.value)}
-                  className="ui-input !text-sm"
+                  className="ui-input text-sm!"
                 >
                   {branchOptions.map((b) => (
                     <option key={b} value={b}>
@@ -667,7 +667,7 @@ export default function Community() {
                 <select
                   value={filterYear}
                   onChange={(e) => setFilterYear(e.target.value)}
-                  className="ui-input !text-sm"
+                  className="ui-input text-sm!"
                 >
                   {yearOptions.map((y) => (
                     <option key={y} value={y}>
@@ -680,7 +680,7 @@ export default function Community() {
                   <select
                     value={filterRole}
                     onChange={(e) => setFilterRole(e.target.value)}
-                    className="ui-input flex-1 !text-sm"
+                    className="ui-input flex-1 text-sm!"
                   >
                     {roleOptions.map((role) => (
                       <option key={role} value={role}>
@@ -703,7 +703,7 @@ export default function Community() {
 
             <section className="border-y border-gray-800/80 overflow-hidden hidden lg:block">
               <div className="overflow-x-auto max-h-[68vh]">
-                <table className="w-full min-w-[920px] border-collapse">
+                <table className="w-full min-w-230 border-collapse">
                   <thead className="sticky top-0 z-10 bg-[#0a0f17]/95 backdrop-blur-sm border-b border-gray-800/80">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs text-gray-400 font-semibold">Member</th>
@@ -725,7 +725,7 @@ export default function Community() {
                       const hasProfile = Boolean(member.collegeId);
 
                       return (
-                        <tr key={member._id} className="hover:bg-white/[0.02] transition-colors">
+                        <tr key={member._id} className="hover:bg-white/2 transition-colors">
                           <td className="px-4 py-3.5 align-top">
                             <div className="flex items-start gap-3">
                               <div className="w-9 h-9 rounded-lg border border-blue-500/35 flex items-center justify-center font-semibold text-cyan-200 text-sm shrink-0">
@@ -752,7 +752,7 @@ export default function Community() {
                           <td className="px-4 py-3.5 align-top">
                             <p className="text-xs text-gray-300 inline-flex items-center gap-1.5">
                               <Mail size={12} className="text-blue-400 shrink-0" />
-                              <span className="truncate max-w-[240px] inline-block">{member.email || 'No email'}</span>
+                              <span className="truncate max-w-60 inline-block">{member.email || 'No email'}</span>
                             </p>
                           </td>
                           <td className="px-4 py-3.5 align-top">
@@ -773,7 +773,7 @@ export default function Community() {
                                 to={`/profile/${encodeURIComponent(member.collegeId)}`}
                                 className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-500/40 text-blue-200 text-xs font-semibold hover:bg-blue-500/10"
                               >
-                                Open <ExternalLink size={11} />
+                                Open Profile <ExternalLink size={11} />
                               </Link>
                             ) : (
                               <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-gray-700 text-gray-500 text-xs font-semibold">
@@ -841,7 +841,7 @@ export default function Community() {
                           to={`/profile/${encodeURIComponent(member.collegeId)}`}
                           className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-500/40 text-cyan-200 text-xs font-semibold hover:bg-cyan-500/10"
                         >
-                          Open <ExternalLink size={11} />
+                          Open Profile <ExternalLink size={11} />
                         </Link>
                       ) : (
                         <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-gray-700 text-gray-500 text-xs font-semibold">
@@ -909,6 +909,7 @@ export default function Community() {
                     minLength={4}
                     maxLength={160}
                   />
+                  <p className="text-xs text-gray-400">Use a clear summary so Admin can triage quickly.</p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <select
@@ -946,11 +947,12 @@ export default function Community() {
                     minLength={10}
                     maxLength={3000}
                   />
+                  <p className="text-xs text-gray-400">Include impact, urgency, and any blocker details.</p>
 
                   <button
                     type="submit"
                     disabled={issueBusy}
-                    className="btn btn-secondary w-full !text-xs !py-2.5 !border-rose-500/40 !text-rose-100 hover:!bg-rose-500/10 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                    className="btn btn-secondary w-full text-xs! py-2.5! border-rose-500/40! text-rose-100! hover:bg-rose-500/10! disabled:opacity-60 inline-flex items-center justify-center gap-2"
                   >
                     {issueBusy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                     Submit To Admin
@@ -959,7 +961,7 @@ export default function Community() {
 
                 <div className="mt-5 border-t border-gray-800/80 pt-4">
                   <h5 className="text-xs text-gray-400 font-semibold">My Ticket History</h5>
-                  <div className="mt-3 space-y-3 max-h-[360px] overflow-auto pr-1">
+                  <div className="mt-3 space-y-3 max-h-90 overflow-auto pr-1">
                     {myIssues.map((issue) => (
                       <article key={issue._id} className="border-b border-gray-800/70 pb-3">
                         <div className="flex items-start justify-between gap-2">
@@ -1029,7 +1031,7 @@ export default function Community() {
                     <select
                       value={adminIssueFilter}
                       onChange={(e) => setAdminIssueFilter(e.target.value)}
-                      className="ui-input !text-sm max-w-[180px]"
+                      className="ui-input text-sm! max-w-45"
                     >
                       <option value="All">All Statuses</option>
                       {ISSUE_STATUSES.map((status) => (
@@ -1040,12 +1042,12 @@ export default function Community() {
                     </select>
                   </div>
 
-                  <div className="mt-4 divide-y divide-gray-800/70 max-h-[720px] overflow-auto pr-1">
+                  <div className="mt-4 divide-y divide-gray-800/70 max-h-180 overflow-auto pr-1">
                     {adminVisibleIssues.map((issue) => (
                       <article key={issue._id} className="py-4">
                         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="text-sm md:text-base font-semibold text-white break-words">{issue.title}</p>
+                            <p className="text-sm md:text-base font-semibold text-white wrap-break-word">{issue.title}</p>
                             <p className="text-xs text-gray-500 mt-1">
                               {issue.createdBy?.name || 'Unknown'} • {issue.createdBy?.collegeId || 'No-ID'}
                             </p>
@@ -1143,7 +1145,7 @@ export default function Community() {
             </div>
 
             {!isStrictAdmin && (
-              <div className="border border-cyan-500/25 bg-cyan-500/[0.05] rounded-xl p-4 text-sm text-gray-300 inline-flex items-start gap-2 section-motion section-motion-delay-3">
+              <div className="border border-cyan-500/25 bg-cyan-500/5 rounded-xl p-4 text-sm text-gray-300 inline-flex items-start gap-2 section-motion section-motion-delay-3">
                 <ShieldCheck size={15} className="text-cyan-300 mt-0.5" />
                 Only admin can access full issue inbox and update statuses.
               </div>

@@ -17,6 +17,7 @@ import { DataEmpty, DataLoading } from '../components/DataState';
 import PageHeader from '../components/PageHeader';
 
 const STATUS_OPTIONS = ['all', 'Planning', 'Active', 'On-Hold', 'Delayed', 'Awaiting Review', 'Completed', 'Archived', 'Ongoing'];
+const PROJECTS_VIEW_KEY = 'projects_saved_view_v1';
 
 const dispatchToast = (message, type = 'info') => {
   try {
@@ -44,12 +45,21 @@ const clampProgress = (value) => Math.max(0, Math.min(100, Number(value) || 0));
 
 export default function Projects() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const savedView = (() => {
+    try {
+      const raw = localStorage.getItem(PROJECTS_VIEW_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  })();
+
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const initialStatus = searchParams.get('status') || 'all';
+  const initialStatus = searchParams.get('status') || savedView.status || 'all';
   const [statusFilter, setStatusFilter] = useState(STATUS_OPTIONS.includes(initialStatus) ? initialStatus : 'all');
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
-  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || savedView.q || '');
+  const [selectedProjectId, setSelectedProjectId] = useState(searchParams.get('focus') || savedView.focus || '');
 
   const profile = JSON.parse(localStorage.getItem('profile') || '{}');
   const userData = profile.result || profile;
@@ -84,11 +94,29 @@ export default function Projects() {
         if (statusFilter && statusFilter !== 'all') next.set('status', statusFilter);
         else next.delete('status');
 
+        if (selectedProjectId) next.set('focus', selectedProjectId);
+        else next.delete('focus');
+
         return next;
       },
       { replace: true }
     );
-  }, [searchTerm, setSearchParams, statusFilter]);
+  }, [searchTerm, selectedProjectId, setSearchParams, statusFilter]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        PROJECTS_VIEW_KEY,
+        JSON.stringify({
+          q: searchTerm,
+          status: statusFilter,
+          focus: selectedProjectId,
+        })
+      );
+    } catch {
+      // ignore persistence failures
+    }
+  }, [searchTerm, selectedProjectId, statusFilter]);
 
   const filteredProjects = useMemo(
     () =>
@@ -160,9 +188,9 @@ export default function Projects() {
       </section>
 
       <section className="ui-toolbar-sticky border border-gray-800/70 section-motion section-motion-delay-2">
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-3 items-start lg:items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_220px] gap-3 items-start lg:items-center">
           <div className="relative w-full">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
               placeholder="Search projects, event, description..."
@@ -172,22 +200,19 @@ export default function Projects() {
             />
           </div>
 
-          <div className="w-full flex flex-wrap gap-2">
-            {STATUS_OPTIONS.map((status) => (
-              <button
-                key={status}
-                type="button"
-                onClick={() => setStatusFilter(status)}
-                aria-label={`Filter status ${status}`}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
-                  statusFilter === status
-                    ? 'text-cyan-100 border-cyan-500/50 bg-cyan-500/10'
-                    : 'text-gray-500 hover:text-gray-200 border-gray-800'
-                }`}
-              >
-                {status}
-              </button>
-            ))}
+          <div className="w-full">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Filter projects by status"
+              className="ui-input"
+            >
+              {STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>
+                  {status === 'all' ? 'All statuses' : status}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </section>
@@ -217,6 +242,14 @@ export default function Projects() {
               {filteredProjects.map((project, idx) => {
                 const active = project._id === selectedProject?._id;
                 const progress = clampProgress(project.progress);
+
+                const handleProjectRowKeyDown = (event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedProjectId(project._id);
+                  }
+                };
+
                 return (
                   <motion.article
                     key={project._id}
@@ -224,8 +257,13 @@ export default function Projects() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.025, duration: 0.3 }}
                     onClick={() => setSelectedProjectId(project._id)}
+                    onKeyDown={handleProjectRowKeyDown}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={active}
+                    aria-label={`Select project ${project.title || 'Untitled project'}`}
                     className={`px-4 md:px-5 py-4 cursor-pointer transition-colors ${
-                      active ? 'bg-cyan-500/[0.06]' : 'hover:bg-white/[0.02]'
+                      active ? 'bg-cyan-500/6' : 'hover:bg-white/2'
                     }`}
                   >
                     <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.6fr)_0.62fr_0.88fr] gap-3 items-center">
@@ -241,7 +279,7 @@ export default function Projects() {
                         </div>
                         <div className="mt-1 h-1.5 rounded-full bg-gray-800 overflow-hidden max-w-xl">
                           <div
-                            className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
+                            className="h-full bg-linear-to-r from-cyan-400 via-blue-400 to-indigo-400"
                             style={{ width: `${progress}%` }}
                           />
                         </div>
@@ -295,7 +333,7 @@ export default function Projects() {
                   </div>
                   <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
+                      className="h-full bg-linear-to-r from-cyan-400 via-blue-400 to-indigo-400"
                       style={{ width: `${clampProgress(selectedProject.progress)}%` }}
                     />
                   </div>
@@ -309,16 +347,16 @@ export default function Projects() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Link to={`/projects/${selectedProject._id}`} className="btn btn-secondary !text-xs !px-3 !py-2">
+                  <Link to={`/projects/${selectedProject._id}`} className="btn btn-secondary text-xs! px-3! py-2!">
                     <ArrowRight size={12} /> Open Workspace
                   </Link>
-                  <Link to={`/projects/${selectedProject._id}/review`} className="btn btn-secondary !text-xs !px-3 !py-2 !text-emerald-200 !border-emerald-500/40">
+                  <Link to={`/projects/${selectedProject._id}/review`} className="btn btn-secondary text-xs! px-3! py-2! text-emerald-200! border-emerald-500/40!">
                     <ShieldCheck size={12} /> Review Desk
                   </Link>
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-500">Select a project to preview details.</p>
+              <p className="text-sm text-gray-400">Select a project to preview details.</p>
             )}
           </aside>
         </div>
