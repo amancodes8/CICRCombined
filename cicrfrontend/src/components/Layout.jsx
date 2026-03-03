@@ -16,6 +16,7 @@ import {
 import logo from './logo.png';
 import CommandPalette from './CommandPalette';
 import NotificationCenter from './NotificationCenter';
+import GlowingChatbot from './GlowingChatbot';
 
 const COMMUNICATION_CONVERSATION_ID = 'admin-stream';
 const COMMUNICATION_LAST_SEEN_KEY = `communication_last_seen_at_${COMMUNICATION_CONVERSATION_ID}`;
@@ -981,6 +982,8 @@ export default function Layout() {
         commands={commandItems}
         initialQuery={commandSeedQuery}
       />
+
+      <GlowingChatbot />
     </div>
   );
 }
