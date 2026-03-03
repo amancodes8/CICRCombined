@@ -22,3 +22,25 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Testing
+coverage/
+# TypeScript
+*.tsbuildinfo
+# Cache
+*.cache
+*.eslintcache
+*.prettiercache
+*.vscode-test/
+# Yarn
+*.yarn-integrity
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.yarn/patches/
+.yarn/plugins/
+.yarn/sdks/
+.yarn/versions/
+
+#vscode
+.vscode/
