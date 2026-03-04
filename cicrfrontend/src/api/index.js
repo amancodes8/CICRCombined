@@ -705,6 +705,7 @@ export const fetchContests = (params = {}) => {
   });
 };
 export const createContest = (payload) => API.post('/programs/contests', payload);
+export const generateContestAI = (payload) => API.post('/programs/contests/generate', payload);
 export const updateContest = (id, payload) => API.patch(`/programs/contests/${id}`, payload);
 export const startContestAttempt = (id) => API.post(`/programs/contests/${id}/attempt`);
 export const submitContestAttempt = (id, payload) => API.post(`/programs/contests/${id}/submit`, payload);

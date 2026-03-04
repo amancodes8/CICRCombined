@@ -30,6 +30,7 @@ const {
   listMyOfficeHourBookings,
   updateOfficeHourBooking,
   listContests,
+  generateContest,
   createContest,
   updateContest,
   startContestAttempt,
@@ -75,6 +76,7 @@ router.patch('/office-hours/bookings/:id', protect, updateOfficeHourBooking);
 
 router.get('/contests', protect, listContests);
 router.get('/contests/attempts/mine', protect, listMyContestAttempts);
+router.post('/contests/generate', protect, generateContest);
 router.post('/contests', protect, createContest);
 router.patch('/contests/:id', protect, updateContest);
 router.post('/contests/:id/attempt', protect, startContestAttempt);

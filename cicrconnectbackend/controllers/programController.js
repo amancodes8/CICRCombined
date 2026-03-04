@@ -14,6 +14,7 @@ const User = require('../models/User');
 const LearningSubmission = require('../models/LearningSubmission');
 const { createNotifications } = require('../utils/notificationService');
 const { logAudit } = require('../utils/auditLogger');
+const { geminiGenerate } = require('../utils/geminiClient');
 
 const ADMIN_ROLES = new Set(['admin', 'head']);
 const QUEST_AUDIENCES = ['AllMembers', 'FirstYear', 'SecondYear', 'FirstAndSecond'];
@@ -1837,6 +1838,90 @@ const listContests = async (req, res) => {
   }
 };
 
+/* AI-powered contest generation */
+const generateContest = async (req, res) => {
+  try {
+    if (!isAdminOrHead(req.user)) {
+      return res.status(403).json({ message: 'Only Admin/Head can generate contests.' });
+    }
+
+    const { prompt, questionCount, difficulty, audience } = req.body;
+    const userPrompt = sanitize(prompt);
+    if (!userPrompt || userPrompt.length < 5) {
+      return res.status(400).json({ message: 'Provide a prompt of at least 5 characters describing the contest.' });
+    }
+
+    const numQuestions = parseInteger(questionCount, 10);
+    const diff = sanitize(difficulty) || 'medium';
+
+    const systemPrompt = `You are an expert quiz/contest generator for a college tech club called CICR Connect.
+The admin wants to create a contest based on the following prompt.
+
+Rules:
+- Generate exactly ${numQuestions} multiple-choice questions (MCQ).
+- Difficulty: ${diff}.
+- Each question must have exactly 4 options labeled A, B, C, D.
+- Exactly one option must be the correct answer.
+- Assign points per question: easy=5, medium=10, hard=15.
+- Return ONLY valid JSON (no markdown, no code fences, no explanation).
+- The JSON must be an object with these fields:
+  {
+    "title": "string — a catchy contest title",
+    "description": "string — 1-2 sentence contest description",
+    "questions": [
+      {
+        "questionText": "string",
+        "questionType": "MCQ",
+        "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+        "correctAnswer": "the full text of the correct option e.g. 'A. Answer text'",
+        "points": number
+      }
+    ]
+  }
+
+Admin's prompt: "${userPrompt}"`;
+
+    const result = await geminiGenerate(systemPrompt);
+    if (!result.ok) {
+      return res.status(result.status || 502).json({ message: result.error || 'AI generation failed.' });
+    }
+
+    // Parse the JSON from AI response — strip markdown fences if present
+    let raw = result.text;
+    raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return res.status(502).json({ message: 'AI returned invalid JSON. Please try again.', raw });
+    }
+
+    // Validate structure
+    if (!parsed.title || !Array.isArray(parsed.questions) || parsed.questions.length === 0) {
+      return res.status(502).json({ message: 'AI response missing required fields.', raw });
+    }
+
+    // Sanitize the generated questions
+    const questions = parsed.questions.map((q) => ({
+      questionText: sanitize(q.questionText).slice(0, 1000),
+      questionType: 'MCQ',
+      options: Array.isArray(q.options) ? q.options.map((o) => sanitize(o).slice(0, 300)).filter(Boolean).slice(0, 4) : [],
+      correctAnswer: sanitize(q.correctAnswer).slice(0, 300),
+      points: parseInteger(q.points, 10),
+    }));
+
+    return res.json({
+      title: sanitize(parsed.title).slice(0, 150),
+      description: sanitize(parsed.description || '').slice(0, 2000),
+      questions,
+      audience: normalizeEnum(audience, QUEST_AUDIENCES, 'AllMembers'),
+      generated: true,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message || 'AI contest generation failed.' });
+  }
+};
+
 const createContest = async (req, res) => {
   try {
     if (!isAdminOrHead(req.user)) {
@@ -1944,11 +2029,7 @@ const startContestAttempt = async (req, res) => {
     }
 
     if (!isAdminOrHead(req.user)) {
-      const now = new Date();
       if (contest.status !== 'Active') return res.status(403).json({ message: 'Contest is not active.' });
-      if (now < contest.startsAt || now > contest.endsAt) {
-        return res.status(403).json({ message: 'Contest is not within the open window.' });
-      }
     }
 
     const existing = await ContestAttempt.findOne({ contest: contest._id, member: req.user.id });
@@ -2066,6 +2147,7 @@ module.exports = {
   listMyOfficeHourBookings,
   updateOfficeHourBooking,
   listContests,
+  generateContest,
   createContest,
   updateContest,
   startContestAttempt,

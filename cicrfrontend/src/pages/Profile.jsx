@@ -30,7 +30,7 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { acknowledgeWarnings, changePassword, getMe, updateProfile } from '../api';
+import { acknowledgeWarnings, changePassword, getMe, updateProfile, fetchMyContestAttempts } from '../api';
 
 const dateToInput = (value) => {
   if (!value) return '';
@@ -178,6 +178,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [contestScore, setContestScore] = useState({ score: 0, total: 0, count: 0 });
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -604,6 +605,12 @@ export default function Profile() {
     };
 
     loadProfile();
+    fetchMyContestAttempts().then((res) => {
+      const attempts = Array.isArray(res?.data) ? res.data : [];
+      let s = 0, t = 0, c = 0;
+      for (const a of attempts) { if (a.status === 'Submitted') { s += a.score || 0; t += a.totalPoints || 0; c++; } }
+      setContestScore({ score: s, total: t, count: c });
+    }).catch(() => {});
     return () => {
       isActive = false;
     };
@@ -727,7 +734,7 @@ export default function Profile() {
 
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 section-motion section-motion-delay-2 pro-stagger">
         <MetricCard label="Profile Completion" value={`${completionScore}%`} helper="Keep this above 85%" />
-        <MetricCard label="Skills Listed" value={skills.length} helper="Technical + domain skills" />
+        <MetricCard label="Contest Score" value={contestScore.score} helper={contestScore.count ? `${contestScore.count} contest${contestScore.count > 1 ? 's' : ''} · ${contestScore.total} total pts` : 'No contests attempted'} />
         <MetricCard label="Achievements" value={achievements.length} helper="Credible accomplishments" />
         <MetricCard label="Years in CICR" value={yearsInCicr(user.joinedAt)} helper={`Joined ${fmtDate(user.joinedAt)}`} />
       </section>

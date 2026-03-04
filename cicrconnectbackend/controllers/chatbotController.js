@@ -8,6 +8,42 @@ const { buildUserInsights } = require('../utils/userInsights');
 const { geminiGenerate } = require('../utils/geminiClient');
 const { normalizeEmail, normalizeCollegeId } = require('../utils/fieldCrypto');
 
+/* ─── Response cache (in-memory, keyed by normalised question) ─── */
+const CACHE = new Map();
+const CACHE_TTL = 15 * 60 * 1000;   // 15 minutes
+const CACHE_MAX = 500;
+
+const normaliseKey = (text) => text.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+
+const cacheGet = (key) => {
+  const entry = CACHE.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL) { CACHE.delete(key); return null; }
+  return entry.data;
+};
+
+const cacheSet = (key, data) => {
+  if (CACHE.size >= CACHE_MAX) {
+    const oldest = CACHE.keys().next().value;
+    CACHE.delete(oldest);
+  }
+  CACHE.set(key, { data, ts: Date.now() });
+};
+
+/* ─── Simple per-user rate limiter ─── */
+const RATE = new Map();
+const RATE_WINDOW = 60_000;  // 1 minute
+const RATE_LIMIT = 12;        // max 12 questions per minute
+
+const checkRate = (userId) => {
+  const now = Date.now();
+  const entry = RATE.get(userId) || { count: 0, reset: now + RATE_WINDOW };
+  if (now > entry.reset) { entry.count = 0; entry.reset = now + RATE_WINDOW; }
+  entry.count++;
+  RATE.set(userId, entry);
+  return entry.count <= RATE_LIMIT;
+};
+
 /* ─── Complete route & feature map for CICR Connect ─── */
 const CICR_ROUTE_MAP = {
     pages: [
@@ -153,6 +189,18 @@ const askCicrAssistant = async (req, res) => {
             return res.status(400).json({ message: 'Question is required' });
         }
 
+        /* ─── Rate limit ─── */
+        if (!checkRate(req.user.id)) {
+            return res.status(429).json({ message: 'Too many requests. Please wait a moment before asking again.' });
+        }
+
+        /* ─── Cache check ─── */
+        const cacheKey = normaliseKey(trimmed);
+        const cached = cacheGet(cacheKey);
+        if (cached) {
+            return res.json(cached);
+        }
+
         const lower = trimmed.toLowerCase();
 
         /* ─── Route / navigation detection ─── */
@@ -226,7 +274,13 @@ const askCicrAssistant = async (req, res) => {
 
         const contextParts = [
             `=== CICR CONNECT PLATFORM KNOWLEDGE ===`,
-            `CICR (Centre for Innovation in Computing and Robotics) Connect is a comprehensive society management platform for the CICR technical society.`,
+            `CICR (Centre for Innovation in Computing and Robotics) Connect is a comprehensive society management platform for the CICR technical society at Chandigarh University.`,
+            `\n=== ABOUT CICR ===`,
+            `CICR is a premier technical society at Chandigarh University focused on computing, robotics, IoT, and emerging tech.`,
+            `It organises hackathons, coding contests, robotics workshops, speaker sessions, and collaborative projects.`,
+            `Members work across domains: Web Development, AI/ML, IoT, Robotics, App Development, Cybersecurity, Cloud Computing, Blockchain, and more.`,
+            `The society has a structured hierarchy: Head → Admin → Senior Members → Members. New members join through an application process.`,
+            `CICR Connect is the custom-built platform that manages everything: projects, meetings, events, learning, mentorship, inventory, community feed, programs (quests, badges, contests, ideas), and admin tools.`,
             `\n=== ALL PAGES & NAVIGATION ROUTES ===\n${routeMapText}`,
             `\n=== QUICK ACTIONS ===\n${actionsText}`,
             `\n=== FEATURE DESCRIPTIONS ===\n${featuresText}`,
@@ -241,14 +295,13 @@ const askCicrAssistant = async (req, res) => {
 
         /* ─── Gemini prompt ─── */
         if (!process.env.GEMINI_API_KEY) {
-            // Fallback without Gemini
             const navigationLinks = matchedRoutes.slice(0, 3).map(r => ({
                 label: r.label,
                 path: r.path,
                 description: r.description,
             }));
 
-            return res.json({
+            const fallback = {
                 answer: memberInsights
                     ? `${memberInsights.member.name} (${memberInsights.member.collegeId}) is a ${memberInsights.member.role} member with ${memberInsights.metrics.totalProjectContributions} project contributions.`
                     : `CICR has ${society.memberCount} members, ${society.projectCount} projects, ${society.meetingCount} meetings. Ask me anything!`,
@@ -256,56 +309,55 @@ const askCicrAssistant = async (req, res) => {
                 actions: matchedActions.slice(0, 3),
                 society,
                 member: memberInsights,
-            });
+            };
+            cacheSet(cacheKey, fallback);
+            return res.json(fallback);
         }
 
-        const systemPrompt = `You are the CICR Connect Assistant — a smart, friendly, and knowledgeable AI built into the CICR Connect platform.
+        const systemPrompt = `You are the CICR Connect Assistant — an AI built exclusively for the CICR Connect platform at Chandigarh University.
+
+STRICT SCOPE — CRITICAL:
+- You ONLY answer questions related to CICR, CICR Connect platform, its features, pages, members, projects, events, meetings, tech domains, society activities, and how to use the platform.
+- If the user asks about politics, news, entertainment, sports, general knowledge, other colleges, other companies, coding problems, or ANYTHING not related to CICR or the CICR Connect platform: politely decline and redirect them.
+  Example response for off-topic: "I'm the CICR Connect assistant and I can only help with CICR-related questions! 😊 Ask me about our projects, events, features, or how to navigate the platform."
+- NEVER answer general knowledge, trivia, opinions, advice unrelated to CICR, or act as a general-purpose AI.
+- You may help with CICR-related tech questions (e.g., "what domains does CICR work in?", "how do I submit a project?") but NOT general coding tutoring.
 
 PERSONALITY:
-- Conversational, warm, and concise. Never robotic.
-- Vary your language every time — never repeat the same phrasing between answers.
-- Use short paragraphs, bullet points, and bold text for readability.
-- If the user greets you, respond naturally and suggest what you can help with.
-
-YOUR KNOWLEDGE:
-- You know every page, route, feature, and action on CICR Connect.
-- You have live data: society stats, recent projects, events, meetings.
-- You understand CICR as a technical society (robotics, computing, innovation).
+- Friendly, energetic, concise. You love CICR.
+- Vary your language — never repeat the same phrasing.
+- Use short paragraphs, bullet points where helpful.
+- Keep answers 2-5 sentences for simple questions.
 
 NAVIGATION RULES:
-When mentioning a page/feature the user can visit, ALWAYS include a navigation tag:
-  [[LINK:/path|Label Text]]     — for pages to visit
-  [[ACTION:/path|Action Label]] — for things to do (create, schedule, etc.)
+When mentioning a page/feature, include navigation tags:
+  [[LINK:/path|Label Text]]     — for pages
+  [[ACTION:/path|Action Label]] — for actions
 Examples:
-  Head over to [[LINK:/projects|Projects]] to browse all active work.
-  You can [[ACTION:/create-project|create a new project]] to get started.
-  Check your stats on [[LINK:/dashboard|Dashboard]].
+  Check out [[LINK:/projects|Projects]] for all society work.
+  [[ACTION:/create-project|Create a new project]] to get started.
 
-ANSWER QUALITY RULES:
-1. Be specific — use real data from context when available (project names, counts, dates).
-2. Structure longer answers with bullet points or numbered steps.
-3. Bold key terms and page names for scannability.
-4. Keep answers 2-6 sentences for simple questions, longer for walkthroughs.
-5. Always provide at least one relevant [[LINK:...]] when the question relates to a feature.
-6. If the user asks something unrelated to CICR, answer helpfully but keep it brief and steer back.
-7. NEVER give a generic or canned response — always tailor to the specific question.
-8. When listing pages or features, include the [[LINK:...]] for each one.
+ANSWER QUALITY:
+1. Use real data from context when available — project names, member counts, dates.
+2. Structure longer answers with bullets or numbered steps.
+3. Bold key terms with **term**.
+4. Always provide at least one [[LINK:...]] when the question relates to a feature.
+5. NEVER make up data. If you don't know, say so.
 
 ${contextParts}
 
-Now answer the user's question with clarity, links, and personality.`;
+Now answer the user's question. Remember: CICR-related topics ONLY.`;
 
         const ai = await geminiGenerate(`${systemPrompt}\n\nUser Question: ${trimmed}`);
 
         if (!ai.ok) {
-            // Fallback response with navigation
             const navigationLinks = matchedRoutes.slice(0, 3).map(r => ({
                 label: r.label,
                 path: r.path,
                 description: r.description,
             }));
 
-            return res.json({
+            const fallback = {
                 answer: `I'm having trouble connecting to my AI engine right now, but I can still help! ${
                     navigationLinks.length > 0
                         ? `Based on your question, you might want to check: ${navigationLinks.map(n => n.label).join(', ')}.`
@@ -315,12 +367,12 @@ Now answer the user's question with clarity, links, and personality.`;
                 actions: matchedActions.slice(0, 3),
                 society,
                 member: memberInsights,
-            });
+            };
+            return res.json(fallback);
         }
 
         const answer = ai.text || 'No response generated.';
 
-        // Extract navigation suggestions from the AI response
         const linkMatches = answer.match(/\[\[LINK:([^\]]+)\]\]/g) || [];
         const actionMatches = answer.match(/\[\[ACTION:([^\]]+)\]\]/g) || [];
 
@@ -336,18 +388,22 @@ Now answer the user's question with clarity, links, and personality.`;
             return { navigateTo: path.trim(), action: (label || path).trim() };
         });
 
-        // Clean the answer of link/action tags for display
         const cleanAnswer = answer
             .replace(/\[\[LINK:([^|]+)\|([^\]]+)\]\]/g, '**$2**')
-            .replace(/\[\[ACTION:([^|]+)\|([^\]]+)\]\]/g, '🚀 **$2**');
+            .replace(/\[\[ACTION:([^|]+)\|([^\]]+)\]\]/g, '**$2**');
 
-        return res.json({
+        const response = {
             answer: cleanAnswer,
             navigation: suggestedLinks.length > 0 ? suggestedLinks : matchedRoutes.slice(0, 3).map(r => ({ label: r.label, path: r.path })),
             actions: suggestedActions.length > 0 ? suggestedActions : matchedActions.slice(0, 3),
             society,
             member: memberInsights,
-        });
+        };
+
+        /* ─── Cache the result ─── */
+        cacheSet(cacheKey, response);
+
+        return res.json(response);
     } catch (err) {
         console.error('askCicrAssistant error:', err);
         return res.status(500).json({ message: 'Server error while handling assistant query' });

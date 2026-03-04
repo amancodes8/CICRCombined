@@ -1,6 +1,7 @@
 const Project = require('../models/Project');
 const Meeting = require('../models/Meeting');
 const Post = require('../models/Post');
+const ContestAttempt = require('../models/ContestAttempt');
 
 const yearsSince = (dateValue) => {
   const start = new Date(dateValue);
@@ -31,13 +32,21 @@ const getAlumniTenureYears = (alumniProfile = {}) => {
 const buildUserInsights = async (user) => {
   const userId = user._id;
 
-  const [projectsLed, projectsInTeam, meetingsOrganized, meetingsJoined, postsCreated] = await Promise.all([
+  const [projectsLed, projectsInTeam, meetingsOrganized, meetingsJoined, postsCreated, contestAgg] = await Promise.all([
     Project.countDocuments({ lead: userId }),
     Project.countDocuments({ team: userId }),
     Meeting.countDocuments({ organizedBy: userId }),
     Meeting.countDocuments({ participants: userId }),
     Post.countDocuments({ user: userId }),
+    ContestAttempt.aggregate([
+      { $match: { member: userId, status: 'Submitted' } },
+      { $group: { _id: null, totalScore: { $sum: '$score' }, totalPossible: { $sum: '$totalPoints' }, count: { $sum: 1 } } },
+    ]),
   ]);
+
+  const contestsAttempted = contestAgg[0]?.count || 0;
+  const contestTotalScore = contestAgg[0]?.totalScore || 0;
+  const contestTotalPossible = contestAgg[0]?.totalPossible || 0;
 
   const suggestionAgg = await Project.aggregate([
     { $unwind: '$suggestions' },
@@ -99,6 +108,9 @@ const buildUserInsights = async (user) => {
       postsCreated,
       totalAchievements: Array.isArray(user.achievements) ? user.achievements.length : 0,
       alumniTenureYears,
+      contestsAttempted,
+      contestTotalScore,
+      contestTotalPossible,
     },
     contributedProjects,
     events,
