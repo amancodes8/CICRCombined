@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { login, register, sendPasswordResetOtp, resetPasswordWithOtp, resetPasswordWithCode } from '../api';
 import { 
   AlertCircle, Loader2, User, Mail, 
-  Lock, Fingerprint, Ticket, ArrowRight 
+  Lock, Ticket, ArrowRight 
 } from 'lucide-react';
 
 export default function Auth() {
@@ -18,7 +18,7 @@ export default function Auth() {
   const [forgotMethod, setForgotMethod] = useState('emailOtp');
   const isLogin = mode === 'login';
   const isForgot = mode === 'forgot';
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -259,14 +259,14 @@ export default function Auth() {
         animate={{ opacity: 1, scale: 1 }}
         className="relative w-full max-w-md z-10 section-motion section-motion-delay-1"
       >
-        <div className="relative p-10 rounded-[2.5rem] shadow-[0_30px_90px_rgba(0,0,0,0.8)] glass-strong">
+        <div className="relative p-10 rounded-[2.5rem] bg-transparent border-none shadow-none">
           <header className="text-center mb-10">
             <motion.div 
               initial={{ scale: 0, rotate: -10 }} animate={{ scale: 1, rotate: 0 }}
               transition={{ type: 'spring', damping: 15, stiffness: 200 }}
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 gradient-blue-purple-icon"
+              className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center mx-auto mb-6 bg-white shadow-lg"
             >
-              <Fingerprint className="text-white" size={32} />
+              <img src="/cicr-logo.png" alt="CICR Logo" className="w-full h-full object-cover rounded-full" />
             </motion.div>
             <h2 className="text-4xl text-white font-black tracking-tighter">
               {isForgot ? (otpSent ? 'Set Password' : 'Reset Password') : (isLogin ? 'Sign In' : 'Join CICR')}
