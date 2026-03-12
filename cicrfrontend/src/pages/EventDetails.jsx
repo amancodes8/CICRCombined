@@ -325,9 +325,9 @@ export default function EventDetails() {
           </div>
         </motion.section>
 
-        <section className="grid grid-cols-1 xl:grid-cols-[350px_minmax(0,1fr)] gap-6">
-          <aside className="space-y-4 xl:sticky xl:top-24 h-fit">
-            <article className="rounded-2xl border border-slate-800/90 bg-slate-950/70 p-4 md:p-5 space-y-3">
+        <section className="grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)] gap-6">
+          <aside className="rounded-3xl border border-slate-800/85 bg-slate-950/65 backdrop-blur-md overflow-hidden xl:sticky xl:top-24 h-fit">
+            <section className="p-5 md:p-6 space-y-3">
               <h2 className="text-sm font-semibold text-slate-200">Operational Context</h2>
               <div className="space-y-2 text-sm text-slate-300">
                 <p className="inline-flex items-center gap-2"><MapPin size={14} className="text-emerald-300" /> {event.location}</p>
@@ -341,36 +341,31 @@ export default function EventDetails() {
                   <p className="text-slate-500">Applications disabled for this event.</p>
                 )}
               </div>
-            </article>
+            </section>
 
-            <article className="rounded-2xl border border-slate-800/90 bg-slate-950/70 p-4 md:p-5 space-y-3">
+            <section className="border-t border-slate-800/80 p-5 md:p-6 space-y-3">
               <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-semibold">Participants</p>
               {participants.length === 0 ? (
                 <p className="text-sm text-slate-500">No participants added yet.</p>
               ) : (
-                <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                <div className="max-h-56 overflow-y-auto flex flex-wrap gap-2 pr-1">
                   {participants.map((participant) => (
-                    <div
+                    <span
                       key={participant._id || participant.email || participant.collegeId}
-                      className="flex items-center gap-3 rounded-xl border border-slate-800/90 bg-slate-900/80 px-3 py-2"
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-700/90 bg-slate-900/80 px-2.5 py-1.5"
                     >
-                      <span className="w-8 h-8 rounded-full border border-cyan-500/40 bg-cyan-500/10 text-cyan-100 text-[11px] font-semibold inline-flex items-center justify-center">
+                      <span className="w-6 h-6 rounded-full border border-cyan-500/35 bg-cyan-500/10 text-cyan-100 text-[10px] font-semibold inline-flex items-center justify-center">
                         {initials(participant.name)}
                       </span>
-                      <div className="min-w-0">
-                        <p className="text-sm text-slate-100 font-medium truncate">{participant.name || 'Unnamed Member'}</p>
-                        <p className="text-xs text-slate-400 truncate">
-                          {participant.role || 'Member'} {participant.collegeId ? `• ${participant.collegeId}` : ''}
-                        </p>
-                      </div>
-                    </div>
+                      <span className="text-xs text-slate-200">{participant.name || 'Unnamed'}</span>
+                    </span>
                   ))}
                 </div>
               )}
-            </article>
+            </section>
 
             {isAdmin ? (
-              <article className="rounded-2xl border border-cyan-500/25 bg-cyan-500/[0.06] p-4 md:p-5 space-y-3">
+              <section className="border-t border-slate-800/80 p-5 md:p-6 space-y-3">
                 <p className="text-xs uppercase tracking-[0.16em] text-cyan-200 font-semibold">Admin Controls</p>
                 <input
                   value={participantSearch}
@@ -427,48 +422,50 @@ export default function EventDetails() {
                     {participantMessage.text}
                   </p>
                 ) : null}
-              </article>
+              </section>
             ) : null}
 
-            <article className="rounded-2xl border border-slate-800/90 bg-slate-950/70 p-4 md:p-5 space-y-3">
-              <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-semibold">Status Distribution</p>
-              {statusEntries.length === 0 ? (
-                <p className="text-sm text-slate-500">No project statuses available yet.</p>
-              ) : (
-                statusEntries.map(([status, count]) => (
-                  <div key={status} className="flex items-center justify-between text-sm text-slate-300">
-                    <span>{status}</span>
-                    <span className="text-cyan-200 font-semibold">{count}</span>
-                  </div>
-                ))
-              )}
-            </article>
-
-            <article className="rounded-2xl border border-slate-800/90 bg-slate-950/70 p-4 md:p-5 space-y-3">
-              <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-semibold">Stage Distribution</p>
-              {stageEntries.length === 0 ? (
-                <p className="text-sm text-slate-500">No stage data available yet.</p>
-              ) : (
-                stageEntries.map(([stage, count]) => {
-                  const width = projects.length ? Math.max(8, (count / projects.length) * 100) : 0;
-                  return (
-                    <div key={stage} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs text-slate-300">
-                        <span>{stage}</span>
-                        <span className="text-cyan-200 font-semibold">{count}</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400" style={{ width: `${width}%` }} />
-                      </div>
+            <section className="border-t border-slate-800/80 p-5 md:p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-5">
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-semibold">Status Distribution</p>
+                {statusEntries.length === 0 ? (
+                  <p className="text-sm text-slate-500">No project statuses available yet.</p>
+                ) : (
+                  statusEntries.map(([status, count]) => (
+                    <div key={status} className="flex items-center justify-between text-sm text-slate-300">
+                      <span>{status}</span>
+                      <span className="text-cyan-200 font-semibold">{count}</span>
                     </div>
-                  );
-                })
-              )}
-            </article>
+                  ))
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-semibold">Stage Distribution</p>
+                {stageEntries.length === 0 ? (
+                  <p className="text-sm text-slate-500">No stage data available yet.</p>
+                ) : (
+                  stageEntries.map(([stage, count]) => {
+                    const width = projects.length ? Math.max(8, (count / projects.length) * 100) : 0;
+                    return (
+                      <div key={stage} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs text-slate-300">
+                          <span>{stage}</span>
+                          <span className="text-cyan-200 font-semibold">{count}</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400" style={{ width: `${width}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </section>
           </aside>
 
-          <section className="rounded-2xl border border-slate-800/90 bg-slate-950/70 overflow-hidden">
-            <div className="px-4 md:px-6 py-4 border-b border-slate-800/90 flex items-center justify-between gap-2">
+          <section className="rounded-3xl border border-slate-800/85 bg-slate-950/65 backdrop-blur-md overflow-hidden">
+            <div className="px-5 md:px-6 py-4 border-b border-slate-800/80 flex items-center justify-between gap-2">
               <div>
                 <p className="text-xs uppercase tracking-[0.16em] text-slate-400 font-semibold">Project Tracks</p>
                 <h3 className="text-lg text-white font-semibold mt-1">Delivery Pipeline</h3>
@@ -481,41 +478,43 @@ export default function EventDetails() {
             {projects.length === 0 ? (
               <p className="px-6 py-12 text-sm text-slate-500">No projects initialized for this event.</p>
             ) : (
-              <div className="p-4 md:p-6 space-y-3">
+              <div className="divide-y divide-slate-800/75">
                 {projects.map((project, idx) => (
                   <motion.article
                     key={project._id || `${project.title}-${idx}`}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.04, duration: 0.32 }}
-                    className="rounded-xl border border-slate-800/90 bg-slate-900/75 px-4 py-4 hover:border-slate-600 transition-colors"
+                    className="px-5 md:px-6 py-4 hover:bg-slate-900/35 transition-colors"
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <p className="text-base text-white font-semibold">{project.title}</p>
-                        <p className="text-xs text-slate-400 mt-1">
-                          {project.stage || 'Planning'} • {project.domain || 'Tech'} • Deadline {formatDate(project.deadline)}
-                        </p>
+                    <div className="grid grid-cols-[4px_minmax(0,1fr)] gap-4">
+                      <span className="rounded-full bg-gradient-to-b from-cyan-300 via-blue-400 to-indigo-500" />
+                      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_130px_140px] gap-3 items-start">
+                        <div>
+                          <p className="text-base text-white font-semibold">{project.title}</p>
+                          <p className="text-xs text-slate-400 mt-1">
+                            {project.stage || 'Planning'} • {project.domain || 'Tech'}
+                          </p>
+                          <div className="mt-3 h-1.5 rounded-full bg-slate-800 overflow-hidden max-w-xl">
+                            <div
+                              className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
+                              style={{ width: `${Math.max(0, Math.min(100, Number(project.progress || 0)))}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.12em] text-slate-500">Deadline</p>
+                          <p className="text-sm text-slate-200 mt-1">{formatDate(project.deadline)}</p>
+                        </div>
+                        <div className="flex lg:flex-col items-start lg:items-end justify-between gap-2">
+                          <span className={`text-xs px-2 py-1 rounded-full border ${projectStatusTone(project.status)}`}>
+                            {project.status || 'Planning'}
+                          </span>
+                          <Link to={`/projects/${project._id}`} className="inline-flex items-center gap-1 text-xs text-cyan-200 hover:text-white">
+                            Open <ArrowRight size={13} />
+                          </Link>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs px-2 py-1 rounded-full border ${projectStatusTone(project.status)}`}>
-                          {project.status || 'Planning'}
-                        </span>
-                        <Link to={`/projects/${project._id}`} className="inline-flex items-center gap-1 text-xs text-cyan-200 hover:text-white">
-                          Open <ArrowRight size={13} />
-                        </Link>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400"
-                        style={{ width: `${Math.max(0, Math.min(100, Number(project.progress || 0)))}%` }}
-                      />
-                    </div>
-                    <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>Progress</span>
-                      <span className="text-cyan-200 font-semibold">{Math.max(0, Math.min(100, Number(project.progress || 0)))}%</span>
                     </div>
                   </motion.article>
                 ))}
