@@ -21,6 +21,7 @@ const EventSchema = new mongoose.Schema(
     capacity: { type: Number, default: null },
     allowApplications: { type: Boolean, default: false },
     applicationDeadline: { type: Date, default: null },
+    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     projects: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Project' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   },

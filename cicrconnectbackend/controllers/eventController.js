@@ -24,6 +24,32 @@ const normalizeIdList = (input) => {
 const EVENT_STATUSES = ['Scheduled', 'Completed', 'Cancelled'];
 const PROJECT_STAGES = ['Planning', 'Execution', 'Testing', 'Review', 'Deployment'];
 const PROJECT_DOMAINS = ['Tech', 'Management', 'PR'];
+const EVENT_PROJECT_DETAIL_SELECT =
+  'title description domain components startTime deadline status progress stage lead guide team updates statusHistory lastEditedBy lastEditedAt lastEditedAction createdAt updatedAt completedAt';
+const EVENT_PROJECT_DETAIL_POPULATE = [
+  { path: 'lead', select: 'name role email collegeId year branch' },
+  { path: 'guide', select: 'name role email collegeId year branch' },
+  { path: 'team', select: 'name role email collegeId year branch batch phone' },
+  { path: 'lastEditedBy', select: 'name role email collegeId' },
+  { path: 'updates.createdBy', select: 'name role email collegeId' },
+  { path: 'statusHistory.changedBy', select: 'name role email collegeId' },
+];
+
+const toEventPayload = (eventDoc) => ({
+  ...eventDoc.toObject(),
+  projectCount: Array.isArray(eventDoc.projects) ? eventDoc.projects.length : 0,
+  participantCount: Array.isArray(eventDoc.participants) ? eventDoc.participants.length : 0,
+});
+
+const findEventByIdWithDetails = (eventId) =>
+  Event.findById(eventId)
+    .populate('createdBy', 'name role')
+    .populate('participants', 'name role email collegeId year branch')
+    .populate({
+      path: 'projects',
+      select: EVENT_PROJECT_DETAIL_SELECT,
+      populate: EVENT_PROJECT_DETAIL_POPULATE,
+    });
 
 const normalizeProjectSeed = (seed, index = 0) => {
   const title = sanitize(seed?.title);
@@ -162,6 +188,7 @@ const createEvent = async (req, res) => {
       allowApplications,
       applicationDeadline: allowApplications ? applicationDeadline : null,
       createdBy: req.user.id,
+      participants: [],
       projects: [],
     });
 
@@ -213,7 +240,10 @@ const createEvent = async (req, res) => {
       }
     }
 
-    const populated = await event.populate('createdBy', 'name role');
+    const populated = await event.populate([
+      { path: 'createdBy', select: 'name role' },
+      { path: 'participants', select: 'name role email collegeId year branch' },
+    ]);
 
     const recipients = await User.find({
       $or: [{ isVerified: true }, { approvalStatus: 'Approved' }],
@@ -244,10 +274,7 @@ const createEvent = async (req, res) => {
       req,
     });
 
-    return res.status(201).json({
-      ...populated.toObject(),
-      projectCount: createdProjects.length,
-    });
+    return res.status(201).json(toEventPayload(populated));
   } catch (err) {
     return res.status(400).json({ message: err.message });
   }
@@ -270,6 +297,7 @@ const getEvents = async (req, res) => {
     const payload = events.map((row) => ({
       ...row.toObject(),
       projectCount: Array.isArray(row.projects) ? row.projects.length : 0,
+      participantCount: Array.isArray(row.participants) ? row.participants.length : 0,
     }));
 
     return res.json(payload);
@@ -280,32 +308,81 @@ const getEvents = async (req, res) => {
 
 const getEventById = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id)
-      .populate('createdBy', 'name role')
-      .populate({
-        path: 'projects',
-        select:
-          'title description domain components startTime deadline status progress stage lead guide team updates statusHistory lastEditedBy lastEditedAt lastEditedAction createdAt updatedAt completedAt',
-        populate: [
-          { path: 'lead', select: 'name role email collegeId year branch' },
-          { path: 'guide', select: 'name role email collegeId year branch' },
-          { path: 'team', select: 'name role email collegeId year branch batch phone' },
-          { path: 'lastEditedBy', select: 'name role email collegeId' },
-          { path: 'updates.createdBy', select: 'name role email collegeId' },
-          { path: 'statusHistory.changedBy', select: 'name role email collegeId' },
-        ],
-      });
+    const event = await findEventByIdWithDetails(req.params.id);
 
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    return res.json({
-      ...event.toObject(),
-      projectCount: Array.isArray(event.projects) ? event.projects.length : 0,
-    });
+    return res.json(toEventPayload(event));
   } catch (err) {
     return res.status(500).json({ message: err.message });
+  }
+};
+
+const addEventParticipants = async (req, res) => {
+  try {
+    const participantIds = normalizeIdList(req.body.participantIds || req.body.participants || req.body.participantId);
+    if (!participantIds.length) {
+      return res.status(400).json({ message: 'At least one participant is required.' });
+    }
+
+    const event = await Event.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    const users = await User.find({ _id: { $in: participantIds } }).select('_id isVerified approvalStatus');
+    if (users.length !== participantIds.length) {
+      return res.status(400).json({ message: 'One or more participants were not found.' });
+    }
+
+    const nonApproved = users.filter((user) => {
+      const approval = String(user.approvalStatus || '').toLowerCase();
+      return !user.isVerified && approval !== 'approved';
+    });
+    if (nonApproved.length) {
+      return res.status(400).json({ message: 'Only approved users can be added as event participants.' });
+    }
+
+    const currentParticipants = Array.isArray(event.participants) ? event.participants.map((id) => String(id)) : [];
+    const currentSet = new Set(currentParticipants);
+    const addedIds = participantIds.filter((id) => !currentSet.has(id));
+
+    if (!addedIds.length) {
+      const unchangedEvent = await findEventByIdWithDetails(req.params.id);
+      return res.json(toEventPayload(unchangedEvent));
+    }
+
+    event.participants = [...new Set([...currentParticipants, ...addedIds])];
+    await event.save();
+
+    await createNotifications({
+      userIds: addedIds,
+      title: 'Event Participation Assigned',
+      message: `You were added as a participant for "${event.title}".`,
+      type: 'info',
+      link: `/events/${event._id}`,
+      meta: { eventId: event._id },
+      createdBy: req.user.id,
+    });
+
+    await logAudit({
+      actor: req.user.id,
+      action: 'EVENT_PARTICIPANTS_ADDED',
+      entityType: 'Event',
+      entityId: event._id,
+      after: {
+        addedCount: addedIds.length,
+        participantIds: addedIds,
+      },
+      req,
+    });
+
+    const populated = await findEventByIdWithDetails(req.params.id);
+    return res.json(toEventPayload(populated));
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
   }
 };
 
@@ -322,6 +399,7 @@ const updateEvent = async (req, res) => {
       allowApplications: event.allowApplications,
       startTime: event.startTime,
       endTime: event.endTime,
+      participantCount: Array.isArray(event.participants) ? event.participants.length : 0,
     };
 
     if (Object.prototype.hasOwnProperty.call(req.body, 'title')) {
@@ -356,6 +434,26 @@ const updateEvent = async (req, res) => {
     }
     if (Object.prototype.hasOwnProperty.call(req.body, 'allowApplications')) {
       event.allowApplications = !!req.body.allowApplications;
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(req.body, 'participantIds') ||
+      Object.prototype.hasOwnProperty.call(req.body, 'participants')
+    ) {
+      const participantIds = normalizeIdList(req.body.participantIds || req.body.participants);
+      if (participantIds.length) {
+        const users = await User.find({ _id: { $in: participantIds } }).select('_id isVerified approvalStatus');
+        if (users.length !== participantIds.length) {
+          return res.status(400).json({ message: 'One or more participants were not found.' });
+        }
+        const nonApproved = users.filter((user) => {
+          const approval = String(user.approvalStatus || '').toLowerCase();
+          return !user.isVerified && approval !== 'approved';
+        });
+        if (nonApproved.length) {
+          return res.status(400).json({ message: 'Only approved users can be added as event participants.' });
+        }
+      }
+      event.participants = participantIds;
     }
     if (Object.prototype.hasOwnProperty.call(req.body, 'applicationDeadline')) {
       const deadline = parseDate(req.body.applicationDeadline);
@@ -407,14 +505,12 @@ const updateEvent = async (req, res) => {
         allowApplications: event.allowApplications,
         startTime: event.startTime,
         endTime: event.endTime,
+        participantCount: Array.isArray(event.participants) ? event.participants.length : 0,
       },
       req,
     });
 
-    return res.json({
-      ...populated.toObject(),
-      projectCount: Array.isArray(populated.projects) ? populated.projects.length : 0,
-    });
+    return res.json(toEventPayload(populated));
   } catch (err) {
     return res.status(400).json({ message: err.message });
   }
@@ -464,6 +560,7 @@ module.exports = {
   createEvent,
   getEvents,
   getEventById,
+  addEventParticipants,
   updateEvent,
   deleteEvent,
 };

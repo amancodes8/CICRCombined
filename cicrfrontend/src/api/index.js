@@ -2,10 +2,10 @@ import axios from 'axios';
 
 
 const API = axios.create({
-  // baseURL: import.meta.env.VITE_API_BASE_URL || 'https://cicrcombined.onrender.com/api',
-  // timeout: 20000,
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://cicrcombined.onrender.com/api',
   timeout: 20000,
+  // baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api',
+  // timeout: 20000,
 
   headers: {
     'Content-Type': 'application/json',
@@ -529,6 +529,23 @@ export const fetchEventById = (id) =>
     ttlMs: 30 * 1000,
   });
 export const createEvent = (payload) => API.post('/events', payload);
+export const addEventParticipants = async (id, payload = {}) => {
+  try {
+    return await API.post(`/events/${id}/participants`, payload);
+  } catch (err) {
+    // Backward compatibility: if dedicated participants route is unavailable,
+    // fall back to updating the event with participant IDs.
+    if (err?.response?.status === 404) {
+      const participantIds = Array.isArray(payload?.participantIds)
+        ? payload.participantIds
+        : Array.isArray(payload?.participants)
+        ? payload.participants
+        : [];
+      return API.put(`/events/${id}`, { participantIds });
+    }
+    throw err;
+  }
+};
 export const updateEvent = (id, payload) => API.put(`/events/${id}`, payload);
 export const deleteEvent = (id) => API.delete(`/events/${id}`);
 

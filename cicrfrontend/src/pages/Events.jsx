@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
   CalendarDays,
@@ -95,6 +95,7 @@ const downloadCsv = (filename, headers, rows) => {
 };
 
 export default function Events() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const savedView = (() => {
     try {
@@ -943,13 +944,21 @@ export default function Events() {
                     : 'text-rose-200 border-rose-500/40 bg-rose-500/10';
 
                 return (
-                  <motion.button
+                  <motion.article
                     key={event._id}
-                    type="button"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.04, duration: 0.35 }}
                     onClick={() => setSelectedEventId(event._id)}
+                    onDoubleClick={() => navigate(`/events/${event._id}`)}
+                    onKeyDown={(eventKey) => {
+                      if (eventKey.key === 'Enter' || eventKey.key === ' ') {
+                        eventKey.preventDefault();
+                        setSelectedEventId(event._id);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
                     className={`w-full text-left px-4 md:px-6 py-4 transition-all ${
                       active ? 'bg-cyan-500/6' : 'hover:bg-white/3'
                     }`}
@@ -984,9 +993,16 @@ export default function Events() {
                       <div className="text-right text-sm">
                         <p className="text-white font-semibold">{event.projectCount || 0}</p>
                         <p className="text-xs text-gray-400">tracks</p>
+                        <Link
+                          to={`/events/${event._id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-200 hover:text-white"
+                        >
+                          Open <ArrowRight size={12} />
+                        </Link>
                       </div>
                     </div>
-                  </motion.button>
+                  </motion.article>
                 );
                 })}
               </div>
