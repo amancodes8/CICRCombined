@@ -14,6 +14,7 @@ import {
   Facebook,
   Github,
   Hash,
+  IdCard,
   Instagram,
   Link as LinkIcon,
   Loader2,
@@ -26,11 +27,15 @@ import {
   Save,
   ShieldAlert,
   SquareUser,
+  QrCode,
+  Download,
+  Share2,
+  Upload,
   Trash2,
   User,
   X,
 } from 'lucide-react';
-import { acknowledgeWarnings, changePassword, getMe, updateProfile, fetchMyContestAttempts } from '../api';
+import { acknowledgeWarnings, changePassword, getMe, updateProfile, fetchMyContestAttempts, logout } from '../api';
 
 const dateToInput = (value) => {
   if (!value) return '';
@@ -132,6 +137,97 @@ const dispatchToast = (message, type = 'info') => {
   }
 };
 
+const fileToCompressedDataUrl = (file, { maxDim = 420, maxBytes = 130 * 1024 } = {}) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read file.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Invalid image file.'));
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Unable to process image.'));
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const encode = (quality) => canvas.toDataURL('image/jpeg', quality);
+
+        let quality = 0.84;
+        let output = encode(quality);
+        while (output.length > maxBytes * 1.37 && quality > 0.4) {
+          quality -= 0.08;
+          output = encode(quality);
+        }
+
+        if (output.length > maxBytes * 1.37) {
+          return reject(new Error('Image too large after compression. Use a smaller photo.'));
+        }
+
+        resolve(output);
+      };
+      img.src = String(reader.result || '');
+    };
+    reader.readAsDataURL(file);
+  });
+
+const buildPrintableIdCard = ({ user, qrUrl }) => {
+  const name = String(user?.name || '').trim() || 'Member';
+  const email = String(user?.email || '').trim() || 'N/A';
+  const branch = String(user?.branch || '').trim() || 'N/A';
+  const role = String(user?.role || '').trim() || 'N/A';
+  const batch = String(user?.batch || '').trim() || 'N/A';
+  const year = user?.year ? String(user.year) : 'N/A';
+  const collegeId = String(user?.collegeId || '').trim() || 'N/A';
+  const photo = String(user?.avatarUrl || '').trim();
+
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>CICR ID Card - ${name}</title>
+  <style>
+    body { margin: 0; padding: 24px; background: #0b1220; font-family: 'Segoe UI', Tahoma, sans-serif; color: #e2e8f0; }
+    .card { max-width: 760px; border: 1px solid #164e63; border-radius: 16px; padding: 20px; background: linear-gradient(145deg, #0f172a, #111827); }
+    .row { display: flex; gap: 16px; align-items: flex-start; }
+    .avatar { width: 96px; height: 96px; border-radius: 12px; object-fit: cover; border: 1px solid #155e75; background: #1f2937; }
+    .meta { flex: 1; }
+    .title { margin: 0; font-size: 22px; color: #e0f2fe; }
+    .grid { margin-top: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+    .item b { color: #67e8f9; }
+    .qr { width: 110px; height: 110px; border: 1px solid #155e75; border-radius: 10px; background: #fff; }
+    .topline { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #93c5fd; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="topline">CICR Connect Official ID Card</div>
+    <div class="row">
+      <img class="avatar" src="${photo || 'https://via.placeholder.com/96x96?text=ID'}" alt="Photo" />
+      <div class="meta">
+        <h1 class="title">${name}</h1>
+        <div class="grid">
+          <div class="item"><b>Email:</b> ${email}</div>
+          <div class="item"><b>College ID:</b> ${collegeId}</div>
+          <div class="item"><b>Branch:</b> ${branch}</div>
+          <div class="item"><b>Role:</b> ${role}</div>
+          <div class="item"><b>Batch:</b> ${batch}</div>
+          <div class="item"><b>Year:</b> ${year}</div>
+        </div>
+      </div>
+      <img class="qr" src="${qrUrl}" alt="QR Code" />
+    </div>
+  </div>
+  <script>window.onload = function(){ window.print(); };</script>
+</body>
+</html>`;
+};
+
 const MetricCard = ({ label, value, helper }) => (
   <article className="py-2">
     <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-black">{label}</p>
@@ -180,6 +276,7 @@ export default function Profile() {
   const [copied, setCopied] = useState(false);
   const [contestScore, setContestScore] = useState({ score: 0, total: 0, count: 0 });
   const [passwordBusy, setPasswordBusy] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -188,6 +285,20 @@ export default function Profile() {
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const publicProfileUrl = user.collegeId ? `${origin}/profile/${user.collegeId}` : '';
+  const cardAvatarUrl = String(user.avatarUrl || '').trim();
+  const cardHasAvatar = Boolean(cardAvatarUrl) && !avatarFailed;
+  const idCardEnabled = user.idCardEnabled !== false;
+  const qrPayload = encodeURIComponent(
+    JSON.stringify({
+      collegeId: user.collegeId || '',
+      name: user.name || '',
+      email: user.email || '',
+      branch: user.branch || '',
+      role: user.role || '',
+      profile: publicProfileUrl || '',
+    })
+  );
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrPayload}`;
   const skills = Array.isArray(user.skills) ? user.skills : [];
   const achievements = Array.isArray(user.achievements) ? user.achievements : [];
   const isAlumni = String(user.role || '').toLowerCase() === 'alumni';
@@ -575,9 +686,82 @@ export default function Profile() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      // Continue with local logout even if audit call fails.
+    } finally {
+      localStorage.clear();
+      window.location.href = '/login';
+    }
+  };
+
+  const handlePhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      dispatchToast('Please select an image file.', 'error');
+      return;
+    }
+
+    setPhotoUploading(true);
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file);
+      setFormData((prev) => ({ ...prev, avatarUrl: dataUrl }));
+      dispatchToast('Profile photo added. Save profile to apply.', 'success');
+    } catch (error) {
+      dispatchToast(error.message || 'Unable to process image.', 'error');
+    } finally {
+      setPhotoUploading(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleDownloadIdCard = () => {
+    if (!idCardEnabled) {
+      dispatchToast('Your ID card is currently disabled by admin.', 'error');
+      return;
+    }
+    const html = buildPrintableIdCard({ user, qrUrl });
+    const popup = window.open('', '_blank', 'noopener,noreferrer,width=900,height=640');
+    if (!popup) {
+      dispatchToast('Popup blocked. Please allow popups to generate ID card.', 'error');
+      return;
+    }
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+  };
+
+  const handleShareIdCard = async () => {
+    if (!publicProfileUrl) {
+      dispatchToast('Public profile URL unavailable.', 'error');
+      return;
+    }
+    try {
+      if (navigator?.share) {
+        await navigator.share({
+          title: `${user.name || 'CICR Member'} DigiCard`,
+          text: 'View my CICR Connect digital identity card.',
+          url: publicProfileUrl,
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(publicProfileUrl);
+      dispatchToast('DigiCard link copied.', 'success');
+    } catch {
+      dispatchToast('Unable to share DigiCard right now.', 'error');
+    }
+  };
+
+  const openProof = () => {
+    if (!publicProfileUrl) {
+      dispatchToast('Public proof URL unavailable.', 'error');
+      return;
+    }
+    window.open(publicProfileUrl, '_blank', 'noopener,noreferrer');
   };
 
   useEffect(() => {
@@ -737,6 +921,97 @@ export default function Profile() {
         <MetricCard label="Contest Score" value={contestScore.score} helper={contestScore.count ? `${contestScore.count} contest${contestScore.count > 1 ? 's' : ''} · ${contestScore.total} total pts` : 'No contests attempted'} />
         <MetricCard label="Achievements" value={achievements.length} helper="Credible accomplishments" />
         <MetricCard label="Years in CICR" value={yearsInCicr(user.joinedAt)} helper={`Joined ${fmtDate(user.joinedAt)}`} />
+      </section>
+
+      <section className="section-motion section-motion-delay-2 border-y border-gray-800/70 py-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-300 font-black">Digital Identity Card</p>
+              <h2 className="profile-section-flow text-3xl font-black inline-flex items-center gap-2 mt-1">CICR Connect DigiCard</h2>
+              <p className="text-sm text-gray-400 mt-1">Preview, download, or share your digital membership card.</p>
+            </div>
+            <div className="inline-flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadIdCard}
+                disabled={!idCardEnabled}
+                className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/35 bg-indigo-500/15 px-4 py-2 text-indigo-100 disabled:opacity-60"
+              >
+                <Download size={14} /> Download
+              </button>
+              <button
+                type="button"
+                onClick={handleShareIdCard}
+                className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/35 bg-cyan-500/15 px-4 py-2 text-cyan-100"
+              >
+                <Share2 size={14} /> Share
+              </button>
+            </div>
+          </div>
+          <div className="relative mt-4 rounded-3xl border border-cyan-500/25 bg-gradient-to-br from-[#071321] via-[#0a2340] to-[#162f55] p-5 md:p-7 overflow-hidden">
+            <div className="pointer-events-none absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_18%_18%,rgba(34,211,238,0.28)_0,transparent_42%),radial-gradient(circle_at_85%_72%,rgba(59,130,246,0.24)_0,transparent_38%),radial-gradient(circle_at_56%_8%,rgba(129,140,248,0.2)_0,transparent_32%)]" />
+            <div className="pointer-events-none absolute inset-0 opacity-[0.07] bg-[linear-gradient(to_right,rgba(148,163,184,0.55)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.55)_1px,transparent_1px)] bg-[size:22px_22px]" />
+            <div className="pointer-events-none absolute -top-16 -left-10 h-44 w-44 rounded-full bg-cyan-400/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-14 -right-8 h-48 w-48 rounded-full bg-indigo-500/20 blur-3xl" />
+            <div className={!idCardEnabled ? 'pointer-events-none select-none opacity-40 blur-[1.6px]' : ''}>
+              <div className="flex flex-col lg:flex-row gap-4 lg:gap-5 items-stretch">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs uppercase tracking-[0.28em] text-cyan-300 font-black">CICR Connect</p>
+                    <span className="text-xs font-black uppercase tracking-[0.15em] px-3 py-1 rounded-xl border border-cyan-400/40 bg-cyan-400/10 text-cyan-100">Status Active Member</span>
+                  </div>
+                  <h3 className="text-5xl max-sm:text-4xl font-black mt-3 text-white tracking-tight">{user.name || 'Member'}</h3>
+                  <p className="mt-2 text-gray-300 max-w-xl">Digital identity card for CICR Connect member access and verification.</p>
+
+                  <div className="mt-5 grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div className="md:col-span-3 rounded-3xl border border-cyan-500/35 bg-gradient-to-br from-cyan-500/20 to-indigo-500/20 min-h-[140px] flex items-center justify-center text-6xl font-black text-cyan-100 overflow-hidden">
+                      {cardHasAvatar ? (
+                        <img
+                          src={cardAvatarUrl}
+                          alt={user.name || 'Profile'}
+                          className="h-full w-full object-cover"
+                          onError={() => setAvatarFailed(true)}
+                        />
+                      ) : (
+                        <span>{user.name ? user.name[0].toUpperCase() : 'U'}</span>
+                      )}
+                    </div>
+                    <div className="md:col-span-9 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-2xl border border-gray-700/60 bg-white/[0.04] px-4 py-3"><p className="text-[10px] tracking-widest uppercase text-gray-400">Year</p><p className="text-2xl font-black mt-1">{user.year || 'N/A'}</p></div>
+                      <div className="rounded-2xl border border-gray-700/60 bg-white/[0.04] px-4 py-3"><p className="text-[10px] tracking-widest uppercase text-gray-400">Batch</p><p className="text-2xl font-black mt-1">{user.batch || 'N/A'}</p></div>
+                      <div className="rounded-2xl border border-gray-700/60 bg-white/[0.04] px-4 py-3"><p className="text-[10px] tracking-widest uppercase text-gray-400">Role</p><p className="text-2xl font-black mt-1">{user.role || 'N/A'}</p></div>
+                      <div className="rounded-2xl border border-gray-700/60 bg-white/[0.04] px-4 py-3"><p className="text-[10px] tracking-widest uppercase text-gray-400">Branch</p><p className="text-2xl font-black mt-1">{(user.branch || 'N/A').toUpperCase()}</p></div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-cyan-500/25 bg-black/15 px-4 py-3 text-sm text-gray-200 flex flex-wrap gap-x-5 gap-y-1">
+                    <span>College ID: {user.collegeId || 'N/A'}</span>
+                    <span>Email ID: {user.email || 'N/A'}</span>
+                  </div>
+                </div>
+
+                <div className="w-full lg:w-[18rem] xl:w-[19.5rem] rounded-3xl border border-cyan-500/25 bg-white/[0.06] p-4 shrink-0">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-cyan-200 font-black inline-flex items-center gap-1"><QrCode size={12} /> Scan To Verify</p>
+                  <img src={qrUrl} alt="ID QR" className="mt-3 w-full max-w-[260px] rounded-2xl bg-white p-2 border border-cyan-500/30 mx-auto" />
+                  <div className="mt-4 text-xs text-gray-300">
+                    <div className="flex items-center justify-between"><span>CICR Member Card</span><span>{user.role || 'Member'}</span></div>
+                    <div className="h-2 rounded-full bg-white/10 overflow-hidden mt-2"><div className="h-full w-full bg-gradient-to-r from-cyan-400 to-blue-300" /></div>
+                    <p className="mt-2 break-all text-gray-400">{publicProfileUrl || 'No public URL available'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {!idCardEnabled && (
+              <div className="absolute inset-0 flex items-center justify-center p-6">
+                <div className="rounded-2xl border border-rose-500/35 bg-[#2a1130]/85 px-6 py-5 text-center max-w-md">
+                  <ShieldAlert size={22} className="mx-auto text-rose-300" />
+                  <p className="mt-3 text-3xl font-black text-white tracking-tight">DigiCard Unavailable</p>
+                  <p className="mt-2 text-gray-200">This member's ID card is currently deactivated by an administrator and cannot be used for verification.</p>
+                </div>
+              </div>
+            )}
+          </div>
       </section>
 
       <section
@@ -986,6 +1261,22 @@ export default function Profile() {
                 placeholder="https://.../your-photo.jpg"
                 disabled={loading}
               />
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Upload Profile Photo</label>
+                <label className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-500/35 bg-cyan-500/10 px-3 py-3 text-sm text-cyan-100 hover:bg-cyan-500/20 cursor-pointer">
+                  {photoUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {photoUploading ? 'Processing image...' : 'Choose Image'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    disabled={loading || photoUploading}
+                    className="hidden"
+                  />
+                </label>
+                <p className="text-[11px] text-gray-500">Image will be optimized automatically before saving.</p>
+              </div>
 
               {!isAlumni && (
                 <InputField

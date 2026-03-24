@@ -73,6 +73,20 @@ export default function Layout() {
   const [user, setUser] = useState(profile.result || profile);
   const isStrictAdmin = user.role?.toLowerCase() === 'admin';
   const isAdminOrHead = user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'head';
+  const temporaryAccess = user?.temporaryAccess || {};
+  const isTemporarySession = Boolean(temporaryAccess?.isTemporarySession && temporaryAccess?.isActive);
+  const temporaryAccessExpiryLabel = useMemo(() => {
+    if (!temporaryAccess?.expiresAt) return '';
+    const parsed = new Date(temporaryAccess.expiresAt);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleString();
+  }, [temporaryAccess?.expiresAt]);
+  const temporaryAllowedSections = useMemo(() => {
+    const raw = Array.isArray(temporaryAccess?.restrictions?.allowedSections)
+      ? temporaryAccess.restrictions.allowedSections
+      : [];
+    return raw.map((value) => String(value || '').trim()).filter(Boolean).slice(0, 6);
+  }, [temporaryAccess?.restrictions?.allowedSections]);
   const logoSrc = useMemo(() => {
     if (logoMode === 'bundle') return logo;
     if (logoMode === 'public') return '/cicr-logo.png';
@@ -902,6 +916,23 @@ export default function Layout() {
           );
         })()}
 
+        {isTemporarySession && (
+          <div className="mb-4 md:mb-5 rounded-xl border border-cyan-500/35 bg-linear-to-r from-cyan-500/12 via-[#0a1220] to-[#09101c] px-3 py-2.5 text-xs md:text-sm inline-flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+            <span className="inline-flex items-center gap-2 font-semibold text-cyan-100">
+              <ShieldCheck size={14} className="text-cyan-300" />
+              Temporary access session active in read-only mode.
+            </span>
+            <span className="text-cyan-200/90 text-[11px] uppercase tracking-wider">
+              Expires {temporaryAccessExpiryLabel || 'soon'}
+            </span>
+            {temporaryAllowedSections.length > 0 && (
+              <span className="text-[11px] text-gray-300">
+                Allowed sections: {temporaryAllowedSections.join(', ')}
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="mb-4 md:mb-6 flex items-center justify-between gap-3">
           <nav aria-label="Breadcrumb" className="inline-flex items-center flex-wrap gap-2 text-[10px] md:text-xs uppercase tracking-widest text-gray-500">
             <Link to="/dashboard" className="hover:text-gray-200 transition-colors">
@@ -963,6 +994,10 @@ export default function Layout() {
             <Outlet />
           </motion.div>
         </AnimatePresence>
+
+        <footer className="mt-8 md:mt-10 border-t border-white/8 pt-4 pb-2 text-center text-xs tracking-wide text-gray-400">
+          made with ❤️ by CICR Tech Team
+        </footer>
       </main>
 
       <NotificationCenter

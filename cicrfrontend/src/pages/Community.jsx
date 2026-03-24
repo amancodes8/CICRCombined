@@ -464,6 +464,23 @@ export default function Community() {
                 onSubmit={handlePostSubmit}
                 className="border-y border-gray-800/80 py-5 md:py-6 space-y-4"
               >
+                <div className="flex flex-wrap gap-2 w-full pb-1">
+                  {['Announcement', 'Requirement', 'Idea', ...(isPrivileged ? ['Event'] : [])].map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setPostType(type)}
+                      className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                        postType === type
+                          ? 'text-cyan-200 border-cyan-500/45 bg-cyan-500/10'
+                          : 'border-gray-800 text-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="flex gap-4">
                   <div className="hidden sm:flex w-11 h-11 rounded-xl border border-cyan-500/35 shrink-0 items-center justify-center font-semibold text-cyan-200 text-lg">
                     {userData.name?.[0] || 'M'}
@@ -478,23 +495,6 @@ export default function Community() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className="flex gap-2 overflow-x-auto w-full sm:w-auto pb-1">
-                    {['Announcement', 'Requirement', 'Idea', ...(isPrivileged ? ['Event'] : [])].map((type) => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => setPostType(type)}
-                        className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                          postType === type
-                            ? 'text-cyan-200 border-cyan-500/45 bg-cyan-500/10'
-                            : 'border-gray-800 text-gray-500 hover:text-gray-300'
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-
                   <input
                     value={postTopic}
                     onChange={(e) => setPostTopic(e.target.value)}

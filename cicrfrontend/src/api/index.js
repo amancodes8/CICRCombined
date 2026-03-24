@@ -189,6 +189,7 @@ export const sendPasswordResetOtp = (payload) => API.post('/auth/password/send-o
 export const resetPasswordWithOtp = (payload) => API.post('/auth/password/reset-with-otp', payload);
 export const resetPasswordWithCode = (payload) => API.post('/auth/password/reset-with-code', payload);
 export const changePassword = (payload) => API.put('/auth/password/change', payload);
+export const logout = () => API.post('/auth/logout');
 
 // Fetches the logged-in user's own data
 export const getMe = () =>
@@ -243,6 +244,14 @@ export const fetchPendingAdminActions = () =>
     ttlMs: 30 * 1000,
   });
 export const approveAdminAction = (actionId) => API.post(`/admin/actions/${actionId}/approve`);
+export const fetchTemporaryAccessUsers = () =>
+  cachedGet({
+    key: 'admin:users:temporary-access',
+    request: () => API.get('/admin/users/temporary-access'),
+    ttlMs: 20 * 1000,
+  });
+export const grantTemporaryAccess = (id, payload) => API.post(`/admin/users/${id}/temporary-access`, payload);
+export const revokeTemporaryAccess = (id, payload = {}) => API.post(`/admin/users/${id}/temporary-access/revoke`, payload);
 export const fetchAuditLogs = (params = {}) => {
   const query = new URLSearchParams(params);
   const suffix = query.toString() ? `?${query.toString()}` : '';

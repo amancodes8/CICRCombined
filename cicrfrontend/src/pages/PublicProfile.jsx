@@ -94,6 +94,10 @@ export default function PublicProfile() {
   }
 
   const { profile, metrics } = data;
+  const idCard = data.idCard || {};
+  const showIdCard = Boolean(idCard.enabled);
+  const cardAvatarUrl = String(idCard.photo || profile.avatarUrl || '').trim();
+  const cardHasAvatar = Boolean(cardAvatarUrl) && !avatarFailed;
   const isAlumni = String(profile.role || '').toLowerCase() === 'alumni';
   const skills = Array.isArray(profile.skills) ? profile.skills : [];
   const achievements = Array.isArray(profile.achievements) ? profile.achievements : [];
@@ -133,6 +137,17 @@ export default function PublicProfile() {
         : profile.yearsInCICR || 0,
     },
   ];
+
+  const publicQrPayload = encodeURIComponent(
+    JSON.stringify({
+      collegeId: idCard.collegeId || profile.collegeId || '',
+      name: idCard.name || profile.name || '',
+      email: idCard.email || '',
+      role: idCard.role || profile.role || '',
+      profile: typeof window !== 'undefined' ? window.location.href : '',
+    })
+  );
+  const publicQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${publicQrPayload}`;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#06090f] text-white">
@@ -245,6 +260,82 @@ export default function PublicProfile() {
               </motion.article>
             ))}
           </motion.div>
+        </motion.section>
+
+        <motion.section
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.25 }}
+          variants={sectionVariants}
+          transition={{ duration: 0.42 }}
+          className="py-9 border-b border-slate-700/55"
+        >
+          <SectionTitle icon={IdCard} title="Digital Identity Card" />
+          <div className="relative mt-4 rounded-3xl border border-cyan-500/28 bg-gradient-to-br from-[#071321] via-[#0a2340] to-[#162f55] p-5 md:p-7 overflow-hidden">
+            <div className="pointer-events-none absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_18%_18%,rgba(34,211,238,0.28)_0,transparent_42%),radial-gradient(circle_at_85%_72%,rgba(59,130,246,0.24)_0,transparent_38%),radial-gradient(circle_at_56%_8%,rgba(129,140,248,0.2)_0,transparent_32%)]" />
+            <div className="pointer-events-none absolute inset-0 opacity-[0.07] bg-[linear-gradient(to_right,rgba(148,163,184,0.55)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.55)_1px,transparent_1px)] bg-[size:22px_22px]" />
+            <div className="pointer-events-none absolute -top-16 -left-10 h-44 w-44 rounded-full bg-cyan-400/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-14 -right-8 h-48 w-48 rounded-full bg-indigo-500/20 blur-3xl" />
+            <div className={!showIdCard ? 'pointer-events-none select-none opacity-40 blur-[1.8px]' : ''}>
+              <div className="flex flex-col lg:flex-row gap-4 lg:gap-5 items-stretch">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs uppercase tracking-[0.28em] text-cyan-300 font-black">CICR Connect</p>
+                    <span className="text-xs font-black uppercase tracking-[0.15em] px-3 py-1 rounded-xl border border-cyan-400/40 bg-cyan-400/10 text-cyan-100">Status Active Member</span>
+                  </div>
+                  <h3 className="text-5xl max-sm:text-4xl font-black mt-3 text-white tracking-tight">{idCard.name || profile.name || 'Member'}</h3>
+                  <p className="mt-2 text-slate-300 max-w-xl">Digital identity card for CICR Connect member access and verification.</p>
+
+                  <div className="mt-5 grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div className="md:col-span-3 rounded-3xl border border-cyan-500/35 bg-gradient-to-br from-cyan-500/20 to-indigo-500/20 min-h-[140px] flex items-center justify-center text-6xl font-black text-cyan-100 overflow-hidden">
+                      {cardHasAvatar ? (
+                        <img
+                          src={cardAvatarUrl}
+                          alt={idCard.name || profile.name || 'Profile'}
+                          className="h-full w-full object-cover"
+                          onError={() => setAvatarFailed(true)}
+                        />
+                      ) : (
+                        <span>{(idCard.name || profile.name || 'C')[0]}</span>
+                      )}
+                    </div>
+                    <div className="md:col-span-9 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-2xl border border-slate-700/60 bg-white/[0.04] px-4 py-3"><p className="text-[10px] tracking-widest uppercase text-slate-400">Year</p><p className="text-2xl font-black mt-1">{idCard.year || profile.year || 'N/A'}</p></div>
+                      <div className="rounded-2xl border border-slate-700/60 bg-white/[0.04] px-4 py-3"><p className="text-[10px] tracking-widest uppercase text-slate-400">Batch</p><p className="text-2xl font-black mt-1">{idCard.batch || profile.batch || 'N/A'}</p></div>
+                      <div className="rounded-2xl border border-slate-700/60 bg-white/[0.04] px-4 py-3"><p className="text-[10px] tracking-widest uppercase text-slate-400">Role</p><p className="text-2xl font-black mt-1">{idCard.role || profile.role || 'N/A'}</p></div>
+                      <div className="rounded-2xl border border-slate-700/60 bg-white/[0.04] px-4 py-3"><p className="text-[10px] tracking-widest uppercase text-slate-400">Branch</p><p className="text-2xl font-black mt-1">{(idCard.branch || profile.branch || 'N/A').toUpperCase()}</p></div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-cyan-500/25 bg-black/15 px-4 py-3 text-sm text-slate-200 flex flex-wrap gap-x-5 gap-y-1">
+                    <span>College ID: {idCard.collegeId || profile.collegeId || 'N/A'}</span>
+                    <span>Email ID: {idCard.email || 'N/A'}</span>
+                  </div>
+
+                </div>
+
+                <div className="w-full lg:w-[18rem] xl:w-[19.5rem] rounded-3xl border border-cyan-500/25 bg-white/[0.06] p-4 shrink-0">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-cyan-200 font-black">Scan To Verify</p>
+                  <img src={publicQrUrl} alt="Public ID QR" className="mt-3 w-full max-w-[260px] rounded-2xl bg-white p-2 border border-cyan-500/30 mx-auto" />
+                  <div className="mt-4 text-xs text-slate-300">
+                    <div className="flex items-center justify-between"><span>CICR Member Card</span><span>{idCard.role || profile.role || 'Member'}</span></div>
+                    <div className="h-2 rounded-full bg-white/10 overflow-hidden mt-2"><div className="h-full w-full bg-gradient-to-r from-cyan-400 to-blue-300" /></div>
+                    <p className="mt-2 break-all text-slate-400">{typeof window !== 'undefined' ? window.location.href : ''}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {!showIdCard && (
+              <div className="absolute inset-0 flex items-center justify-center p-6">
+                <div className="rounded-2xl border border-rose-500/35 bg-[#2a1130]/85 px-6 py-5 text-center max-w-md">
+                  <BadgeCheck size={22} className="mx-auto text-rose-300" />
+                  <p className="mt-3 text-4xl font-black text-white tracking-tight">DigiCard Unavailable</p>
+                  <p className="mt-2 text-slate-200">This member's ID card is currently deactivated by an administrator and cannot be used for verification.</p>
+                </div>
+              </div>
+            )}
+          </div>
         </motion.section>
 
         <motion.section

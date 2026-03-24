@@ -36,6 +36,28 @@ const AlumniProfileSchema = new mongoose.Schema(
     { _id: false }
 );
 
+const TemporaryAccessSchema = new mongoose.Schema(
+    {
+        enabled: { type: Boolean, default: false },
+        mode: {
+            type: String,
+            enum: ['read-only'],
+            default: 'read-only',
+        },
+        grantedAt: { type: Date, default: null },
+        expiresAt: { type: Date, default: null },
+        grantedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        revokedAt: { type: Date, default: null },
+        revokedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        revokeReason: { type: String, default: '', maxlength: 240 },
+        restrictions: {
+            readOnly: { type: Boolean, default: true },
+            allowedSections: { type: [String], default: [] },
+        },
+    },
+    { _id: false }
+);
+
 const UserSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true },
@@ -56,6 +78,27 @@ const UserSchema = new mongoose.Schema({
     year: { type: Number },
     branch: { type: String },
     batch: { type: String },
+    idCardEnabled: {
+        type: Boolean,
+        default: true,
+    },
+    temporaryAccess: {
+        type: TemporaryAccessSchema,
+        default: () => ({
+            enabled: false,
+            mode: 'read-only',
+            grantedAt: null,
+            expiresAt: null,
+            grantedBy: null,
+            revokedAt: null,
+            revokedBy: null,
+            revokeReason: '',
+            restrictions: {
+                readOnly: true,
+                allowedSections: [],
+            },
+        }),
+    },
     role: {
         type: String,
         enum: ['Admin', 'Head', 'User', 'Alumni'], 
@@ -64,7 +107,7 @@ const UserSchema = new mongoose.Schema({
     projects: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Project' }], 
     projectIdeas: [{ type: String }],
     bio: { type: String, default: '' },
-    avatarUrl: { type: String, default: '', trim: true, maxlength: 600 },
+    avatarUrl: { type: String, default: '', trim: true, maxlength: 180000 },
     achievements: [{ type: String }],
     skills: [{ type: String }],
     social: {

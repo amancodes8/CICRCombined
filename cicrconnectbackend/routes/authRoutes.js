@@ -10,7 +10,8 @@ const {
   sendPasswordResetOtp,
   resetPasswordWithOtp,
   changePassword,
-  updateProfile
+  updateProfile,
+  logoutUser,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const { authLimiter, passwordLimiter } = require('../middleware/securityMiddleware');
@@ -100,5 +101,6 @@ router.put(
 );
 router.get('/me', protect, getMe);
 router.put('/profile', protect, updateProfile);
+router.post('/logout', protect, logoutUser);
 
 module.exports = router;

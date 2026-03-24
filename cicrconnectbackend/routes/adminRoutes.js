@@ -10,6 +10,9 @@ const {
     approveAdminAction,
     generatePasswordResetCode,
     getAuditLogs,
+    grantTemporaryAccess,
+    revokeTemporaryAccess,
+    getTemporaryAccessUsers,
 } = require('../controllers/adminController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -30,6 +33,9 @@ router.route('/users/:id')
     .put(updateUserByAdmin)
     .delete(deleteUser);
 router.post('/users/:id/password-reset-code', generatePasswordResetCode);
+router.get('/users/temporary-access', getTemporaryAccessUsers);
+router.post('/users/:id/temporary-access', grantTemporaryAccess);
+router.post('/users/:id/temporary-access/revoke', revokeTemporaryAccess);
 
 router.get('/actions/pending', getPendingAdminActions);
 router.post('/actions/:actionId/approve', approveAdminAction);

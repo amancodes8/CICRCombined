@@ -10,6 +10,20 @@ const crypto = require('crypto');
 const REQUIRED_ADMIN_APPROVALS = 3;
 const INVITE_CODE_TTL_MS = 24 * 60 * 60 * 1000;
 const INVITE_CODE_MAX_USES_LIMIT = 100;
+const TEMP_ACCESS_MIN_HOURS = 1;
+const TEMP_ACCESS_MAX_HOURS = 168;
+const TEMP_ACCESS_ALLOWED_SECTIONS = [
+  'dashboard',
+  'projects',
+  'meetings',
+  'events',
+  'learning',
+  'programs',
+  'community',
+  'inventory',
+  'profile',
+  'guidelines',
+];
 
 const resolveFrontendUrl = () => {
   const raw = String(process.env.FRONTEND_URL || '').trim();
@@ -88,6 +102,54 @@ const isSelfTarget = (req, targetUser) => {
   if (actorCollegeId && targetCollegeId && actorCollegeId === targetCollegeId) return true;
 
   return false;
+};
+
+const normalizeAllowedSections = (sections) => {
+  if (!Array.isArray(sections)) return [];
+  return Array.from(
+    new Set(
+      sections
+        .map((value) => String(value || '').trim().toLowerCase())
+        .filter((value) => TEMP_ACCESS_ALLOWED_SECTIONS.includes(value))
+    )
+  );
+};
+
+const normalizeTemporaryAccessHours = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  const rounded = Math.round(parsed);
+  if (rounded < TEMP_ACCESS_MIN_HOURS || rounded > TEMP_ACCESS_MAX_HOURS) return null;
+  return rounded;
+};
+
+const summarizeTemporaryAccess = (user = {}) => {
+  const pass = user?.temporaryAccess || {};
+  const expiresAtRaw = pass.expiresAt ? new Date(pass.expiresAt) : null;
+  const expiresAt = expiresAtRaw && !Number.isNaN(expiresAtRaw.getTime()) ? expiresAtRaw : null;
+  const isActive = Boolean(pass.enabled) && Boolean(expiresAt) && expiresAt.getTime() > Date.now();
+  const remainingMinutes = isActive
+    ? Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 60000))
+    : 0;
+
+  return {
+    enabled: Boolean(pass.enabled),
+    isActive,
+    mode: String(pass.mode || 'read-only').toLowerCase() === 'read-only' ? 'read-only' : 'read-only',
+    grantedAt: pass.grantedAt || null,
+    expiresAt,
+    remainingMinutes,
+    grantedBy: pass.grantedBy || null,
+    revokedAt: pass.revokedAt || null,
+    revokedBy: pass.revokedBy || null,
+    revokeReason: String(pass.revokeReason || '').trim(),
+    restrictions: {
+      readOnly: pass?.restrictions?.readOnly !== false,
+      allowedSections: normalizeAllowedSections(pass?.restrictions?.allowedSections),
+      writeOperationsBlocked: true,
+      adminBlocked: true,
+    },
+  };
 };
 
 /**
@@ -296,12 +358,197 @@ exports.getAllUsers = async (req, res) => {
       if (!plain.approvalStatus) {
         plain.approvalStatus = plain.isVerified ? 'Approved' : 'Pending';
       }
+      plain.temporaryAccess = summarizeTemporaryAccess(plain);
       return plain;
     });
     res.json(normalized);
   } catch (err) {
     console.error("❌ getAllUsers error:", err.message);
     res.status(500).send('Server error');
+  }
+};
+
+exports.getTemporaryAccessUsers = async (req, res) => {
+  try {
+    const rows = await User.find({ 'temporaryAccess.enabled': true })
+      .select('-password')
+      .populate('temporaryAccess.grantedBy', 'name role')
+      .populate('temporaryAccess.revokedBy', 'name role')
+      .sort({ 'temporaryAccess.expiresAt': 1, updatedAt: -1 });
+
+    const result = rows.map((user) => {
+      const plain = user.toObject();
+      return {
+        _id: plain._id,
+        name: plain.name,
+        email: plain.email,
+        collegeId: plain.collegeId,
+        role: plain.role,
+        approvalStatus: plain.approvalStatus,
+        isVerified: plain.isVerified,
+        temporaryAccess: summarizeTemporaryAccess(plain),
+      };
+    });
+
+    return res.json(result);
+  } catch (err) {
+    console.error('❌ getTemporaryAccessUsers error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.grantTemporaryAccess = async (req, res) => {
+  try {
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const approval = String(targetUser.approvalStatus || '').trim().toLowerCase();
+    const isApproved = targetUser.isVerified || approval === 'approved';
+    if (isApproved) {
+      return res.status(400).json({
+        success: false,
+        message: 'This user is already approved and does not need temporary access.',
+      });
+    }
+
+    const hours = normalizeTemporaryAccessHours(req.body?.hours);
+    if (hours === null) {
+      return res.status(400).json({
+        success: false,
+        message: `hours must be between ${TEMP_ACCESS_MIN_HOURS} and ${TEMP_ACCESS_MAX_HOURS}`,
+      });
+    }
+
+    const mode = String(req.body?.mode || 'read-only').trim().toLowerCase();
+    if (mode !== 'read-only') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only read-only temporary access mode is supported.',
+      });
+    }
+
+    const allowedSections = normalizeAllowedSections(req.body?.restrictions?.allowedSections);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + hours * 60 * 60 * 1000);
+
+    const before = summarizeTemporaryAccess(targetUser);
+    targetUser.temporaryAccess = {
+      enabled: true,
+      mode: 'read-only',
+      grantedAt: now,
+      expiresAt,
+      grantedBy: req.user.id,
+      revokedAt: null,
+      revokedBy: null,
+      revokeReason: '',
+      restrictions: {
+        readOnly: true,
+        allowedSections,
+      },
+    };
+    await targetUser.save({ validateBeforeSave: false });
+
+    await createNotifications({
+      userIds: [targetUser._id],
+      title: 'Temporary Dashboard Access Enabled',
+      message: `Admin granted you read-only dashboard access for ${hours} hour(s).`,
+      type: 'warning',
+      link: '/dashboard',
+      meta: { mode: 'read-only', expiresAt },
+      createdBy: req.user.id,
+    });
+
+    const after = summarizeTemporaryAccess(targetUser);
+    await logAudit({
+      actor: req.user.id,
+      action: 'TEMP_ACCESS_GRANTED',
+      entityType: 'User',
+      entityId: targetUser._id,
+      before,
+      after,
+      req,
+    });
+
+    return res.json({
+      success: true,
+      message: `Temporary access enabled for ${hours} hour(s).`,
+      user: {
+        _id: targetUser._id,
+        name: targetUser.name,
+        email: targetUser.email,
+        collegeId: targetUser.collegeId,
+        temporaryAccess: after,
+      },
+    });
+  } catch (err) {
+    console.error('❌ grantTemporaryAccess error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.revokeTemporaryAccess = async (req, res) => {
+  try {
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const before = summarizeTemporaryAccess(targetUser);
+    if (!before.enabled) {
+      return res.status(400).json({ success: false, message: 'No temporary access is currently enabled.' });
+    }
+
+    const reason = String(req.body?.reason || '').trim().slice(0, 240);
+    targetUser.temporaryAccess = {
+      ...(targetUser.temporaryAccess || {}),
+      enabled: false,
+      revokedAt: new Date(),
+      revokedBy: req.user.id,
+      revokeReason: reason,
+      restrictions: {
+        readOnly: true,
+        allowedSections: normalizeAllowedSections(targetUser?.temporaryAccess?.restrictions?.allowedSections),
+      },
+    };
+    await targetUser.save({ validateBeforeSave: false });
+
+    await createNotifications({
+      userIds: [targetUser._id],
+      title: 'Temporary Dashboard Access Revoked',
+      message: 'Admin revoked your temporary dashboard access.',
+      type: 'warning',
+      link: '/login',
+      meta: { reason: reason || undefined },
+      createdBy: req.user.id,
+    });
+
+    const after = summarizeTemporaryAccess(targetUser);
+    await logAudit({
+      actor: req.user.id,
+      action: 'TEMP_ACCESS_REVOKED',
+      entityType: 'User',
+      entityId: targetUser._id,
+      before,
+      after,
+      req,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Temporary access revoked successfully.',
+      user: {
+        _id: targetUser._id,
+        name: targetUser.name,
+        email: targetUser.email,
+        collegeId: targetUser.collegeId,
+        temporaryAccess: after,
+      },
+    });
+  } catch (err) {
+    console.error('❌ revokeTemporaryAccess error:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
@@ -427,6 +674,12 @@ exports.updateUserByAdmin = async (req, res) => {
       payload.approvalStatus = payload.isVerified ? 'Approved' : 'Pending';
     }
 
+    if (Object.prototype.hasOwnProperty.call(payload, 'idCardEnabled')) {
+      if (typeof payload.idCardEnabled !== 'boolean') {
+        return res.status(400).json({ success: false, message: 'idCardEnabled must be a boolean' });
+      }
+    }
+
     if (payload.approvalStatus === 'Approved') {
       payload.isVerified = true;
     } else if (payload.approvalStatus === 'Pending' || payload.approvalStatus === 'Rejected') {
@@ -442,6 +695,7 @@ exports.updateUserByAdmin = async (req, res) => {
       role: targetUser.role,
       approvalStatus: targetUser.approvalStatus,
       isVerified: targetUser.isVerified,
+      idCardEnabled: Boolean(targetUser.idCardEnabled),
     };
 
     if (
@@ -534,6 +788,7 @@ exports.updateUserByAdmin = async (req, res) => {
         role: updatedUser?.role,
         approvalStatus: updatedUser?.approvalStatus,
         isVerified: updatedUser?.isVerified,
+        idCardEnabled: Boolean(updatedUser?.idCardEnabled),
       },
       meta: { changedFields: Object.keys(payload) },
       req,
@@ -696,7 +951,7 @@ exports.getAuditLogs = async (req, res) => {
     }
 
     const logs = await AuditLog.find(query)
-      .populate('actor', 'name role collegeId')
+      .populate('actor', 'name role collegeId year')
       .sort({ createdAt: -1 })
       .limit(limit);
 

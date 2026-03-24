@@ -31,6 +31,12 @@ const normalizeAvatarUrl = (value) => {
     const raw = String(value || '').trim();
     if (!raw) return '';
 
+    const isDataImage = /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=\s]+$/i.test(raw);
+    if (isDataImage) {
+        if (raw.length > 180000) return null;
+        return raw;
+    }
+
     try {
         const parsed = new URL(raw);
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
@@ -91,7 +97,7 @@ const updateUserProfile = async (req, res) => {
         if (Object.prototype.hasOwnProperty.call(req.body, 'avatarUrl')) {
             const avatarUrl = normalizeAvatarUrl(req.body.avatarUrl);
             if (avatarUrl === null) {
-                return res.status(400).json({ message: 'Profile picture URL must be a valid http/https URL.' });
+                return res.status(400).json({ message: 'Profile picture must be a valid http/https URL or uploaded image file.' });
             }
             user.avatarUrl = avatarUrl;
         }
@@ -193,7 +199,7 @@ const getPublicProfileByCollegeId = async (req, res) => {
     }
 
     const user = await User.findOneByCollegeId(collegeId).select(
-        'name collegeId role branch year batch joinedAt bio avatarUrl achievements skills social alumniProfile createdAt'
+        'name email collegeId role branch year batch joinedAt bio avatarUrl achievements skills social alumniProfile createdAt idCardEnabled'
     );
 
     if (!user) {
@@ -203,6 +209,19 @@ const getPublicProfileByCollegeId = async (req, res) => {
     const insights = await buildUserInsights(user);
     const member = insights.member || {};
     const metrics = insights.metrics || {};
+
+    const idCardEnabled = Boolean(readDoc(user, 'idCardEnabled', true));
+    const idCard = {
+        enabled: idCardEnabled,
+        photo: member.avatarUrl || readDoc(user, 'avatarUrl', '') || '',
+        name: member.name || readDoc(user, 'name', ''),
+        email: readDoc(user, 'email', ''),
+        batch: member.batch || readDoc(user, 'batch', '') || '',
+        year: member.year || readDoc(user, 'year', null),
+        branch: member.branch || readDoc(user, 'branch', '') || '',
+        role: member.role || readDoc(user, 'role', ''),
+        collegeId: member.collegeId || readDoc(user, 'collegeId', ''),
+    };
 
     res.json({
         profile: {
@@ -220,7 +239,9 @@ const getPublicProfileByCollegeId = async (req, res) => {
             skills: member.skills || [],
             social: member.social || {},
             alumniProfile: member.alumniProfile || readDoc(user, 'alumniProfile', {}) || {},
+            idCardEnabled,
         },
+        idCard,
         metrics: {
             totalProjectContributions: metrics.totalProjectContributions || 0,
             totalEvents: metrics.totalEvents || 0,

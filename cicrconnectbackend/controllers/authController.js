@@ -15,6 +15,7 @@ const {
 } = require('../utils/alumniProfile');
 const { env } = require('../config/env');
 const logger = require('../utils/logger');
+const { logAudit } = require('../utils/auditLogger');
 
 const AUTH_RECOVERY_SELECT =
   'name email collegeId password role warningCount hasUnreadWarning approvalStatus isVerified +emailHash +collegeIdHash';
@@ -108,6 +109,13 @@ const normalizeAvatarUrl = (value) => {
   const raw = String(value || '').trim();
   if (!raw) return '';
 
+  const isDataImage = /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=\s]+$/i.test(raw);
+  if (isDataImage) {
+    // Keep payload bounded so avatar uploads don't exceed request limits.
+    if (raw.length > 180000) return null;
+    return raw;
+  }
+
   try {
     const parsed = new URL(raw);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
@@ -117,6 +125,40 @@ const normalizeAvatarUrl = (value) => {
   } catch {
     return null;
   }
+};
+
+const normalizeAllowedSections = (sections) => {
+  if (!Array.isArray(sections)) return [];
+  return sections
+    .map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 20);
+};
+
+const buildTemporaryAccessSnapshot = (user, { isTemporarySession = false } = {}) => {
+  const pass = user?.temporaryAccess || {};
+  const expiresAtRaw = pass.expiresAt ? new Date(pass.expiresAt) : null;
+  const expiresAt = expiresAtRaw && !Number.isNaN(expiresAtRaw.getTime()) ? expiresAtRaw : null;
+  const isActive = Boolean(pass.enabled) && Boolean(expiresAt) && expiresAt.getTime() > Date.now();
+  const remainingMinutes = isActive
+    ? Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 60000))
+    : 0;
+
+  return {
+    enabled: Boolean(pass.enabled),
+    isActive,
+    isTemporarySession: Boolean(isTemporarySession),
+    mode: String(pass.mode || 'read-only').toLowerCase() === 'read-only' ? 'read-only' : 'read-only',
+    expiresAt,
+    grantedAt: pass.grantedAt || null,
+    remainingMinutes,
+    restrictions: {
+      readOnly: pass?.restrictions?.readOnly !== false,
+      allowedSections: normalizeAllowedSections(pass?.restrictions?.allowedSections),
+      writeOperationsBlocked: true,
+      adminBlocked: true,
+    },
+  };
 };
 
 const registerUser = async (req, res) => {
@@ -305,16 +347,61 @@ const loginUser = async (req, res) => {
   const approval = String(user.approvalStatus || '').trim().toLowerCase();
 
   if (approval === 'rejected') {
+    await logAudit({
+      actor: user._id,
+      action: 'AUTH_LOGIN_REJECTED_ACCOUNT',
+      entityType: 'User',
+      entityId: user._id,
+      req,
+    });
     return res.status(403).json({ message: 'Your registration has been rejected. Contact admin.' });
   }
 
   const isApproved = user.isVerified || approval === 'approved';
-  if (!isApproved) {
+  const temporaryAccess = buildTemporaryAccessSnapshot(user);
+  const isTemporarySession = !isApproved && temporaryAccess.isActive;
+
+  if (!isApproved && !isTemporarySession) {
+    await logAudit({
+      actor: user._id,
+      action: 'AUTH_LOGIN_PENDING_APPROVAL',
+      entityType: 'User',
+      entityId: user._id,
+      req,
+    });
     return res.status(401).json({
       code: 'ACCOUNT_PENDING_APPROVAL',
       message: 'Account pending admin approval',
     });
   }
+
+  if (isTemporarySession) {
+    await logAudit({
+      actor: user._id,
+      action: 'AUTH_LOGIN_TEMP_ACCESS_GRANTED',
+      entityType: 'User',
+      entityId: user._id,
+      after: {
+        mode: temporaryAccess.mode,
+        expiresAt: temporaryAccess.expiresAt,
+        remainingMinutes: temporaryAccess.remainingMinutes,
+      },
+      req,
+    });
+  }
+
+  await logAudit({
+    actor: user._id,
+    action: 'AUTH_LOGIN_SUCCESS',
+    entityType: 'User',
+    entityId: user._id,
+    after: {
+      lastLoginAt: user.lastLoginAt,
+      role: user.role,
+      year: user.year,
+    },
+    req,
+  });
 
   const token = generateToken(user._id);
   const profile = {
@@ -323,8 +410,14 @@ const loginUser = async (req, res) => {
     email: user.email,
     collegeId: user.collegeId,
     role: user.role,
+    approvalStatus: user.approvalStatus,
+    isVerified: user.isVerified,
     warningCount: user.warningCount || 0,
     hasUnreadWarning: !!user.hasUnreadWarning,
+    temporaryAccess: {
+      ...temporaryAccess,
+      isTemporarySession,
+    },
   };
 
   // Return flat fields (web compat) + nested `result` (mobile compat)
@@ -401,7 +494,30 @@ const changePassword = async (req, res) => {
   user.passwordResetOtpExpires = undefined;
   await user.save();
 
+  await logAudit({
+    actor: user._id,
+    action: 'AUTH_PASSWORD_CHANGED',
+    entityType: 'User',
+    entityId: user._id,
+    req,
+  });
+
   return res.json({ success: true, message: 'Password updated successfully.' });
+};
+
+const logoutUser = async (req, res) => {
+  try {
+    await logAudit({
+      actor: req.user.id,
+      action: 'AUTH_LOGOUT',
+      entityType: 'User',
+      entityId: req.user.id,
+      req,
+    });
+    return res.json({ success: true, message: 'Logged out successfully.' });
+  } catch (err) {
+    return res.status(500).json({ message: 'Unable to logout right now.' });
+  }
 };
 
 const sendPasswordResetOtp = async (req, res) => {
@@ -491,8 +607,12 @@ const getMe = async (req, res) => {
   if (!user) {
     return res.status(404).json({ message: 'User not found' });
   }
+  const userResponse = user.toObject();
+  userResponse.temporaryAccess = buildTemporaryAccessSnapshot(userResponse, {
+    isTemporarySession: Boolean(req.user?.temporaryAccessContext?.isTemporarySession),
+  });
 
-  res.json(user);
+  res.json(userResponse);
 };
 
 const updateProfile = async (req, res) => {
@@ -502,6 +622,15 @@ const updateProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+
+    const before = {
+      name: user.name,
+      phone: user.phone,
+      year: user.year,
+      branch: user.branch,
+      batch: user.batch,
+      avatarUrl: user.avatarUrl,
+    };
 
     if (Object.prototype.hasOwnProperty.call(req.body, 'name')) {
       const name = String(req.body.name || '').trim();
@@ -562,7 +691,7 @@ const updateProfile = async (req, res) => {
     if (Object.prototype.hasOwnProperty.call(req.body, 'avatarUrl')) {
       const avatarUrl = normalizeAvatarUrl(req.body.avatarUrl);
       if (avatarUrl === null) {
-        return res.status(400).json({ message: 'Profile picture URL must be a valid http/https URL.' });
+        return res.status(400).json({ message: 'Profile picture must be a valid http/https URL or uploaded image file.' });
       }
       user.avatarUrl = avatarUrl;
     }
@@ -604,6 +733,23 @@ const updateProfile = async (req, res) => {
     const userResponse = updatedUser.toObject();
     delete userResponse.password;
 
+    await logAudit({
+      actor: updatedUser._id,
+      action: 'USER_PROFILE_UPDATED',
+      entityType: 'User',
+      entityId: updatedUser._id,
+      before,
+      after: {
+        name: updatedUser.name,
+        phone: updatedUser.phone,
+        year: updatedUser.year,
+        branch: updatedUser.branch,
+        batch: updatedUser.batch,
+        avatarUrl: updatedUser.avatarUrl,
+      },
+      req,
+    });
+
     return res.json(userResponse);
   } catch (err) {
     return res.status(400).json({ message: err.message || 'Unable to update profile.' });
@@ -618,6 +764,7 @@ module.exports = {
   sendPasswordResetOtp,
   resetPasswordWithOtp,
   changePassword,
+  logoutUser,
   getMe,
   updateProfile,
 };

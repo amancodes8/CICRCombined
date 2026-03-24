@@ -9,6 +9,9 @@ import {
   sendInviteEmail,
   fetchPendingAdminActions,
   approveAdminAction,
+  fetchTemporaryAccessUsers,
+  grantTemporaryAccess,
+  revokeTemporaryAccess,
   fetchApplications,
   updateApplication,
   sendApplicationInvite,
@@ -22,7 +25,8 @@ import { DataEmpty, DataLoading } from '../components/DataState';
 import { 
   Shield, Trash2, UserPlus, Copy, Check, 
   Search, Mail, Send, Loader2, UserCheck, GraduationCap, Fingerprint,
-  ClipboardCheck, Crown, KeyRound, Megaphone, ScrollText, Download, ArrowUpDown, UserCog, GripVertical, ShieldAlert, X
+  ClipboardCheck, Crown, KeyRound, Megaphone, ScrollText, Download, ArrowUpDown,
+  UserCog, GripVertical, ShieldAlert, Sparkles, X
 } from 'lucide-react';
 
 const APPLICATION_STATUSES = ['New', 'InReview', 'Interview', 'Accepted', 'Selected', 'Rejected'];
@@ -164,6 +168,16 @@ export default function AdminPanel() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetCodeData, setResetCodeData] = useState(null);
   const [pendingActions, setPendingActions] = useState([]);
+  const [temporaryAccessRows, setTemporaryAccessRows] = useState([]);
+  const [temporaryAccessLoading, setTemporaryAccessLoading] = useState(true);
+  const [temporaryAccessBusy, setTemporaryAccessBusy] = useState(false);
+  const [temporaryRevokeBusyId, setTemporaryRevokeBusyId] = useState('');
+  const [temporaryAccessForm, setTemporaryAccessForm] = useState({
+    userId: '',
+    hours: 8,
+    mode: 'read-only',
+    sections: 'dashboard, projects, meetings, events, learning, programs, community, inventory, profile, guidelines',
+  });
   const [applications, setApplications] = useState([]);
   const [appFilter, setAppFilter] = useState(searchParams.get('appStatus') || 'All');
   const [appSearch, setAppSearch] = useState(searchParams.get('appQ') || '');
@@ -192,6 +206,7 @@ export default function AdminPanel() {
   useEffect(() => {
     loadUsers();
     loadPendingActions();
+    loadTemporaryAccessUsers();
     loadApplications();
     loadAuditLogs();
   }, []);
@@ -265,9 +280,10 @@ export default function AdminPanel() {
   const loadUsers = async () => {
     try {
       const { data } = await fetchMembers();
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : []);
     } catch (err) { 
       console.error("Failed to load users", err); 
+      setUsers([]);
     } finally { 
       setLoading(false); 
     }
@@ -279,6 +295,18 @@ export default function AdminPanel() {
       setPendingActions(Array.isArray(data) ? data : []);
     } catch (err) {
       // ignore
+    }
+  };
+
+  const loadTemporaryAccessUsers = async () => {
+    setTemporaryAccessLoading(true);
+    try {
+      const { data } = await fetchTemporaryAccessUsers();
+      setTemporaryAccessRows(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setTemporaryAccessRows([]);
+    } finally {
+      setTemporaryAccessLoading(false);
     }
   };
 
@@ -334,6 +362,78 @@ export default function AdminPanel() {
       )));
     } catch (err) {
       alert('Error updating approval status');
+    }
+  };
+
+  const handleIdCardToggle = async (userId, currentValue) => {
+    const enableNext = !currentValue;
+    const prompt = enableNext ? 'Enable this member ID card?' : 'Disable this member ID card?';
+    if (!window.confirm(prompt)) return;
+
+    try {
+      await updateUserByAdmin(userId, { idCardEnabled: enableNext });
+      setUsers((prev) =>
+        prev.map((u) => (String(u._id) === String(userId) ? { ...u, idCardEnabled: enableNext } : u))
+      );
+      dispatchToast(`ID card ${enableNext ? 'enabled' : 'disabled'} successfully.`, 'success');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update ID card visibility');
+    }
+  };
+
+  const grantTemporaryAccessForUser = async (userId, options = {}) => {
+    if (!userId) return;
+
+    const hours = Math.max(1, Math.min(168, Number(options.hours || temporaryAccessForm.hours || 8) || 8));
+    const sectionsRaw = String(options.sections || temporaryAccessForm.sections || '');
+    const allowedSections = sectionsRaw
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean)
+      .slice(0, 20);
+
+    setTemporaryAccessBusy(true);
+    try {
+      await grantTemporaryAccess(userId, {
+        hours,
+        mode: 'read-only',
+        restrictions: { allowedSections },
+      });
+      dispatchToast(`Temporary dashboard access granted for ${hours} hour(s).`, 'success');
+      setTemporaryAccessForm((prev) => ({ ...prev, userId: '' }));
+      await Promise.all([loadUsers(), loadTemporaryAccessUsers(), loadAuditLogs()]);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to grant temporary access');
+    } finally {
+      setTemporaryAccessBusy(false);
+    }
+  };
+
+  const handleGrantTemporaryAccess = async () => {
+    if (!temporaryAccessForm.userId) {
+      alert('Select a user first.');
+      return;
+    }
+    await grantTemporaryAccessForUser(temporaryAccessForm.userId);
+  };
+
+  const handleQuickTemporaryAccessGrant = async (userId) => {
+    const confirmed = window.confirm('Grant 8-hour read-only temporary dashboard access to this user?');
+    if (!confirmed) return;
+    await grantTemporaryAccessForUser(userId, { hours: 8 });
+  };
+
+  const handleRevokeTemporaryAccess = async (userId) => {
+    const reason = String(window.prompt('Reason for revoking this temporary access? (optional)') || '').trim();
+    setTemporaryRevokeBusyId(String(userId));
+    try {
+      await revokeTemporaryAccess(userId, { reason });
+      dispatchToast('Temporary access revoked.', 'success');
+      await Promise.all([loadUsers(), loadTemporaryAccessUsers(), loadAuditLogs()]);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to revoke temporary access');
+    } finally {
+      setTemporaryRevokeBusyId('');
     }
   };
 
@@ -676,6 +776,15 @@ export default function AdminPanel() {
       (u.isVerified || String(u.approvalStatus || '').toLowerCase() === 'approved')
   );
 
+  const temporaryAccessEligibleUsers = users.filter((u) => {
+    const approval = String(u.approvalStatus || (u.isVerified ? 'Approved' : 'Pending')).toLowerCase();
+    const role = String(u.role || '').toLowerCase();
+    return approval !== 'approved' && approval !== 'rejected' && !['admin', 'head'].includes(role);
+  });
+
+  const safeTemporaryAccessRows = Array.isArray(temporaryAccessRows) ? temporaryAccessRows : [];
+  const activeTemporaryAccessCount = safeTemporaryAccessRows.filter((row) => row?.temporaryAccess?.isActive).length;
+
   const resetEligibleUsers = users.filter((u) => String(u.approvalStatus || '').toLowerCase() !== 'rejected');
   const inviteExpiryLabel = useMemo(() => {
     const raw = inviteMeta?.expiresAt;
@@ -817,6 +926,7 @@ export default function AdminPanel() {
     { id: 'recruitment', label: 'Recruitment', icon: ClipboardCheck },
     { id: 'broadcast', label: 'Broadcast', icon: Megaphone },
     { id: 'audit', label: 'Audit', icon: ScrollText },
+    { id: 'temp-access', label: 'Temp Access', icon: Sparkles },
   ];
 
   const approvalSummary = useMemo(() => {
@@ -876,6 +986,13 @@ export default function AdminPanel() {
       hint: `${recruitmentSummary.interview} interview • ${recruitmentSummary.selected} selected`,
       tone: 'cyan',
     },
+    {
+      id: 'temporary-access',
+      label: 'Active Temp Access',
+      value: activeTemporaryAccessCount,
+      hint: `${temporaryAccessEligibleUsers.length} pending users eligible`,
+      tone: activeTemporaryAccessCount > 0 ? 'emerald' : 'cyan',
+    },
   ];
 
   return (
@@ -927,7 +1044,7 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 section-motion section-motion-delay-2">
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 section-motion section-motion-delay-2">
         {adminKpis.map((tile) => (
           <AdminKpiTile
             key={tile.id}
@@ -992,6 +1109,136 @@ export default function AdminPanel() {
             </motion.div>
           )}
         </AnimatePresence>
+      )}
+
+      {adminTab === 'temp-access' && (
+      <AdminSectionShell
+        icon={Sparkles}
+        title="Temporary Dashboard Access Passes"
+        subtitle="Grant pending users a read-only pass with strict expiry and instant revocation controls."
+        badge={`${activeTemporaryAccessCount} active`}
+        className="section-motion section-motion-delay-2"
+        actions={(
+          <button type="button" onClick={loadTemporaryAccessUsers} className="btn btn-ghost !px-3 !py-1.5">
+            Refresh Passes
+          </button>
+        )}
+      >
+        <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-5">
+          <div className="rounded-2xl border border-cyan-500/35 bg-linear-to-br from-cyan-500/15 via-[#081018] to-[#05080f] p-4 md:p-5 space-y-3">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200 font-black">Create Access Pass</p>
+            <select
+              value={temporaryAccessForm.userId}
+              onChange={(e) => setTemporaryAccessForm((prev) => ({ ...prev, userId: e.target.value }))}
+              className="ui-input [color-scheme:dark]"
+            >
+              <option value="">Select pending member</option>
+              {temporaryAccessEligibleUsers.map((u) => (
+                <option key={u._id} value={u._id}>
+                  {u.name} ({u.collegeId || 'NO-ID'})
+                </option>
+              ))}
+            </select>
+
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs text-gray-400">Duration (hours)</label>
+              <label className="text-xs text-gray-400">Mode</label>
+              <input
+                type="number"
+                min={1}
+                max={168}
+                value={temporaryAccessForm.hours}
+                onChange={(e) => setTemporaryAccessForm((prev) => ({ ...prev, hours: e.target.value }))}
+                className="ui-input"
+              />
+              <select
+                value={temporaryAccessForm.mode}
+                onChange={(e) => setTemporaryAccessForm((prev) => ({ ...prev, mode: e.target.value }))}
+                className="ui-input [color-scheme:dark]"
+              >
+                <option value="read-only">Read-only</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-400">Allowed sections (comma-separated)</label>
+              <textarea
+                rows={3}
+                value={temporaryAccessForm.sections}
+                onChange={(e) => setTemporaryAccessForm((prev) => ({ ...prev, sections: e.target.value }))}
+                className="ui-input resize-none mt-1"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGrantTemporaryAccess}
+              disabled={temporaryAccessBusy || !temporaryAccessForm.userId}
+              className="btn btn-secondary !w-full !text-cyan-100 !border-cyan-500/45 !bg-cyan-500/10"
+            >
+              {temporaryAccessBusy ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+              Grant Temporary Access
+            </button>
+          </div>
+
+          <div className="rounded-2xl border border-gray-800 bg-[#0a0f17]/70 overflow-hidden">
+            <div className="grid grid-cols-[minmax(180px,1.2fr)_minmax(160px,1fr)_140px_120px_130px] gap-3 px-4 py-3 border-b border-gray-800 text-[10px] uppercase tracking-[0.16em] text-gray-500 font-black">
+              <span>Member</span>
+              <span>Pass Window</span>
+              <span>Status</span>
+              <span>Mode</span>
+              <span className="text-right">Action</span>
+            </div>
+            {temporaryAccessLoading ? (
+              <div className="p-5"><DataLoading label="Loading temporary access passes..." /></div>
+            ) : safeTemporaryAccessRows.length === 0 ? (
+              <div className="p-5">
+                <DataEmpty title="No temporary passes" hint="Grant a pass to allow pending users controlled read-only access." />
+              </div>
+            ) : (
+              <div className="max-h-[340px] overflow-auto divide-y divide-gray-800/60">
+                {safeTemporaryAccessRows.map((row) => {
+                  const temp = row.temporaryAccess || {};
+                  const expiryLabel = temp.expiresAt ? new Date(temp.expiresAt).toLocaleString() : 'N/A';
+                  return (
+                    <div
+                      key={row._id}
+                      className="grid grid-cols-[minmax(180px,1.2fr)_minmax(160px,1fr)_140px_120px_130px] gap-3 px-4 py-3 items-center"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-gray-100 truncate">{row.name}</p>
+                        <p className="text-[11px] text-gray-500 truncate">{row.collegeId || 'NO-ID'} • {row.email || 'No email'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-200">Expires {expiryLabel}</p>
+                        <p className="text-[11px] text-gray-500">{temp.remainingMinutes || 0} min left</p>
+                      </div>
+                      <div>
+                        <span
+                          className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded-lg border ${temp.isActive ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10' : 'text-rose-300 border-rose-500/40 bg-rose-500/10'}`}
+                        >
+                          {temp.isActive ? 'Active' : 'Expired'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-cyan-200 uppercase tracking-wider">{temp.mode || 'read-only'}</div>
+                      <div className="text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeTemporaryAccess(row._id)}
+                          disabled={temporaryRevokeBusyId === String(row._id)}
+                          className="btn btn-danger !px-3 !py-1.5 !text-[10px]"
+                        >
+                          {temporaryRevokeBusyId === String(row._id) ? <Loader2 size={12} className="animate-spin" /> : 'Revoke'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </AdminSectionShell>
       )}
 
       {adminTab === 'users' && (
@@ -1112,13 +1359,14 @@ export default function AdminPanel() {
               ))}
             </select>
             <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
               <input
                 value={appSearch}
                 onChange={(e) => setAppSearch(e.target.value)}
                 placeholder="Search applicants..."
                 aria-label="Search applicants"
                 className="ui-input !text-xs !pl-10 !py-2 !pr-3 min-w-[220px]"
+                style={{ paddingLeft: '2.75rem' }}
               />
             </div>
           </div>
@@ -1363,9 +1611,9 @@ export default function AdminPanel() {
         <AdminSectionShell
           icon={ScrollText}
           title="Audit Trail"
-          subtitle="Recent privileged actions across admin operations."
+          subtitle="Complete activity log including sign-in, sign-out, profile updates, and admin actions."
           badge={`${auditRows.length} records`}
-          className="max-w-4xl"
+          className="max-w-6xl"
           actions={(
             <button
               type="button"
@@ -1379,21 +1627,35 @@ export default function AdminPanel() {
           {auditLoading ? (
             <DataLoading label="Loading audit log..." />
           ) : (
-            <div className="max-h-[360px] overflow-auto space-y-2 pr-1">
-              {auditRows.map((row) => (
-                <div key={row._id} className="border border-gray-800 rounded-xl px-3 py-2.5 bg-[#0a0f17]/65">
-                  <p className="text-xs text-white font-semibold">{row.action}</p>
-                  <p className="text-[11px] text-gray-500 mt-1">
-                    {row.actor?.name || 'System'} ({row.actor?.role || 'N/A'}) • {new Date(row.createdAt).toLocaleString()}
-                  </p>
-                  <p className="text-[10px] text-gray-600 uppercase tracking-widest mt-1">
-                    {row.entityType} {row.entityId ? `• ${row.entityId}` : ''}
-                  </p>
-                </div>
-              ))}
-              {auditRows.length === 0 && (
-                <DataEmpty label="No audit entries found." />
-              )}
+            <div className="max-h-[420px] overflow-auto pr-1">
+              <table className="w-full text-left border-collapse min-w-[980px]">
+                <thead className="sticky top-0 bg-[#0b111a]/95 border-b border-gray-800 z-10">
+                  <tr>
+                    <th className="px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500">Name</th>
+                    <th className="px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500">Action</th>
+                    <th className="px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500">Time</th>
+                    <th className="px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500">Year</th>
+                    <th className="px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500">Role</th>
+                    <th className="px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500">Entity</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800/60">
+                  {auditRows.map((row) => (
+                    <tr key={row._id} className="bg-[#0a0f17]/55 hover:bg-[#0f1826]/60">
+                      <td className="px-3 py-2.5 text-sm text-gray-100">
+                        <div className="font-semibold">{row.actor?.name || 'System'}</div>
+                        <div className="text-[11px] text-gray-500">{row.actor?.collegeId || 'N/A'}</div>
+                      </td>
+                      <td className="px-3 py-2.5 text-[12px] text-cyan-200 font-semibold">{row.action}</td>
+                      <td className="px-3 py-2.5 text-[12px] text-gray-300">{new Date(row.createdAt).toLocaleString()}</td>
+                      <td className="px-3 py-2.5 text-[12px] text-gray-300">{Number.isFinite(Number(row.actor?.year)) ? row.actor.year : 'N/A'}</td>
+                      <td className="px-3 py-2.5 text-[12px] text-gray-300">{row.actor?.role || 'N/A'}</td>
+                      <td className="px-3 py-2.5 text-[11px] text-gray-400">{row.entityType} {row.entityId ? `• ${row.entityId}` : ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {auditRows.length === 0 && <DataEmpty label="No audit entries found." />}
             </div>
           )}
         </AdminSectionShell>
@@ -1428,13 +1690,14 @@ export default function AdminPanel() {
               <div className="w-full flex flex-col gap-2">
                 <div className="flex flex-col lg:flex-row gap-2">
                   <div className="relative flex-1 min-w-[220px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                    <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
                     <input
                       type="text"
                       placeholder="Search name, reg no, email..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="ui-input pl-10"
+                      style={{ paddingLeft: '2.75rem' }}
                     />
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -1610,6 +1873,14 @@ export default function AdminPanel() {
                                   <Fingerprint size={10} className="text-blue-500" /> {u.collegeId || 'NO-REG'}
                                 </span>
                                 <span className="text-[10px] text-gray-600">{u.email || 'No email'}</span>
+                                <span className={`text-[10px] font-black uppercase tracking-[0.18em] px-2 py-1 rounded-lg border ${u.idCardEnabled !== false ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10' : 'text-rose-300 border-rose-500/40 bg-rose-500/10'}`}>
+                                  Card {u.idCardEnabled !== false ? 'On' : 'Off'}
+                                </span>
+                                {u.temporaryAccess?.isActive ? (
+                                  <span className="text-[10px] font-black uppercase tracking-[0.18em] px-2 py-1 rounded-lg border text-amber-200 border-amber-500/35 bg-amber-500/10">
+                                    Temp Pass {Math.max(0, Number(u.temporaryAccess?.remainingMinutes || 0))}m
+                                  </span>
+                                ) : null}
                               </div>
                             </div>
                           </div>
@@ -1656,6 +1927,29 @@ export default function AdminPanel() {
                       {visibleColumns.includes('actions') && (
                         <td className="p-4 text-right">
                           <div className="inline-flex items-center gap-1">
+                            <button
+                              aria-label="Toggle ID card visibility"
+                              onClick={() => handleIdCardToggle(u._id, u.idCardEnabled !== false)}
+                              className={`px-3 py-2 rounded-xl transition-all text-[11px] font-black uppercase tracking-[0.12em] border ${u.idCardEnabled !== false ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20' : 'text-cyan-200 border-cyan-500/35 bg-cyan-500/10 hover:bg-cyan-500/20'}`}
+                              title={u.idCardEnabled !== false ? 'Disable ID card' : 'Enable ID card'}
+                            >
+                              {u.idCardEnabled !== false ? 'Deactivate Card' : 'Activate Card'}
+                            </button>
+                            {String(u.approvalStatus || (u.isVerified ? 'Approved' : 'Pending')).toLowerCase() !== 'approved' &&
+                              !['admin', 'head'].includes(String(u.role || '').toLowerCase()) && (
+                              <button
+                                aria-label={u.temporaryAccess?.isActive ? 'Revoke temporary access' : 'Grant temporary access'}
+                                onClick={() =>
+                                  u.temporaryAccess?.isActive
+                                    ? handleRevokeTemporaryAccess(u._id)
+                                    : handleQuickTemporaryAccessGrant(u._id)
+                                }
+                                className={`px-3 py-2 rounded-xl transition-all text-[11px] font-black uppercase tracking-[0.12em] border ${u.temporaryAccess?.isActive ? 'text-rose-200 border-rose-500/35 bg-rose-500/10 hover:bg-rose-500/20' : 'text-amber-200 border-amber-500/35 bg-amber-500/10 hover:bg-amber-500/20'}`}
+                                title={u.temporaryAccess?.isActive ? 'Revoke temporary pass' : 'Grant 8h temporary pass'}
+                              >
+                                {u.temporaryAccess?.isActive ? 'Revoke Pass' : 'Grant 8h Pass'}
+                              </button>
+                            )}
                             <button
                               aria-label="Generate password reset code"
                               onClick={() => handleGenerateResetCode(u._id, u.name)}
